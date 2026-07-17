@@ -1,0 +1,8 @@
+src/
+scripts/
+openspec/
+.opencode/
+tsconfig.json
+*.md
+!src/best-practices.md
+.gitignore

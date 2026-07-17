@@ -1,0 +1,40 @@
+{
+  "name": "@pnp/powershell-mcp-server",
+  "version": "0.1.0",
+  "mcpName": "io.github.pnp/pnp-powershell-mcp-server",
+  "description": "Model Context Protocol (MCP) server for PnP.PowerShell that allows using natural language to manage your Microsoft 365 tenant via PnP.PowerShell cmdlets.",
+  "author": "Microsoft 365 & Power Platform Community",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "bin": {
+    "pnp-powershell-mcp-server": "dist/index.js"
+  },
+  "type": "module",
+  "keywords": [
+    "Microsoft365",
+    "SharePointOnline",
+    "PnP",
+    "PowerShell",
+    "mcp",
+    "model-context-protocol",
+    "pnp-powershell"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsc && cp src/cmdlet-index.json dist/cmdlet-index.json && cp src/best-practices.md dist/best-practices.md",
+    "build:index": "node --loader ts-node/esm scripts/build-index.ts",
+    "start": "node dist/index.js",
+    "inspect": "npx -y @modelcontextprotocol/inspector node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.27.1",
+    "fuse.js": "7.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "10.9.2",
+    "typescript": "5.4.5"
+  }
+}

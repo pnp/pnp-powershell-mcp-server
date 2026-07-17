@@ -1,0 +1,12 @@
+{
+  "mame": "pnp-powershell-mcp-server",
+  "displayName": "PnP PowerShell MCP Server",
+  "version": "0.1.0",
+  "description": "MCP server that exposes PnP.PowerShell cmdlets to AI agents for natural-language Microsoft 365 management",
+  "author": {
+    "name": "Microsoft 365 & Power Platform Community"
+  },
+  "license": "MIT",
+  "keywords": ["Microsoft365", "SharePointOnline", "PnP", "PowerShell", "mcp"],
+  "runtimes": ["node"]
+}

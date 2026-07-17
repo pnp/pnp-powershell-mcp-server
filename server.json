@@ -1,0 +1,27 @@
+{
+  "id": "pnp-powershell-mcp-server",
+  "name": "PnP PowerShell MCP Server",
+  "description": "Model Context Protocol server for PnP.PowerShell. Enables AI agents to search, document, and execute PnP.PowerShell cmdlets for Microsoft 365 management.",
+  "version": "0.1.0",
+  "type": "stdio",
+  "command": "npx",
+  "args": ["-y", "@pnp/powershell-mcp-server@latest"],
+  "tools": [
+    {
+      "name": "pnpSearchCmdlets",
+      "description": "Fuzzy search PnP.PowerShell cmdlets by name or description"
+    },
+    {
+      "name": "pnpGetCmdletDocs",
+      "description": "Retrieve full documentation for a PnP.PowerShell cmdlet"
+    },
+    {
+      "name": "pnpRunCmdlet",
+      "description": "Execute a PnP.PowerShell expression and return the output"
+    },
+    {
+      "name": "pnpGetBestPractices",
+      "description": "Get best practices for using PnP.PowerShell in AI-driven automation"
+    }
+  ]
+}

@@ -1,0 +1,4452 @@
+[
+  {
+    "name": "Add-PnPAdaptiveScopeProperty",
+    "synopsis": "Adds PnP Adaptive Scope Property",
+    "docsPath": "cmdlets/Add-PnPAdaptiveScopeProperty.html"
+  },
+  {
+    "name": "Add-PnPAlert",
+    "synopsis": "Adds PnP Alert",
+    "docsPath": "cmdlets/Add-PnPAlert.html"
+  },
+  {
+    "name": "Add-PnPApp",
+    "synopsis": "Adds PnP App",
+    "docsPath": "cmdlets/Add-PnPApp.html"
+  },
+  {
+    "name": "Add-PnPApplicationCustomizer",
+    "synopsis": "Adds PnP Application Customizer",
+    "docsPath": "cmdlets/Add-PnPApplicationCustomizer.html"
+  },
+  {
+    "name": "Add-PnPAvailableSiteClassification",
+    "synopsis": "Adds PnP Available Site Classification",
+    "docsPath": "cmdlets/Add-PnPAvailableSiteClassification.html"
+  },
+  {
+    "name": "Add-PnPAzureADGroupMember",
+    "synopsis": "Adds PnP Azure A D Group Member",
+    "docsPath": "cmdlets/Add-PnPAzureADGroupMember.html"
+  },
+  {
+    "name": "Add-PnPAzureADGroupOwner",
+    "synopsis": "Adds PnP Azure A D Group Owner",
+    "docsPath": "cmdlets/Add-PnPAzureADGroupOwner.html"
+  },
+  {
+    "name": "Add-PnPAzureADServicePrincipalAppRole",
+    "synopsis": "Adds PnP Azure A D Service Principal App Role",
+    "docsPath": "cmdlets/Add-PnPAzureADServicePrincipalAppRole.html"
+  },
+  {
+    "name": "Add-PnPAzureADServicePrincipalAppRoleAssignment",
+    "synopsis": "Adds PnP Azure A D Service Principal App Role Assignment",
+    "docsPath": "cmdlets/Add-PnPAzureADServicePrincipalAppRoleAssignment.html"
+  },
+  {
+    "name": "Add-PnPBrandCenterFont",
+    "synopsis": "Adds PnP Brand Center Font",
+    "docsPath": "cmdlets/Add-PnPBrandCenterFont.html"
+  },
+  {
+    "name": "Add-PnPBrandCenterFontPackage",
+    "synopsis": "Adds PnP Brand Center Font Package",
+    "docsPath": "cmdlets/Add-PnPBrandCenterFontPackage.html"
+  },
+  {
+    "name": "Add-PnPContentType",
+    "synopsis": "Adds PnP Content Type",
+    "docsPath": "cmdlets/Add-PnPContentType.html"
+  },
+  {
+    "name": "Add-PnPContentTypesFromContentTypeHub",
+    "synopsis": "Adds PnP Content Types From Content Type Hub",
+    "docsPath": "cmdlets/Add-PnPContentTypesFromContentTypeHub.html"
+  },
+  {
+    "name": "Add-PnPContentTypeToDocumentSet",
+    "synopsis": "Adds PnP Content Type To Document Set",
+    "docsPath": "cmdlets/Add-PnPContentTypeToDocumentSet.html"
+  },
+  {
+    "name": "Add-PnPContentTypeToList",
+    "synopsis": "Adds PnP Content Type To List",
+    "docsPath": "cmdlets/Add-PnPContentTypeToList.html"
+  },
+  {
+    "name": "Add-PnPCustomAction",
+    "synopsis": "Adds PnP Custom Action",
+    "docsPath": "cmdlets/Add-PnPCustomAction.html"
+  },
+  {
+    "name": "Add-PnPDataRowsToSiteTemplate",
+    "synopsis": "Adds PnP Data Rows To Site Template",
+    "docsPath": "cmdlets/Add-PnPDataRowsToSiteTemplate.html"
+  },
+  {
+    "name": "Add-PnPDocumentSet",
+    "synopsis": "Adds PnP Document Set",
+    "docsPath": "cmdlets/Add-PnPDocumentSet.html"
+  },
+  {
+    "name": "Add-PnPEntraIDGroupMember",
+    "synopsis": "Adds PnP Entra I D Group Member",
+    "docsPath": "cmdlets/Add-PnPEntraIDGroupMember.html"
+  },
+  {
+    "name": "Add-PnPEntraIDGroupOwner",
+    "synopsis": "Adds PnP Entra I D Group Owner",
+    "docsPath": "cmdlets/Add-PnPEntraIDGroupOwner.html"
+  },
+  {
+    "name": "Add-PnPEntraIDServicePrincipalAppRole",
+    "synopsis": "Adds PnP Entra I D Service Principal App Role",
+    "docsPath": "cmdlets/Add-PnPEntraIDServicePrincipalAppRole.html"
+  },
+  {
+    "name": "Add-PnPEntraIDServicePrincipalAppRoleAssignment",
+    "synopsis": "Adds PnP Entra I D Service Principal App Role Assignment",
+    "docsPath": "cmdlets/Add-PnPEntraIDServicePrincipalAppRoleAssignment.html"
+  },
+  {
+    "name": "Add-PnPEventReceiver",
+    "synopsis": "Adds PnP Event Receiver",
+    "docsPath": "cmdlets/Add-PnPEventReceiver.html"
+  },
+  {
+    "name": "Add-PnPField",
+    "synopsis": "Adds PnP Field",
+    "docsPath": "cmdlets/Add-PnPField.html"
+  },
+  {
+    "name": "Add-PnPFieldFromXml",
+    "synopsis": "Adds PnP Field From Xml",
+    "docsPath": "cmdlets/Add-PnPFieldFromXml.html"
+  },
+  {
+    "name": "Add-PnPFieldToContentType",
+    "synopsis": "Adds PnP Field To Content Type",
+    "docsPath": "cmdlets/Add-PnPFieldToContentType.html"
+  },
+  {
+    "name": "Add-PnPFile",
+    "synopsis": "Adds PnP File",
+    "docsPath": "cmdlets/Add-PnPFile.html"
+  },
+  {
+    "name": "Add-PnPFileAnonymousSharingLink",
+    "synopsis": "Adds PnP File Anonymous Sharing Link",
+    "docsPath": "cmdlets/Add-PnPFileAnonymousSharingLink.html"
+  },
+  {
+    "name": "Add-PnPFileOrganizationalSharingLink",
+    "synopsis": "Adds PnP File Organizational Sharing Link",
+    "docsPath": "cmdlets/Add-PnPFileOrganizationalSharingLink.html"
+  },
+  {
+    "name": "Add-PnPFileSensitivityLabel",
+    "synopsis": "Adds PnP File Sensitivity Label",
+    "docsPath": "cmdlets/Add-PnPFileSensitivityLabel.html"
+  },
+  {
+    "name": "Add-PnPFileSharingInvite",
+    "synopsis": "Adds PnP File Sharing Invite",
+    "docsPath": "cmdlets/Add-PnPFileSharingInvite.html"
+  },
+  {
+    "name": "Add-PnPFileToSiteTemplate",
+    "synopsis": "Adds PnP File To Site Template",
+    "docsPath": "cmdlets/Add-PnPFileToSiteTemplate.html"
+  },
+  {
+    "name": "Add-PnPFileUserSharingLink",
+    "synopsis": "Adds PnP File User Sharing Link",
+    "docsPath": "cmdlets/Add-PnPFileUserSharingLink.html"
+  },
+  {
+    "name": "Add-PnPFlowOwner",
+    "synopsis": "Adds PnP Flow Owner",
+    "docsPath": "cmdlets/Add-PnPFlowOwner.html"
+  },
+  {
+    "name": "Add-PnPFolder",
+    "synopsis": "Adds PnP Folder",
+    "docsPath": "cmdlets/Add-PnPFolder.html"
+  },
+  {
+    "name": "Add-PnPFolderAnonymousSharingLink",
+    "synopsis": "Adds PnP Folder Anonymous Sharing Link",
+    "docsPath": "cmdlets/Add-PnPFolderAnonymousSharingLink.html"
+  },
+  {
+    "name": "Add-PnPFolderOrganizationalSharingLink",
+    "synopsis": "Adds PnP Folder Organizational Sharing Link",
+    "docsPath": "cmdlets/Add-PnPFolderOrganizationalSharingLink.html"
+  },
+  {
+    "name": "Add-PnPFolderSharingInvite",
+    "synopsis": "Adds PnP Folder Sharing Invite",
+    "docsPath": "cmdlets/Add-PnPFolderSharingInvite.html"
+  },
+  {
+    "name": "Add-PnPFolderUserSharingLink",
+    "synopsis": "Adds PnP Folder User Sharing Link",
+    "docsPath": "cmdlets/Add-PnPFolderUserSharingLink.html"
+  },
+  {
+    "name": "Add-PnPGeoAdministrator",
+    "synopsis": "Adds PnP Geo Administrator",
+    "docsPath": "cmdlets/Add-PnPGeoAdministrator.html"
+  },
+  {
+    "name": "Add-PnPGroupMember",
+    "synopsis": "Adds PnP Group Member",
+    "docsPath": "cmdlets/Add-PnPGroupMember.html"
+  },
+  {
+    "name": "Add-PnPHomeSite",
+    "synopsis": "Adds PnP Home Site",
+    "docsPath": "cmdlets/Add-PnPHomeSite.html"
+  },
+  {
+    "name": "Add-PnPHtmlPublishingPageLayout",
+    "synopsis": "Adds PnP Html Publishing Page Layout",
+    "docsPath": "cmdlets/Add-PnPHtmlPublishingPageLayout.html"
+  },
+  {
+    "name": "Add-PnPHubSiteAssociation",
+    "synopsis": "Adds PnP Hub Site Association",
+    "docsPath": "cmdlets/Add-PnPHubSiteAssociation.html"
+  },
+  {
+    "name": "Add-PnPHubToHubAssociation",
+    "synopsis": "Adds PnP Hub To Hub Association",
+    "docsPath": "cmdlets/Add-PnPHubToHubAssociation.html"
+  },
+  {
+    "name": "Add-PnPIndexedProperty",
+    "synopsis": "Adds PnP Indexed Property",
+    "docsPath": "cmdlets/Add-PnPIndexedProperty.html"
+  },
+  {
+    "name": "Add-PnPJavaScriptBlock",
+    "synopsis": "Adds PnP Java Script Block",
+    "docsPath": "cmdlets/Add-PnPJavaScriptBlock.html"
+  },
+  {
+    "name": "Add-PnPJavaScriptLink",
+    "synopsis": "Adds PnP Java Script Link",
+    "docsPath": "cmdlets/Add-PnPJavaScriptLink.html"
+  },
+  {
+    "name": "Add-PnPListDesign",
+    "synopsis": "Adds PnP List Design",
+    "docsPath": "cmdlets/Add-PnPListDesign.html"
+  },
+  {
+    "name": "Add-PnPListFoldersToSiteTemplate",
+    "synopsis": "Adds PnP List Folders To Site Template",
+    "docsPath": "cmdlets/Add-PnPListFoldersToSiteTemplate.html"
+  },
+  {
+    "name": "Add-PnPListItem",
+    "synopsis": "Adds PnP List Item",
+    "docsPath": "cmdlets/Add-PnPListItem.html"
+  },
+  {
+    "name": "Add-PnPListItemAttachment",
+    "synopsis": "Adds PnP List Item Attachment",
+    "docsPath": "cmdlets/Add-PnPListItemAttachment.html"
+  },
+  {
+    "name": "Add-PnPListItemComment",
+    "synopsis": "Adds PnP List Item Comment",
+    "docsPath": "cmdlets/Add-PnPListItemComment.html"
+  },
+  {
+    "name": "Add-PnPMasterPage",
+    "synopsis": "Adds PnP Master Page",
+    "docsPath": "cmdlets/Add-PnPMasterPage.html"
+  },
+  {
+    "name": "Add-PnPMicrosoft365GroupMember",
+    "synopsis": "Adds PnP Microsoft365 Group Member",
+    "docsPath": "cmdlets/Add-PnPMicrosoft365GroupMember.html"
+  },
+  {
+    "name": "Add-PnPMicrosoft365GroupOwner",
+    "synopsis": "Adds PnP Microsoft365 Group Owner",
+    "docsPath": "cmdlets/Add-PnPMicrosoft365GroupOwner.html"
+  },
+  {
+    "name": "Add-PnPMicrosoft365GroupToSite",
+    "synopsis": "Adds PnP Microsoft365 Group To Site",
+    "docsPath": "cmdlets/Add-PnPMicrosoft365GroupToSite.html"
+  },
+  {
+    "name": "Add-PnPNavigationNode",
+    "synopsis": "Adds PnP Navigation Node",
+    "docsPath": "cmdlets/Add-PnPNavigationNode.html"
+  },
+  {
+    "name": "Add-PnPOrgAssetsLibrary",
+    "synopsis": "Adds PnP Org Assets Library",
+    "docsPath": "cmdlets/Add-PnPOrgAssetsLibrary.html"
+  },
+  {
+    "name": "Add-PnPOrgNewsSite",
+    "synopsis": "Adds PnP Org News Site",
+    "docsPath": "cmdlets/Add-PnPOrgNewsSite.html"
+  },
+  {
+    "name": "Add-PnPPage",
+    "synopsis": "Adds PnP Page",
+    "docsPath": "cmdlets/Add-PnPPage.html"
+  },
+  {
+    "name": "Add-PnPPageImageWebPart",
+    "synopsis": "Adds PnP Page Image Web Part",
+    "docsPath": "cmdlets/Add-PnPPageImageWebPart.html"
+  },
+  {
+    "name": "Add-PnPPageSection",
+    "synopsis": "Adds PnP Page Section",
+    "docsPath": "cmdlets/Add-PnPPageSection.html"
+  },
+  {
+    "name": "Add-PnPPageTextPart",
+    "synopsis": "Adds PnP Page Text Part",
+    "docsPath": "cmdlets/Add-PnPPageTextPart.html"
+  },
+  {
+    "name": "Add-PnPPageWebPart",
+    "synopsis": "Adds PnP Page Web Part",
+    "docsPath": "cmdlets/Add-PnPPageWebPart.html"
+  },
+  {
+    "name": "Add-PnPPlannerBucket",
+    "synopsis": "Adds PnP Planner Bucket",
+    "docsPath": "cmdlets/Add-PnPPlannerBucket.html"
+  },
+  {
+    "name": "Add-PnPPlannerRoster",
+    "synopsis": "Adds PnP Planner Roster",
+    "docsPath": "cmdlets/Add-PnPPlannerRoster.html"
+  },
+  {
+    "name": "Add-PnPPlannerRosterMember",
+    "synopsis": "Adds PnP Planner Roster Member",
+    "docsPath": "cmdlets/Add-PnPPlannerRosterMember.html"
+  },
+  {
+    "name": "Add-PnPPlannerTask",
+    "synopsis": "Adds PnP Planner Task",
+    "docsPath": "cmdlets/Add-PnPPlannerTask.html"
+  },
+  {
+    "name": "Add-PnPPropertyBagValue",
+    "synopsis": "Adds PnP Property Bag Value",
+    "docsPath": "cmdlets/Add-PnPPropertyBagValue.html"
+  },
+  {
+    "name": "Add-PnPPublishingImageRendition",
+    "synopsis": "Adds PnP Publishing Image Rendition",
+    "docsPath": "cmdlets/Add-PnPPublishingImageRendition.html"
+  },
+  {
+    "name": "Add-PnPPublishingPage",
+    "synopsis": "Adds PnP Publishing Page",
+    "docsPath": "cmdlets/Add-PnPPublishingPage.html"
+  },
+  {
+    "name": "Add-PnPPublishingPageLayout",
+    "synopsis": "Adds PnP Publishing Page Layout",
+    "docsPath": "cmdlets/Add-PnPPublishingPageLayout.html"
+  },
+  {
+    "name": "Add-PnPRoleDefinition",
+    "synopsis": "Adds PnP Role Definition",
+    "docsPath": "cmdlets/Add-PnPRoleDefinition.html"
+  },
+  {
+    "name": "Add-PnPSiteClassification",
+    "synopsis": "Adds PnP Site Classification",
+    "docsPath": "cmdlets/Add-PnPSiteClassification.html"
+  },
+  {
+    "name": "Add-PnPSiteCollectionAdmin",
+    "synopsis": "Adds PnP Site Collection Admin",
+    "docsPath": "cmdlets/Add-PnPSiteCollectionAdmin.html"
+  },
+  {
+    "name": "Add-PnPSiteCollectionAppCatalog",
+    "synopsis": "Adds PnP Site Collection App Catalog",
+    "docsPath": "cmdlets/Add-PnPSiteCollectionAppCatalog.html"
+  },
+  {
+    "name": "Add-PnPSiteDesign",
+    "synopsis": "Adds PnP Site Design",
+    "docsPath": "cmdlets/Add-PnPSiteDesign.html"
+  },
+  {
+    "name": "Add-PnPSiteDesignFromWeb",
+    "synopsis": "Adds PnP Site Design From Web",
+    "docsPath": "cmdlets/Add-PnPSiteDesignFromWeb.html"
+  },
+  {
+    "name": "Add-PnPSiteDesignTask",
+    "synopsis": "Adds PnP Site Design Task",
+    "docsPath": "cmdlets/Add-PnPSiteDesignTask.html"
+  },
+  {
+    "name": "Add-PnPSiteScript",
+    "synopsis": "Adds PnP Site Script",
+    "docsPath": "cmdlets/Add-PnPSiteScript.html"
+  },
+  {
+    "name": "Add-PnPSiteScriptPackage",
+    "synopsis": "Adds PnP Site Script Package",
+    "docsPath": "cmdlets/Add-PnPSiteScriptPackage.html"
+  },
+  {
+    "name": "Add-PnPSiteTemplate",
+    "synopsis": "Adds PnP Site Template",
+    "docsPath": "cmdlets/Add-PnPSiteTemplate.html"
+  },
+  {
+    "name": "Add-PnPStoredCredential",
+    "synopsis": "Adds PnP Stored Credential",
+    "docsPath": "cmdlets/Add-PnPStoredCredential.html"
+  },
+  {
+    "name": "Add-PnPTaxonomyField",
+    "synopsis": "Adds PnP Taxonomy Field",
+    "docsPath": "cmdlets/Add-PnPTaxonomyField.html"
+  },
+  {
+    "name": "Add-PnPTeamsChannel",
+    "synopsis": "Adds PnP Teams Channel",
+    "docsPath": "cmdlets/Add-PnPTeamsChannel.html"
+  },
+  {
+    "name": "Add-PnPTeamsTab",
+    "synopsis": "Adds PnP Teams Tab",
+    "docsPath": "cmdlets/Add-PnPTeamsTab.html"
+  },
+  {
+    "name": "Add-PnPTeamsTeam",
+    "synopsis": "Adds PnP Teams Team",
+    "docsPath": "cmdlets/Add-PnPTeamsTeam.html"
+  },
+  {
+    "name": "Add-PnPTeamsUser",
+    "synopsis": "Adds PnP Teams User",
+    "docsPath": "cmdlets/Add-PnPTeamsUser.html"
+  },
+  {
+    "name": "Add-PnPTenantCdnOrigin",
+    "synopsis": "Adds PnP Tenant Cdn Origin",
+    "docsPath": "cmdlets/Add-PnPTenantCdnOrigin.html"
+  },
+  {
+    "name": "Add-PnPTenantRestrictedSearchAllowedList",
+    "synopsis": "Adds PnP Tenant Restricted Search Allowed List",
+    "docsPath": "cmdlets/Add-PnPTenantRestrictedSearchAllowedList.html"
+  },
+  {
+    "name": "Add-PnPTenantSearchCrawledProperty",
+    "synopsis": "Adds PnP Tenant Search Crawled Property",
+    "docsPath": "cmdlets/Add-PnPTenantSearchCrawledProperty.html"
+  },
+  {
+    "name": "Add-PnPTenantSequence",
+    "synopsis": "Adds PnP Tenant Sequence",
+    "docsPath": "cmdlets/Add-PnPTenantSequence.html"
+  },
+  {
+    "name": "Add-PnPTenantSequenceSite",
+    "synopsis": "Adds PnP Tenant Sequence Site",
+    "docsPath": "cmdlets/Add-PnPTenantSequenceSite.html"
+  },
+  {
+    "name": "Add-PnPTenantSequenceSubSite",
+    "synopsis": "Adds PnP Tenant Sequence Sub Site",
+    "docsPath": "cmdlets/Add-PnPTenantSequenceSubSite.html"
+  },
+  {
+    "name": "Add-PnPTenantTheme",
+    "synopsis": "Adds PnP Tenant Theme",
+    "docsPath": "cmdlets/Add-PnPTenantTheme.html"
+  },
+  {
+    "name": "Add-PnPTermToTerm",
+    "synopsis": "Adds PnP Term To Term",
+    "docsPath": "cmdlets/Add-PnPTermToTerm.html"
+  },
+  {
+    "name": "Add-PnPTodoTaskFileAttachment",
+    "synopsis": "Adds PnP Todo Task File Attachment",
+    "docsPath": "cmdlets/Add-PnPTodoTaskFileAttachment.html"
+  },
+  {
+    "name": "Add-PnPView",
+    "synopsis": "Adds PnP View",
+    "docsPath": "cmdlets/Add-PnPView.html"
+  },
+  {
+    "name": "Add-PnPViewsFromXML",
+    "synopsis": "Adds PnP Views From X M L",
+    "docsPath": "cmdlets/Add-PnPViewsFromXML.html"
+  },
+  {
+    "name": "Add-PnPVivaConnectionsDashboardACE",
+    "synopsis": "Adds PnP Viva Connections Dashboard A C E",
+    "docsPath": "cmdlets/Add-PnPVivaConnectionsDashboardACE.html"
+  },
+  {
+    "name": "Add-PnPWebhookSubscription",
+    "synopsis": "Adds PnP Webhook Subscription",
+    "docsPath": "cmdlets/Add-PnPWebhookSubscription.html"
+  },
+  {
+    "name": "Add-PnPWebPartToWebPartPage",
+    "synopsis": "Adds PnP Web Part To Web Part Page",
+    "docsPath": "cmdlets/Add-PnPWebPartToWebPartPage.html"
+  },
+  {
+    "name": "Add-PnPWebPartToWikiPage",
+    "synopsis": "Adds PnP Web Part To Wiki Page",
+    "docsPath": "cmdlets/Add-PnPWebPartToWikiPage.html"
+  },
+  {
+    "name": "Add-PnPWikiPage",
+    "synopsis": "Adds PnP Wiki Page",
+    "docsPath": "cmdlets/Add-PnPWikiPage.html"
+  },
+  {
+    "name": "Approve-PnPTenantServicePrincipalPermissionRequest",
+    "synopsis": "Approves PnP Tenant Service Principal Permission Request",
+    "docsPath": "cmdlets/Approve-PnPTenantServicePrincipalPermissionRequest.html"
+  },
+  {
+    "name": "Clear-PnPAzureADGroupMember",
+    "synopsis": "Clears PnP Azure A D Group Member",
+    "docsPath": "cmdlets/Clear-PnPAzureADGroupMember.html"
+  },
+  {
+    "name": "Clear-PnPAzureADGroupOwner",
+    "synopsis": "Clears PnP Azure A D Group Owner",
+    "docsPath": "cmdlets/Clear-PnPAzureADGroupOwner.html"
+  },
+  {
+    "name": "Clear-PnPDefaultColumnValues",
+    "synopsis": "Clears PnP Default Column Values",
+    "docsPath": "cmdlets/Clear-PnPDefaultColumnValues.html"
+  },
+  {
+    "name": "Clear-PnPEntraIDGroupMember",
+    "synopsis": "Clears PnP Entra I D Group Member",
+    "docsPath": "cmdlets/Clear-PnPEntraIDGroupMember.html"
+  },
+  {
+    "name": "Clear-PnPEntraIDGroupOwner",
+    "synopsis": "Clears PnP Entra I D Group Owner",
+    "docsPath": "cmdlets/Clear-PnPEntraIDGroupOwner.html"
+  },
+  {
+    "name": "Clear-PnPListItemAsRecord",
+    "synopsis": "Clears PnP List Item As Record",
+    "docsPath": "cmdlets/Clear-PnPListItemAsRecord.html"
+  },
+  {
+    "name": "Clear-PnPMicrosoft365GroupMember",
+    "synopsis": "Clears PnP Microsoft365 Group Member",
+    "docsPath": "cmdlets/Clear-PnPMicrosoft365GroupMember.html"
+  },
+  {
+    "name": "Clear-PnPMicrosoft365GroupOwner",
+    "synopsis": "Clears PnP Microsoft365 Group Owner",
+    "docsPath": "cmdlets/Clear-PnPMicrosoft365GroupOwner.html"
+  },
+  {
+    "name": "Clear-PnPTenantAppCatalogUrl",
+    "synopsis": "Clears PnP Tenant App Catalog Url",
+    "docsPath": "cmdlets/Clear-PnPTenantAppCatalogUrl.html"
+  },
+  {
+    "name": "Clear-PnPTenantRecycleBinItem",
+    "synopsis": "Clears PnP Tenant Recycle Bin Item",
+    "docsPath": "cmdlets/Clear-PnPTenantRecycleBinItem.html"
+  },
+  {
+    "name": "Clear-PnPTraceLog",
+    "synopsis": "Clears PnP Trace Log",
+    "docsPath": "cmdlets/Clear-PnPTraceLog.html"
+  },
+  {
+    "name": "Connect-PnPOnline",
+    "synopsis": "Connects PnP Online",
+    "docsPath": "cmdlets/Connect-PnPOnline.html"
+  },
+  {
+    "name": "Convert-PnPFile",
+    "synopsis": "Converts PnP File",
+    "docsPath": "cmdlets/Convert-PnPFile.html"
+  },
+  {
+    "name": "Convert-PnPFolderToSiteTemplate",
+    "synopsis": "Converts PnP Folder To Site Template",
+    "docsPath": "cmdlets/Convert-PnPFolderToSiteTemplate.html"
+  },
+  {
+    "name": "Convert-PnPSiteTemplate",
+    "synopsis": "Converts PnP Site Template",
+    "docsPath": "cmdlets/Convert-PnPSiteTemplate.html"
+  },
+  {
+    "name": "Convert-PnPSiteTemplateToMarkdown",
+    "synopsis": "Converts PnP Site Template To Markdown",
+    "docsPath": "cmdlets/Convert-PnPSiteTemplateToMarkdown.html"
+  },
+  {
+    "name": "ConvertTo-PnPPage",
+    "synopsis": "ConvertTo-PnPPage",
+    "docsPath": "cmdlets/ConvertTo-PnPPage.html"
+  },
+  {
+    "name": "Copy-PnPFile",
+    "synopsis": "Copies PnP File",
+    "docsPath": "cmdlets/Copy-PnPFile.html"
+  },
+  {
+    "name": "Copy-PnPFileMetadata",
+    "synopsis": "Copies PnP File Metadata",
+    "docsPath": "cmdlets/Copy-PnPFileMetadata.html"
+  },
+  {
+    "name": "Copy-PnPFolder",
+    "synopsis": "Copies PnP Folder",
+    "docsPath": "cmdlets/Copy-PnPFolder.html"
+  },
+  {
+    "name": "Copy-PnPItemProxy",
+    "synopsis": "Copies PnP Item Proxy",
+    "docsPath": "cmdlets/Copy-PnPItemProxy.html"
+  },
+  {
+    "name": "Copy-PnPList",
+    "synopsis": "Copies PnP List",
+    "docsPath": "cmdlets/Copy-PnPList.html"
+  },
+  {
+    "name": "Copy-PnPPage",
+    "synopsis": "Copies PnP Page",
+    "docsPath": "cmdlets/Copy-PnPPage.html"
+  },
+  {
+    "name": "Copy-PnPTeamsTeam",
+    "synopsis": "Copies PnP Teams Team",
+    "docsPath": "cmdlets/Copy-PnPTeamsTeam.html"
+  },
+  {
+    "name": "Deny-PnPTenantServicePrincipalPermissionRequest",
+    "synopsis": "Denies PnP Tenant Service Principal Permission Request",
+    "docsPath": "cmdlets/Deny-PnPTenantServicePrincipalPermissionRequest.html"
+  },
+  {
+    "name": "Disable-PnPFeature",
+    "synopsis": "Disables PnP Feature",
+    "docsPath": "cmdlets/Disable-PnPFeature.html"
+  },
+  {
+    "name": "Disable-PnPFlow",
+    "synopsis": "Disables PnP Flow",
+    "docsPath": "cmdlets/Disable-PnPFlow.html"
+  },
+  {
+    "name": "Disable-PnPPageScheduling",
+    "synopsis": "Disables PnP Page Scheduling",
+    "docsPath": "cmdlets/Disable-PnPPageScheduling.html"
+  },
+  {
+    "name": "Disable-PnPPowerShellTelemetry",
+    "synopsis": "Disables PnP Power Shell Telemetry",
+    "docsPath": "cmdlets/Disable-PnPPowerShellTelemetry.html"
+  },
+  {
+    "name": "Disable-PnPSharingForNonOwnersOfSite",
+    "synopsis": "Disables PnP Sharing For Non Owners Of Site",
+    "docsPath": "cmdlets/Disable-PnPSharingForNonOwnersOfSite.html"
+  },
+  {
+    "name": "Disable-PnPSiteClassification",
+    "synopsis": "Disables PnP Site Classification",
+    "docsPath": "cmdlets/Disable-PnPSiteClassification.html"
+  },
+  {
+    "name": "Disable-PnPTenantServicePrincipal",
+    "synopsis": "Disables PnP Tenant Service Principal",
+    "docsPath": "cmdlets/Disable-PnPTenantServicePrincipal.html"
+  },
+  {
+    "name": "Disconnect-PnPOnline",
+    "synopsis": "Disconnects PnP Online",
+    "docsPath": "cmdlets/Disconnect-PnPOnline.html"
+  },
+  {
+    "name": "Enable-PnPCommSite",
+    "synopsis": "Enables PnP Comm Site",
+    "docsPath": "cmdlets/Enable-PnPCommSite.html"
+  },
+  {
+    "name": "Enable-PnPFeature",
+    "synopsis": "Enables PnP Feature",
+    "docsPath": "cmdlets/Enable-PnPFeature.html"
+  },
+  {
+    "name": "Enable-PnPFlow",
+    "synopsis": "Enables PnP Flow",
+    "docsPath": "cmdlets/Enable-PnPFlow.html"
+  },
+  {
+    "name": "Enable-PnPPageScheduling",
+    "synopsis": "Enables PnP Page Scheduling",
+    "docsPath": "cmdlets/Enable-PnPPageScheduling.html"
+  },
+  {
+    "name": "Enable-PnPPowerShellTelemetry",
+    "synopsis": "Enables PnP Power Shell Telemetry",
+    "docsPath": "cmdlets/Enable-PnPPowerShellTelemetry.html"
+  },
+  {
+    "name": "Enable-PnPPriviledgedIdentityManagement",
+    "synopsis": "Enables PnP Priviledged Identity Management",
+    "docsPath": "cmdlets/Enable-PnPPriviledgedIdentityManagement.html"
+  },
+  {
+    "name": "Enable-PnPPrivilegedIdentityManagement",
+    "synopsis": "Enables PnP Privileged Identity Management",
+    "docsPath": "cmdlets/Enable-PnPPrivilegedIdentityManagement.html"
+  },
+  {
+    "name": "Enable-PnPSiteClassification",
+    "synopsis": "Enables PnP Site Classification",
+    "docsPath": "cmdlets/Enable-PnPSiteClassification.html"
+  },
+  {
+    "name": "Enable-PnPTenantServicePrincipal",
+    "synopsis": "Enables PnP Tenant Service Principal",
+    "docsPath": "cmdlets/Enable-PnPTenantServicePrincipal.html"
+  },
+  {
+    "name": "Export-PnPFlow",
+    "synopsis": "Exports PnP Flow",
+    "docsPath": "cmdlets/Export-PnPFlow.html"
+  },
+  {
+    "name": "Export-PnPListToSiteTemplate",
+    "synopsis": "Exports PnP List To Site Template",
+    "docsPath": "cmdlets/Export-PnPListToSiteTemplate.html"
+  },
+  {
+    "name": "Export-PnPPage",
+    "synopsis": "Exports PnP Page",
+    "docsPath": "cmdlets/Export-PnPPage.html"
+  },
+  {
+    "name": "Export-PnPPageMapping",
+    "synopsis": "Exports PnP Page Mapping",
+    "docsPath": "cmdlets/Export-PnPPageMapping.html"
+  },
+  {
+    "name": "Export-PnPPowerApp",
+    "synopsis": "Exports PnP Power App",
+    "docsPath": "cmdlets/Export-PnPPowerApp.html"
+  },
+  {
+    "name": "Export-PnPTaxonomy",
+    "synopsis": "Exports PnP Taxonomy",
+    "docsPath": "cmdlets/Export-PnPTaxonomy.html"
+  },
+  {
+    "name": "Export-PnPTermGroupToXml",
+    "synopsis": "Exports PnP Term Group To Xml",
+    "docsPath": "cmdlets/Export-PnPTermGroupToXml.html"
+  },
+  {
+    "name": "Export-PnPUserInfo",
+    "synopsis": "Exports PnP User Info",
+    "docsPath": "cmdlets/Export-PnPUserInfo.html"
+  },
+  {
+    "name": "Export-PnPUserProfile",
+    "synopsis": "Exports PnP User Profile",
+    "docsPath": "cmdlets/Export-PnPUserProfile.html"
+  },
+  {
+    "name": "Find-PnPFile",
+    "synopsis": "Finds PnP File",
+    "docsPath": "cmdlets/Find-PnPFile.html"
+  },
+  {
+    "name": "Get-PnPAccessToken",
+    "synopsis": "Gets PnP Access Token",
+    "docsPath": "cmdlets/Get-PnPAccessToken.html"
+  },
+  {
+    "name": "Get-PnPAlert",
+    "synopsis": "Gets PnP Alert",
+    "docsPath": "cmdlets/Get-PnPAlert.html"
+  },
+  {
+    "name": "Get-PnPApp",
+    "synopsis": "Gets PnP App",
+    "docsPath": "cmdlets/Get-PnPApp.html"
+  },
+  {
+    "name": "Get-PnPAppErrors",
+    "synopsis": "Gets PnP App Errors",
+    "docsPath": "cmdlets/Get-PnPAppErrors.html"
+  },
+  {
+    "name": "Get-PnPAppInfo",
+    "synopsis": "Gets PnP App Info",
+    "docsPath": "cmdlets/Get-PnPAppInfo.html"
+  },
+  {
+    "name": "Get-PnPApplicationCustomizer",
+    "synopsis": "Gets PnP Application Customizer",
+    "docsPath": "cmdlets/Get-PnPApplicationCustomizer.html"
+  },
+  {
+    "name": "Get-PnPAuditing",
+    "synopsis": "Gets PnP Auditing",
+    "docsPath": "cmdlets/Get-PnPAuditing.html"
+  },
+  {
+    "name": "Get-PnPAuthenticationRealm",
+    "synopsis": "Gets PnP Authentication Realm",
+    "docsPath": "cmdlets/Get-PnPAuthenticationRealm.html"
+  },
+  {
+    "name": "Get-PnPAvailableLanguage",
+    "synopsis": "Gets PnP Available Language",
+    "docsPath": "cmdlets/Get-PnPAvailableLanguage.html"
+  },
+  {
+    "name": "Get-PnPAvailableSensitivityLabel",
+    "synopsis": "Gets PnP Available Sensitivity Label",
+    "docsPath": "cmdlets/Get-PnPAvailableSensitivityLabel.html"
+  },
+  {
+    "name": "Get-PnPAvailableSiteClassification",
+    "synopsis": "Gets PnP Available Site Classification",
+    "docsPath": "cmdlets/Get-PnPAvailableSiteClassification.html"
+  },
+  {
+    "name": "Get-PnPAzureACSPrincipal",
+    "synopsis": "Gets PnP Azure A C S Principal",
+    "docsPath": "cmdlets/Get-PnPAzureACSPrincipal.html"
+  },
+  {
+    "name": "Get-PnPAzureADActivityReportDirectoryAudit",
+    "synopsis": "Gets PnP Azure A D Activity Report Directory Audit",
+    "docsPath": "cmdlets/Get-PnPAzureADActivityReportDirectoryAudit.html"
+  },
+  {
+    "name": "Get-PnPAzureADActivityReportSignIn",
+    "synopsis": "Gets PnP Azure A D Activity Report Sign In",
+    "docsPath": "cmdlets/Get-PnPAzureADActivityReportSignIn.html"
+  },
+  {
+    "name": "Get-PnPAzureADApp",
+    "synopsis": "Gets PnP Azure A D App",
+    "docsPath": "cmdlets/Get-PnPAzureADApp.html"
+  },
+  {
+    "name": "Get-PnPAzureADAppPermission",
+    "synopsis": "Gets PnP Azure A D App Permission",
+    "docsPath": "cmdlets/Get-PnPAzureADAppPermission.html"
+  },
+  {
+    "name": "Get-PnPAzureADAppSitePermission",
+    "synopsis": "Gets PnP Azure A D App Site Permission",
+    "docsPath": "cmdlets/Get-PnPAzureADAppSitePermission.html"
+  },
+  {
+    "name": "Get-PnPAzureADGroup",
+    "synopsis": "Gets PnP Azure A D Group",
+    "docsPath": "cmdlets/Get-PnPAzureADGroup.html"
+  },
+  {
+    "name": "Get-PnPAzureADGroupMember",
+    "synopsis": "Gets PnP Azure A D Group Member",
+    "docsPath": "cmdlets/Get-PnPAzureADGroupMember.html"
+  },
+  {
+    "name": "Get-PnPAzureADGroupOwner",
+    "synopsis": "Gets PnP Azure A D Group Owner",
+    "docsPath": "cmdlets/Get-PnPAzureADGroupOwner.html"
+  },
+  {
+    "name": "Get-PnPAzureADServicePrincipal",
+    "synopsis": "Gets PnP Azure A D Service Principal",
+    "docsPath": "cmdlets/Get-PnPAzureADServicePrincipal.html"
+  },
+  {
+    "name": "Get-PnPAzureADServicePrincipalAppRoleAssignment",
+    "synopsis": "Gets PnP Azure A D Service Principal App Role Assignment",
+    "docsPath": "cmdlets/Get-PnPAzureADServicePrincipalAppRoleAssignment.html"
+  },
+  {
+    "name": "Get-PnPAzureADServicePrincipalAssignedAppRole",
+    "synopsis": "Gets PnP Azure A D Service Principal Assigned App Role",
+    "docsPath": "cmdlets/Get-PnPAzureADServicePrincipalAssignedAppRole.html"
+  },
+  {
+    "name": "Get-PnPAzureADServicePrincipalAvailableAppRole",
+    "synopsis": "Gets PnP Azure A D Service Principal Available App Role",
+    "docsPath": "cmdlets/Get-PnPAzureADServicePrincipalAvailableAppRole.html"
+  },
+  {
+    "name": "Get-PnPAzureADUser",
+    "synopsis": "Gets PnP Azure A D User",
+    "docsPath": "cmdlets/Get-PnPAzureADUser.html"
+  },
+  {
+    "name": "Get-PnPAzureCertificate",
+    "synopsis": "Gets PnP Azure Certificate",
+    "docsPath": "cmdlets/Get-PnPAzureCertificate.html"
+  },
+  {
+    "name": "Get-PnPBrandCenterConfig",
+    "synopsis": "Gets PnP Brand Center Config",
+    "docsPath": "cmdlets/Get-PnPBrandCenterConfig.html"
+  },
+  {
+    "name": "Get-PnPBrandCenterFont",
+    "synopsis": "Gets PnP Brand Center Font",
+    "docsPath": "cmdlets/Get-PnPBrandCenterFont.html"
+  },
+  {
+    "name": "Get-PnPBrandCenterFontPackage",
+    "synopsis": "Gets PnP Brand Center Font Package",
+    "docsPath": "cmdlets/Get-PnPBrandCenterFontPackage.html"
+  },
+  {
+    "name": "Get-PnPBrowserIdleSignout",
+    "synopsis": "Gets PnP Browser Idle Signout",
+    "docsPath": "cmdlets/Get-PnPBrowserIdleSignout.html"
+  },
+  {
+    "name": "Get-PnPBuiltInDesignPackageVisibility",
+    "synopsis": "Gets PnP Built In Design Package Visibility",
+    "docsPath": "cmdlets/Get-PnPBuiltInDesignPackageVisibility.html"
+  },
+  {
+    "name": "Get-PnPBuiltInSiteTemplateSettings",
+    "synopsis": "Gets PnP Built In Site Template Settings",
+    "docsPath": "cmdlets/Get-PnPBuiltInSiteTemplateSettings.html"
+  },
+  {
+    "name": "Get-PnPChangeLog",
+    "synopsis": "Gets PnP Change Log",
+    "docsPath": "cmdlets/Get-PnPChangeLog.html"
+  },
+  {
+    "name": "Get-PnPClientSidePage",
+    "synopsis": "Gets PnP Client Side Page",
+    "docsPath": "cmdlets/Get-PnPClientSidePage.html"
+  },
+  {
+    "name": "Get-PnPCompatibleHubContentTypes",
+    "synopsis": "Gets PnP Compatible Hub Content Types",
+    "docsPath": "cmdlets/Get-PnPCompatibleHubContentTypes.html"
+  },
+  {
+    "name": "Get-PnPConnection",
+    "synopsis": "Gets PnP Connection",
+    "docsPath": "cmdlets/Get-PnPConnection.html"
+  },
+  {
+    "name": "Get-PnPContainer",
+    "synopsis": "Gets PnP Container",
+    "docsPath": "cmdlets/Get-PnPContainer.html"
+  },
+  {
+    "name": "Get-PnPContainerType",
+    "synopsis": "Gets PnP Container Type",
+    "docsPath": "cmdlets/Get-PnPContainerType.html"
+  },
+  {
+    "name": "Get-PnPContainerTypeConfiguration",
+    "synopsis": "Gets PnP Container Type Configuration",
+    "docsPath": "cmdlets/Get-PnPContainerTypeConfiguration.html"
+  },
+  {
+    "name": "Get-PnPContentType",
+    "synopsis": "Gets PnP Content Type",
+    "docsPath": "cmdlets/Get-PnPContentType.html"
+  },
+  {
+    "name": "Get-PnPContentTypePublishingHubUrl",
+    "synopsis": "Gets PnP Content Type Publishing Hub Url",
+    "docsPath": "cmdlets/Get-PnPContentTypePublishingHubUrl.html"
+  },
+  {
+    "name": "Get-PnPContentTypePublishingStatus",
+    "synopsis": "Gets PnP Content Type Publishing Status",
+    "docsPath": "cmdlets/Get-PnPContentTypePublishingStatus.html"
+  },
+  {
+    "name": "Get-PnPContext",
+    "synopsis": "Gets PnP Context",
+    "docsPath": "cmdlets/Get-PnPContext.html"
+  },
+  {
+    "name": "Get-PnPCopilotAdminLimitedMode",
+    "synopsis": "Gets PnP Copilot Admin Limited Mode",
+    "docsPath": "cmdlets/Get-PnPCopilotAdminLimitedMode.html"
+  },
+  {
+    "name": "Get-PnPCopilotAgent",
+    "synopsis": "Gets PnP Copilot Agent",
+    "docsPath": "cmdlets/Get-PnPCopilotAgent.html"
+  },
+  {
+    "name": "Get-PnPCustomAction",
+    "synopsis": "Gets PnP Custom Action",
+    "docsPath": "cmdlets/Get-PnPCustomAction.html"
+  },
+  {
+    "name": "Get-PnPDefaultColumnValues",
+    "synopsis": "Gets PnP Default Column Values",
+    "docsPath": "cmdlets/Get-PnPDefaultColumnValues.html"
+  },
+  {
+    "name": "Get-PnPDeletedContainer",
+    "synopsis": "Gets PnP Deleted Container",
+    "docsPath": "cmdlets/Get-PnPDeletedContainer.html"
+  },
+  {
+    "name": "Get-PnPDeletedFlow",
+    "synopsis": "Gets PnP Deleted Flow",
+    "docsPath": "cmdlets/Get-PnPDeletedFlow.html"
+  },
+  {
+    "name": "Get-PnPDeletedMicrosoft365Group",
+    "synopsis": "Gets PnP Deleted Microsoft365 Group",
+    "docsPath": "cmdlets/Get-PnPDeletedMicrosoft365Group.html"
+  },
+  {
+    "name": "Get-PnPDeletedTeam",
+    "synopsis": "Gets PnP Deleted Team",
+    "docsPath": "cmdlets/Get-PnPDeletedTeam.html"
+  },
+  {
+    "name": "Get-PnPDiagnostics",
+    "synopsis": "Gets PnP Diagnostics",
+    "docsPath": "cmdlets/Get-PnPDiagnostics.html"
+  },
+  {
+    "name": "Get-PnPDisableSpacesActivation",
+    "synopsis": "Gets PnP Disable Spaces Activation",
+    "docsPath": "cmdlets/Get-PnPDisableSpacesActivation.html"
+  },
+  {
+    "name": "Get-PnPDocumentSetTemplate",
+    "synopsis": "Gets PnP Document Set Template",
+    "docsPath": "cmdlets/Get-PnPDocumentSetTemplate.html"
+  },
+  {
+    "name": "Get-PnPEnterpriseAppInsightsReport",
+    "synopsis": "Gets PnP Enterprise App Insights Report",
+    "docsPath": "cmdlets/Get-PnPEnterpriseAppInsightsReport.html"
+  },
+  {
+    "name": "Get-PnPEntraIDActivityReportDirectoryAudit",
+    "synopsis": "Gets PnP Entra I D Activity Report Directory Audit",
+    "docsPath": "cmdlets/Get-PnPEntraIDActivityReportDirectoryAudit.html"
+  },
+  {
+    "name": "Get-PnPEntraIDActivityReportSignIn",
+    "synopsis": "Gets PnP Entra I D Activity Report Sign In",
+    "docsPath": "cmdlets/Get-PnPEntraIDActivityReportSignIn.html"
+  },
+  {
+    "name": "Get-PnPEntraIDApp",
+    "synopsis": "Gets PnP Entra I D App",
+    "docsPath": "cmdlets/Get-PnPEntraIDApp.html"
+  },
+  {
+    "name": "Get-PnPEntraIDAppFilePermission",
+    "synopsis": "Gets PnP Entra I D App File Permission",
+    "docsPath": "cmdlets/Get-PnPEntraIDAppFilePermission.html"
+  },
+  {
+    "name": "Get-PnPEntraIDAppListItemPermission",
+    "synopsis": "Gets PnP Entra I D App List Item Permission",
+    "docsPath": "cmdlets/Get-PnPEntraIDAppListItemPermission.html"
+  },
+  {
+    "name": "Get-PnPEntraIDAppListPermission",
+    "synopsis": "Gets PnP Entra I D App List Permission",
+    "docsPath": "cmdlets/Get-PnPEntraIDAppListPermission.html"
+  },
+  {
+    "name": "Get-PnPEntraIDAppPermission",
+    "synopsis": "Gets PnP Entra I D App Permission",
+    "docsPath": "cmdlets/Get-PnPEntraIDAppPermission.html"
+  },
+  {
+    "name": "Get-PnPEntraIDAppSitePermission",
+    "synopsis": "Gets PnP Entra I D App Site Permission",
+    "docsPath": "cmdlets/Get-PnPEntraIDAppSitePermission.html"
+  },
+  {
+    "name": "Get-PnPEntraIDGroup",
+    "synopsis": "Gets PnP Entra I D Group",
+    "docsPath": "cmdlets/Get-PnPEntraIDGroup.html"
+  },
+  {
+    "name": "Get-PnPEntraIDGroupMember",
+    "synopsis": "Gets PnP Entra I D Group Member",
+    "docsPath": "cmdlets/Get-PnPEntraIDGroupMember.html"
+  },
+  {
+    "name": "Get-PnPEntraIDGroupOwner",
+    "synopsis": "Gets PnP Entra I D Group Owner",
+    "docsPath": "cmdlets/Get-PnPEntraIDGroupOwner.html"
+  },
+  {
+    "name": "Get-PnPEntraIDServicePrincipal",
+    "synopsis": "Gets PnP Entra I D Service Principal",
+    "docsPath": "cmdlets/Get-PnPEntraIDServicePrincipal.html"
+  },
+  {
+    "name": "Get-PnPEntraIDServicePrincipalAppRoleAssignment",
+    "synopsis": "Gets PnP Entra I D Service Principal App Role Assignment",
+    "docsPath": "cmdlets/Get-PnPEntraIDServicePrincipalAppRoleAssignment.html"
+  },
+  {
+    "name": "Get-PnPEntraIDServicePrincipalAssignedAppRole",
+    "synopsis": "Gets PnP Entra I D Service Principal Assigned App Role",
+    "docsPath": "cmdlets/Get-PnPEntraIDServicePrincipalAssignedAppRole.html"
+  },
+  {
+    "name": "Get-PnPEntraIDServicePrincipalAvailableAppRole",
+    "synopsis": "Gets PnP Entra I D Service Principal Available App Role",
+    "docsPath": "cmdlets/Get-PnPEntraIDServicePrincipalAvailableAppRole.html"
+  },
+  {
+    "name": "Get-PnPEntraIDUser",
+    "synopsis": "Gets PnP Entra I D User",
+    "docsPath": "cmdlets/Get-PnPEntraIDUser.html"
+  },
+  {
+    "name": "Get-PnPEventReceiver",
+    "synopsis": "Gets PnP Event Receiver",
+    "docsPath": "cmdlets/Get-PnPEventReceiver.html"
+  },
+  {
+    "name": "Get-PnPException",
+    "synopsis": "Gets PnP Exception",
+    "docsPath": "cmdlets/Get-PnPException.html"
+  },
+  {
+    "name": "Get-PnPExternalUser",
+    "synopsis": "Gets PnP External User",
+    "docsPath": "cmdlets/Get-PnPExternalUser.html"
+  },
+  {
+    "name": "Get-PnPFeature",
+    "synopsis": "Gets PnP Feature",
+    "docsPath": "cmdlets/Get-PnPFeature.html"
+  },
+  {
+    "name": "Get-PnPField",
+    "synopsis": "Gets PnP Field",
+    "docsPath": "cmdlets/Get-PnPField.html"
+  },
+  {
+    "name": "Get-PnPFile",
+    "synopsis": "Gets PnP File",
+    "docsPath": "cmdlets/Get-PnPFile.html"
+  },
+  {
+    "name": "Get-PnPFileAnalyticsData",
+    "synopsis": "Gets PnP File Analytics Data",
+    "docsPath": "cmdlets/Get-PnPFileAnalyticsData.html"
+  },
+  {
+    "name": "Get-PnPFileCheckedOut",
+    "synopsis": "Gets PnP File Checked Out",
+    "docsPath": "cmdlets/Get-PnPFileCheckedOut.html"
+  },
+  {
+    "name": "Get-PnPFileInFolder",
+    "synopsis": "Gets PnP File In Folder",
+    "docsPath": "cmdlets/Get-PnPFileInFolder.html"
+  },
+  {
+    "name": "Get-PnPFileRetentionLabel",
+    "synopsis": "Gets PnP File Retention Label",
+    "docsPath": "cmdlets/Get-PnPFileRetentionLabel.html"
+  },
+  {
+    "name": "Get-PnPFileSensitivityLabel",
+    "synopsis": "Gets PnP File Sensitivity Label",
+    "docsPath": "cmdlets/Get-PnPFileSensitivityLabel.html"
+  },
+  {
+    "name": "Get-PnPFileSensitivityLabelInfo",
+    "synopsis": "Gets PnP File Sensitivity Label Info",
+    "docsPath": "cmdlets/Get-PnPFileSensitivityLabelInfo.html"
+  },
+  {
+    "name": "Get-PnPFileSharingLink",
+    "synopsis": "Gets PnP File Sharing Link",
+    "docsPath": "cmdlets/Get-PnPFileSharingLink.html"
+  },
+  {
+    "name": "Get-PnPFileVersion",
+    "synopsis": "Gets PnP File Version",
+    "docsPath": "cmdlets/Get-PnPFileVersion.html"
+  },
+  {
+    "name": "Get-PnPFlow",
+    "synopsis": "Gets PnP Flow",
+    "docsPath": "cmdlets/Get-PnPFlow.html"
+  },
+  {
+    "name": "Get-PnPFlowOwner",
+    "synopsis": "Gets PnP Flow Owner",
+    "docsPath": "cmdlets/Get-PnPFlowOwner.html"
+  },
+  {
+    "name": "Get-PnPFlowRun",
+    "synopsis": "Gets PnP Flow Run",
+    "docsPath": "cmdlets/Get-PnPFlowRun.html"
+  },
+  {
+    "name": "Get-PnPFolder",
+    "synopsis": "Gets PnP Folder",
+    "docsPath": "cmdlets/Get-PnPFolder.html"
+  },
+  {
+    "name": "Get-PnPFolderInFolder",
+    "synopsis": "Gets PnP Folder In Folder",
+    "docsPath": "cmdlets/Get-PnPFolderInFolder.html"
+  },
+  {
+    "name": "Get-PnPFolderItem",
+    "synopsis": "Gets PnP Folder Item",
+    "docsPath": "cmdlets/Get-PnPFolderItem.html"
+  },
+  {
+    "name": "Get-PnPFolderSharingLink",
+    "synopsis": "Gets PnP Folder Sharing Link",
+    "docsPath": "cmdlets/Get-PnPFolderSharingLink.html"
+  },
+  {
+    "name": "Get-PnPFolderStorageMetric",
+    "synopsis": "Gets PnP Folder Storage Metric",
+    "docsPath": "cmdlets/Get-PnPFolderStorageMetric.html"
+  },
+  {
+    "name": "Get-PnPFooter",
+    "synopsis": "Gets PnP Footer",
+    "docsPath": "cmdlets/Get-PnPFooter.html"
+  },
+  {
+    "name": "Get-PnPGeoAdministrator",
+    "synopsis": "Gets PnP Geo Administrator",
+    "docsPath": "cmdlets/Get-PnPGeoAdministrator.html"
+  },
+  {
+    "name": "Get-PnPGeoMoveCrossCompatibilityStatus",
+    "synopsis": "Gets PnP Geo Move Cross Compatibility Status",
+    "docsPath": "cmdlets/Get-PnPGeoMoveCrossCompatibilityStatus.html"
+  },
+  {
+    "name": "Get-PnPGeoStorageQuota",
+    "synopsis": "Gets PnP Geo Storage Quota",
+    "docsPath": "cmdlets/Get-PnPGeoStorageQuota.html"
+  },
+  {
+    "name": "Get-PnPGraphSubscription",
+    "synopsis": "Gets PnP Graph Subscription",
+    "docsPath": "cmdlets/Get-PnPGraphSubscription.html"
+  },
+  {
+    "name": "Get-PnPGroup",
+    "synopsis": "Gets PnP Group",
+    "docsPath": "cmdlets/Get-PnPGroup.html"
+  },
+  {
+    "name": "Get-PnPGroupMember",
+    "synopsis": "Gets PnP Group Member",
+    "docsPath": "cmdlets/Get-PnPGroupMember.html"
+  },
+  {
+    "name": "Get-PnPGroupPermissions",
+    "synopsis": "Gets PnP Group Permissions",
+    "docsPath": "cmdlets/Get-PnPGroupPermissions.html"
+  },
+  {
+    "name": "Get-PnPHideDefaultThemes",
+    "synopsis": "Gets PnP Hide Default Themes",
+    "docsPath": "cmdlets/Get-PnPHideDefaultThemes.html"
+  },
+  {
+    "name": "Get-PnPHomePage",
+    "synopsis": "Gets PnP Home Page",
+    "docsPath": "cmdlets/Get-PnPHomePage.html"
+  },
+  {
+    "name": "Get-PnPHomeSite",
+    "synopsis": "Gets PnP Home Site",
+    "docsPath": "cmdlets/Get-PnPHomeSite.html"
+  },
+  {
+    "name": "Get-PnPHubSite",
+    "synopsis": "Gets PnP Hub Site",
+    "docsPath": "cmdlets/Get-PnPHubSite.html"
+  },
+  {
+    "name": "Get-PnPHubSiteChild",
+    "synopsis": "Gets PnP Hub Site Child",
+    "docsPath": "cmdlets/Get-PnPHubSiteChild.html"
+  },
+  {
+    "name": "Get-PnPIndexedPropertyKeys",
+    "synopsis": "Gets PnP Indexed Property Keys",
+    "docsPath": "cmdlets/Get-PnPIndexedPropertyKeys.html"
+  },
+  {
+    "name": "Get-PnPInPlaceRecordsManagement",
+    "synopsis": "Gets PnP In Place Records Management",
+    "docsPath": "cmdlets/Get-PnPInPlaceRecordsManagement.html"
+  },
+  {
+    "name": "Get-PnPIsSiteAliasAvailable",
+    "synopsis": "Gets PnP Is Site Alias Available",
+    "docsPath": "cmdlets/Get-PnPIsSiteAliasAvailable.html"
+  },
+  {
+    "name": "Get-PnPJavaScriptLink",
+    "synopsis": "Gets PnP Java Script Link",
+    "docsPath": "cmdlets/Get-PnPJavaScriptLink.html"
+  },
+  {
+    "name": "Get-PnPKnowledgeHubSite",
+    "synopsis": "Gets PnP Knowledge Hub Site",
+    "docsPath": "cmdlets/Get-PnPKnowledgeHubSite.html"
+  },
+  {
+    "name": "Get-PnPLargeListOperationStatus",
+    "synopsis": "Gets PnP Large List Operation Status",
+    "docsPath": "cmdlets/Get-PnPLargeListOperationStatus.html"
+  },
+  {
+    "name": "Get-PnPLibraryFileVersionBatchDeleteJobStatus",
+    "synopsis": "Gets PnP Library File Version Batch Delete Job Status",
+    "docsPath": "cmdlets/Get-PnPLibraryFileVersionBatchDeleteJobStatus.html"
+  },
+  {
+    "name": "Get-PnPLibraryFileVersionExpirationReportJobStatus",
+    "synopsis": "Gets PnP Library File Version Expiration Report Job Status",
+    "docsPath": "cmdlets/Get-PnPLibraryFileVersionExpirationReportJobStatus.html"
+  },
+  {
+    "name": "Get-PnPList",
+    "synopsis": "Gets PnP List",
+    "docsPath": "cmdlets/Get-PnPList.html"
+  },
+  {
+    "name": "Get-PnPListDesign",
+    "synopsis": "Gets PnP List Design",
+    "docsPath": "cmdlets/Get-PnPListDesign.html"
+  },
+  {
+    "name": "Get-PnPListInformationRightsManagement",
+    "synopsis": "Gets PnP List Information Rights Management",
+    "docsPath": "cmdlets/Get-PnPListInformationRightsManagement.html"
+  },
+  {
+    "name": "Get-PnPListItem",
+    "synopsis": "Gets PnP List Item",
+    "docsPath": "cmdlets/Get-PnPListItem.html"
+  },
+  {
+    "name": "Get-PnPListItemAttachment",
+    "synopsis": "Gets PnP List Item Attachment",
+    "docsPath": "cmdlets/Get-PnPListItemAttachment.html"
+  },
+  {
+    "name": "Get-PnPListItemComment",
+    "synopsis": "Gets PnP List Item Comment",
+    "docsPath": "cmdlets/Get-PnPListItemComment.html"
+  },
+  {
+    "name": "Get-PnPListItemPermission",
+    "synopsis": "Gets PnP List Item Permission",
+    "docsPath": "cmdlets/Get-PnPListItemPermission.html"
+  },
+  {
+    "name": "Get-PnPListItemVersion",
+    "synopsis": "Gets PnP List Item Version",
+    "docsPath": "cmdlets/Get-PnPListItemVersion.html"
+  },
+  {
+    "name": "Get-PnPListPermissions",
+    "synopsis": "Gets PnP List Permissions",
+    "docsPath": "cmdlets/Get-PnPListPermissions.html"
+  },
+  {
+    "name": "Get-PnPListRecordDeclaration",
+    "synopsis": "Gets PnP List Record Declaration",
+    "docsPath": "cmdlets/Get-PnPListRecordDeclaration.html"
+  },
+  {
+    "name": "Get-PnPListVersionPolicy",
+    "synopsis": "Gets PnP List Version Policy",
+    "docsPath": "cmdlets/Get-PnPListVersionPolicy.html"
+  },
+  {
+    "name": "Get-PnPManagedAppId",
+    "synopsis": "Gets PnP Managed App Id",
+    "docsPath": "cmdlets/Get-PnPManagedAppId.html"
+  },
+  {
+    "name": "Get-PnPMasterPage",
+    "synopsis": "Gets PnP Master Page",
+    "docsPath": "cmdlets/Get-PnPMasterPage.html"
+  },
+  {
+    "name": "Get-PnPMessageCenterAnnouncement",
+    "synopsis": "Gets PnP Message Center Announcement",
+    "docsPath": "cmdlets/Get-PnPMessageCenterAnnouncement.html"
+  },
+  {
+    "name": "Get-PnPMicrosoft365ExpiringGroup",
+    "synopsis": "Gets PnP Microsoft365 Expiring Group",
+    "docsPath": "cmdlets/Get-PnPMicrosoft365ExpiringGroup.html"
+  },
+  {
+    "name": "Get-PnPMicrosoft365Group",
+    "synopsis": "Gets PnP Microsoft365 Group",
+    "docsPath": "cmdlets/Get-PnPMicrosoft365Group.html"
+  },
+  {
+    "name": "Get-PnPMicrosoft365GroupEndpoint",
+    "synopsis": "Gets PnP Microsoft365 Group Endpoint",
+    "docsPath": "cmdlets/Get-PnPMicrosoft365GroupEndpoint.html"
+  },
+  {
+    "name": "Get-PnPMicrosoft365GroupMember",
+    "synopsis": "Gets PnP Microsoft365 Group Member",
+    "docsPath": "cmdlets/Get-PnPMicrosoft365GroupMember.html"
+  },
+  {
+    "name": "Get-PnPMicrosoft365GroupMembers",
+    "synopsis": "Gets PnP Microsoft365 Group Members",
+    "docsPath": "cmdlets/Get-PnPMicrosoft365GroupMembers.html"
+  },
+  {
+    "name": "Get-PnPMicrosoft365GroupOwner",
+    "synopsis": "Gets PnP Microsoft365 Group Owner",
+    "docsPath": "cmdlets/Get-PnPMicrosoft365GroupOwner.html"
+  },
+  {
+    "name": "Get-PnPMicrosoft365GroupOwners",
+    "synopsis": "Gets PnP Microsoft365 Group Owners",
+    "docsPath": "cmdlets/Get-PnPMicrosoft365GroupOwners.html"
+  },
+  {
+    "name": "Get-PnPMicrosoft365GroupSettings",
+    "synopsis": "Gets PnP Microsoft365 Group Settings",
+    "docsPath": "cmdlets/Get-PnPMicrosoft365GroupSettings.html"
+  },
+  {
+    "name": "Get-PnPMicrosoft365GroupSettingTemplates",
+    "synopsis": "Gets PnP Microsoft365 Group Setting Templates",
+    "docsPath": "cmdlets/Get-PnPMicrosoft365GroupSettingTemplates.html"
+  },
+  {
+    "name": "Get-PnPMicrosoft365GroupTeam",
+    "synopsis": "Gets PnP Microsoft365 Group Team",
+    "docsPath": "cmdlets/Get-PnPMicrosoft365GroupTeam.html"
+  },
+  {
+    "name": "Get-PnPMicrosoft365GroupYammerCommunity",
+    "synopsis": "Gets PnP Microsoft365 Group Yammer Community",
+    "docsPath": "cmdlets/Get-PnPMicrosoft365GroupYammerCommunity.html"
+  },
+  {
+    "name": "Get-PnPMicrosoft365Roadmap",
+    "synopsis": "Gets PnP Microsoft365 Roadmap",
+    "docsPath": "cmdlets/Get-PnPMicrosoft365Roadmap.html"
+  },
+  {
+    "name": "Get-PnPMultiGeoCompanyAllowedDataLocation",
+    "synopsis": "Gets PnP Multi Geo Company Allowed Data Location",
+    "docsPath": "cmdlets/Get-PnPMultiGeoCompanyAllowedDataLocation.html"
+  },
+  {
+    "name": "Get-PnPMultiGeoExperience",
+    "synopsis": "Gets PnP Multi Geo Experience",
+    "docsPath": "cmdlets/Get-PnPMultiGeoExperience.html"
+  },
+  {
+    "name": "Get-PnPNavigationNode",
+    "synopsis": "Gets PnP Navigation Node",
+    "docsPath": "cmdlets/Get-PnPNavigationNode.html"
+  },
+  {
+    "name": "Get-PnPOrgAssetsLibrary",
+    "synopsis": "Gets PnP Org Assets Library",
+    "docsPath": "cmdlets/Get-PnPOrgAssetsLibrary.html"
+  },
+  {
+    "name": "Get-PnPOrgNewsSite",
+    "synopsis": "Gets PnP Org News Site",
+    "docsPath": "cmdlets/Get-PnPOrgNewsSite.html"
+  },
+  {
+    "name": "Get-PnPPage",
+    "synopsis": "Gets PnP Page",
+    "docsPath": "cmdlets/Get-PnPPage.html"
+  },
+  {
+    "name": "Get-PnPPageComponent",
+    "synopsis": "Gets PnP Page Component",
+    "docsPath": "cmdlets/Get-PnPPageComponent.html"
+  },
+  {
+    "name": "Get-PnPPageCopyProgress",
+    "synopsis": "Gets PnP Page Copy Progress",
+    "docsPath": "cmdlets/Get-PnPPageCopyProgress.html"
+  },
+  {
+    "name": "Get-PnPPageLikedByInformation",
+    "synopsis": "Gets PnP Page Liked By Information",
+    "docsPath": "cmdlets/Get-PnPPageLikedByInformation.html"
+  },
+  {
+    "name": "Get-PnPPageSchedulingEnabled",
+    "synopsis": "Gets PnP Page Scheduling Enabled",
+    "docsPath": "cmdlets/Get-PnPPageSchedulingEnabled.html"
+  },
+  {
+    "name": "Get-PnPPlannerBucket",
+    "synopsis": "Gets PnP Planner Bucket",
+    "docsPath": "cmdlets/Get-PnPPlannerBucket.html"
+  },
+  {
+    "name": "Get-PnPPlannerConfiguration",
+    "synopsis": "Gets PnP Planner Configuration",
+    "docsPath": "cmdlets/Get-PnPPlannerConfiguration.html"
+  },
+  {
+    "name": "Get-PnPPlannerPlan",
+    "synopsis": "Gets PnP Planner Plan",
+    "docsPath": "cmdlets/Get-PnPPlannerPlan.html"
+  },
+  {
+    "name": "Get-PnPPlannerRosterMember",
+    "synopsis": "Gets PnP Planner Roster Member",
+    "docsPath": "cmdlets/Get-PnPPlannerRosterMember.html"
+  },
+  {
+    "name": "Get-PnPPlannerRosterPlan",
+    "synopsis": "Gets PnP Planner Roster Plan",
+    "docsPath": "cmdlets/Get-PnPPlannerRosterPlan.html"
+  },
+  {
+    "name": "Get-PnPPlannerTask",
+    "synopsis": "Gets PnP Planner Task",
+    "docsPath": "cmdlets/Get-PnPPlannerTask.html"
+  },
+  {
+    "name": "Get-PnPPlannerUserPolicy",
+    "synopsis": "Gets PnP Planner User Policy",
+    "docsPath": "cmdlets/Get-PnPPlannerUserPolicy.html"
+  },
+  {
+    "name": "Get-PnPPowerApp",
+    "synopsis": "Gets PnP Power App",
+    "docsPath": "cmdlets/Get-PnPPowerApp.html"
+  },
+  {
+    "name": "Get-PnPPowerAppPermission",
+    "synopsis": "Gets PnP Power App Permission",
+    "docsPath": "cmdlets/Get-PnPPowerAppPermission.html"
+  },
+  {
+    "name": "Get-PnPPowerPlatformCustomConnector",
+    "synopsis": "Gets PnP Power Platform Custom Connector",
+    "docsPath": "cmdlets/Get-PnPPowerPlatformCustomConnector.html"
+  },
+  {
+    "name": "Get-PnPPowerPlatformEnvironment",
+    "synopsis": "Gets PnP Power Platform Environment",
+    "docsPath": "cmdlets/Get-PnPPowerPlatformEnvironment.html"
+  },
+  {
+    "name": "Get-PnPPowerPlatformSolution",
+    "synopsis": "Gets PnP Power Platform Solution",
+    "docsPath": "cmdlets/Get-PnPPowerPlatformSolution.html"
+  },
+  {
+    "name": "Get-PnPPowerShellTelemetryEnabled",
+    "synopsis": "Gets PnP Power Shell Telemetry Enabled",
+    "docsPath": "cmdlets/Get-PnPPowerShellTelemetryEnabled.html"
+  },
+  {
+    "name": "Get-PnPPriviledgedIdentityManagementEligibleAssignment",
+    "synopsis": "Gets PnP Priviledged Identity Management Eligible Assignment",
+    "docsPath": "cmdlets/Get-PnPPriviledgedIdentityManagementEligibleAssignment.html"
+  },
+  {
+    "name": "Get-PnPPriviledgedIdentityManagementRole",
+    "synopsis": "Gets PnP Priviledged Identity Management Role",
+    "docsPath": "cmdlets/Get-PnPPriviledgedIdentityManagementRole.html"
+  },
+  {
+    "name": "Get-PnPPrivilegedIdentityManagementEligibleAssignment",
+    "synopsis": "Gets PnP Privileged Identity Management Eligible Assignment",
+    "docsPath": "cmdlets/Get-PnPPrivilegedIdentityManagementEligibleAssignment.html"
+  },
+  {
+    "name": "Get-PnPPrivilegedIdentityManagementRole",
+    "synopsis": "Gets PnP Privileged Identity Management Role",
+    "docsPath": "cmdlets/Get-PnPPrivilegedIdentityManagementRole.html"
+  },
+  {
+    "name": "Get-PnPProfileCardProperty",
+    "synopsis": "Gets PnP Profile Card Property",
+    "docsPath": "cmdlets/Get-PnPProfileCardProperty.html"
+  },
+  {
+    "name": "Get-PnPProperty",
+    "synopsis": "Gets PnP Property",
+    "docsPath": "cmdlets/Get-PnPProperty.html"
+  },
+  {
+    "name": "Get-PnPPropertyBag",
+    "synopsis": "Gets PnP Property Bag",
+    "docsPath": "cmdlets/Get-PnPPropertyBag.html"
+  },
+  {
+    "name": "Get-PnPPublishingImageRendition",
+    "synopsis": "Gets PnP Publishing Image Rendition",
+    "docsPath": "cmdlets/Get-PnPPublishingImageRendition.html"
+  },
+  {
+    "name": "Get-PnPRecycleBinItem",
+    "synopsis": "Gets PnP Recycle Bin Item",
+    "docsPath": "cmdlets/Get-PnPRecycleBinItem.html"
+  },
+  {
+    "name": "Get-PnPRequestAccessEmails",
+    "synopsis": "Gets PnP Request Access Emails",
+    "docsPath": "cmdlets/Get-PnPRequestAccessEmails.html"
+  },
+  {
+    "name": "Get-PnPRetentionLabel",
+    "synopsis": "Gets PnP Retention Label",
+    "docsPath": "cmdlets/Get-PnPRetentionLabel.html"
+  },
+  {
+    "name": "Get-PnPRoleDefinition",
+    "synopsis": "Gets PnP Role Definition",
+    "docsPath": "cmdlets/Get-PnPRoleDefinition.html"
+  },
+  {
+    "name": "Get-PnPSearchConfiguration",
+    "synopsis": "Gets PnP Search Configuration",
+    "docsPath": "cmdlets/Get-PnPSearchConfiguration.html"
+  },
+  {
+    "name": "Get-PnPSearchCrawlLog",
+    "synopsis": "Gets PnP Search Crawl Log",
+    "docsPath": "cmdlets/Get-PnPSearchCrawlLog.html"
+  },
+  {
+    "name": "Get-PnPSearchExternalConnection",
+    "synopsis": "Gets PnP Search External Connection",
+    "docsPath": "cmdlets/Get-PnPSearchExternalConnection.html"
+  },
+  {
+    "name": "Get-PnPSearchExternalItem",
+    "synopsis": "Gets PnP Search External Item",
+    "docsPath": "cmdlets/Get-PnPSearchExternalItem.html"
+  },
+  {
+    "name": "Get-PnPSearchExternalSchema",
+    "synopsis": "Gets PnP Search External Schema",
+    "docsPath": "cmdlets/Get-PnPSearchExternalSchema.html"
+  },
+  {
+    "name": "Get-PnPSearchResultType",
+    "synopsis": "Gets PnP Search Result Type",
+    "docsPath": "cmdlets/Get-PnPSearchResultType.html"
+  },
+  {
+    "name": "Get-PnPSearchSettings",
+    "synopsis": "Gets PnP Search Settings",
+    "docsPath": "cmdlets/Get-PnPSearchSettings.html"
+  },
+  {
+    "name": "Get-PnPSearchSiteConnection",
+    "synopsis": "Gets PnP Search Site Connection",
+    "docsPath": "cmdlets/Get-PnPSearchSiteConnection.html"
+  },
+  {
+    "name": "Get-PnPSearchVertical",
+    "synopsis": "Gets PnP Search Vertical",
+    "docsPath": "cmdlets/Get-PnPSearchVertical.html"
+  },
+  {
+    "name": "Get-PnPServiceCurrentHealth",
+    "synopsis": "Gets PnP Service Current Health",
+    "docsPath": "cmdlets/Get-PnPServiceCurrentHealth.html"
+  },
+  {
+    "name": "Get-PnPServiceHealthIssue",
+    "synopsis": "Gets PnP Service Health Issue",
+    "docsPath": "cmdlets/Get-PnPServiceHealthIssue.html"
+  },
+  {
+    "name": "Get-PnPSharePointAddIn",
+    "synopsis": "Gets PnP Share Point Add In",
+    "docsPath": "cmdlets/Get-PnPSharePointAddIn.html"
+  },
+  {
+    "name": "Get-PnPSharingForNonOwnersOfSite",
+    "synopsis": "Gets PnP Sharing For Non Owners Of Site",
+    "docsPath": "cmdlets/Get-PnPSharingForNonOwnersOfSite.html"
+  },
+  {
+    "name": "Get-PnPSite",
+    "synopsis": "Gets PnP Site",
+    "docsPath": "cmdlets/Get-PnPSite.html"
+  },
+  {
+    "name": "Get-PnPSiteAnalyticsData",
+    "synopsis": "Gets PnP Site Analytics Data",
+    "docsPath": "cmdlets/Get-PnPSiteAnalyticsData.html"
+  },
+  {
+    "name": "Get-PnPSiteClassification",
+    "synopsis": "Gets PnP Site Classification",
+    "docsPath": "cmdlets/Get-PnPSiteClassification.html"
+  },
+  {
+    "name": "Get-PnPSiteClosure",
+    "synopsis": "Gets PnP Site Closure",
+    "docsPath": "cmdlets/Get-PnPSiteClosure.html"
+  },
+  {
+    "name": "Get-PnPSiteCollectionAdmin",
+    "synopsis": "Gets PnP Site Collection Admin",
+    "docsPath": "cmdlets/Get-PnPSiteCollectionAdmin.html"
+  },
+  {
+    "name": "Get-PnPSiteCollectionAppCatalog",
+    "synopsis": "Gets PnP Site Collection App Catalog",
+    "docsPath": "cmdlets/Get-PnPSiteCollectionAppCatalog.html"
+  },
+  {
+    "name": "Get-PnPSiteCollectionTermStore",
+    "synopsis": "Gets PnP Site Collection Term Store",
+    "docsPath": "cmdlets/Get-PnPSiteCollectionTermStore.html"
+  },
+  {
+    "name": "Get-PnPSiteContentMoveState",
+    "synopsis": "Gets PnP Site Content Move State",
+    "docsPath": "cmdlets/Get-PnPSiteContentMoveState.html"
+  },
+  {
+    "name": "Get-PnPSiteDesign",
+    "synopsis": "Gets PnP Site Design",
+    "docsPath": "cmdlets/Get-PnPSiteDesign.html"
+  },
+  {
+    "name": "Get-PnPSiteDesignRights",
+    "synopsis": "Gets PnP Site Design Rights",
+    "docsPath": "cmdlets/Get-PnPSiteDesignRights.html"
+  },
+  {
+    "name": "Get-PnPSiteDesignRun",
+    "synopsis": "Gets PnP Site Design Run",
+    "docsPath": "cmdlets/Get-PnPSiteDesignRun.html"
+  },
+  {
+    "name": "Get-PnPSiteDesignRunStatus",
+    "synopsis": "Gets PnP Site Design Run Status",
+    "docsPath": "cmdlets/Get-PnPSiteDesignRunStatus.html"
+  },
+  {
+    "name": "Get-PnPSiteDesignTask",
+    "synopsis": "Gets PnP Site Design Task",
+    "docsPath": "cmdlets/Get-PnPSiteDesignTask.html"
+  },
+  {
+    "name": "Get-PnPSiteFileVersionBatchDeleteJobStatus",
+    "synopsis": "Gets PnP Site File Version Batch Delete Job Status",
+    "docsPath": "cmdlets/Get-PnPSiteFileVersionBatchDeleteJobStatus.html"
+  },
+  {
+    "name": "Get-PnPSiteFileVersionExpirationReportJobStatus",
+    "synopsis": "Gets PnP Site File Version Expiration Report Job Status",
+    "docsPath": "cmdlets/Get-PnPSiteFileVersionExpirationReportJobStatus.html"
+  },
+  {
+    "name": "Get-PnPSiteGroup",
+    "synopsis": "Gets PnP Site Group",
+    "docsPath": "cmdlets/Get-PnPSiteGroup.html"
+  },
+  {
+    "name": "Get-PnPSitePolicy",
+    "synopsis": "Gets PnP Site Policy",
+    "docsPath": "cmdlets/Get-PnPSitePolicy.html"
+  },
+  {
+    "name": "Get-PnPSiteScript",
+    "synopsis": "Gets PnP Site Script",
+    "docsPath": "cmdlets/Get-PnPSiteScript.html"
+  },
+  {
+    "name": "Get-PnPSiteScriptFromList",
+    "synopsis": "Gets PnP Site Script From List",
+    "docsPath": "cmdlets/Get-PnPSiteScriptFromList.html"
+  },
+  {
+    "name": "Get-PnPSiteScriptFromWeb",
+    "synopsis": "Gets PnP Site Script From Web",
+    "docsPath": "cmdlets/Get-PnPSiteScriptFromWeb.html"
+  },
+  {
+    "name": "Get-PnPSiteSearchQueryResults",
+    "synopsis": "Gets PnP Site Search Query Results",
+    "docsPath": "cmdlets/Get-PnPSiteSearchQueryResults.html"
+  },
+  {
+    "name": "Get-PnPSiteSensitivityLabel",
+    "synopsis": "Gets PnP Site Sensitivity Label",
+    "docsPath": "cmdlets/Get-PnPSiteSensitivityLabel.html"
+  },
+  {
+    "name": "Get-PnPSiteTemplate",
+    "synopsis": "Gets PnP Site Template",
+    "docsPath": "cmdlets/Get-PnPSiteTemplate.html"
+  },
+  {
+    "name": "Get-PnPSiteUserInvitations",
+    "synopsis": "Gets PnP Site User Invitations",
+    "docsPath": "cmdlets/Get-PnPSiteUserInvitations.html"
+  },
+  {
+    "name": "Get-PnPSiteVersionPolicy",
+    "synopsis": "Gets PnP Site Version Policy",
+    "docsPath": "cmdlets/Get-PnPSiteVersionPolicy.html"
+  },
+  {
+    "name": "Get-PnPSiteVersionPolicyStatus",
+    "synopsis": "Gets PnP Site Version Policy Status",
+    "docsPath": "cmdlets/Get-PnPSiteVersionPolicyStatus.html"
+  },
+  {
+    "name": "Get-PnPStorageEntity",
+    "synopsis": "Gets PnP Storage Entity",
+    "docsPath": "cmdlets/Get-PnPStorageEntity.html"
+  },
+  {
+    "name": "Get-PnPStoredCredential",
+    "synopsis": "Gets PnP Stored Credential",
+    "docsPath": "cmdlets/Get-PnPStoredCredential.html"
+  },
+  {
+    "name": "Get-PnPStructuralNavigationCacheSiteState",
+    "synopsis": "Gets PnP Structural Navigation Cache Site State",
+    "docsPath": "cmdlets/Get-PnPStructuralNavigationCacheSiteState.html"
+  },
+  {
+    "name": "Get-PnPStructuralNavigationCacheWebState",
+    "synopsis": "Gets PnP Structural Navigation Cache Web State",
+    "docsPath": "cmdlets/Get-PnPStructuralNavigationCacheWebState.html"
+  },
+  {
+    "name": "Get-PnPSubWeb",
+    "synopsis": "Gets PnP Sub Web",
+    "docsPath": "cmdlets/Get-PnPSubWeb.html"
+  },
+  {
+    "name": "Get-PnPSyntexModel",
+    "synopsis": "Gets PnP Syntex Model",
+    "docsPath": "cmdlets/Get-PnPSyntexModel.html"
+  },
+  {
+    "name": "Get-PnPSyntexModelPublication",
+    "synopsis": "Gets PnP Syntex Model Publication",
+    "docsPath": "cmdlets/Get-PnPSyntexModelPublication.html"
+  },
+  {
+    "name": "Get-PnPTaxonomyItem",
+    "synopsis": "Gets PnP Taxonomy Item",
+    "docsPath": "cmdlets/Get-PnPTaxonomyItem.html"
+  },
+  {
+    "name": "Get-PnPTaxonomySession",
+    "synopsis": "Gets PnP Taxonomy Session",
+    "docsPath": "cmdlets/Get-PnPTaxonomySession.html"
+  },
+  {
+    "name": "Get-PnPTeamsApp",
+    "synopsis": "Gets PnP Teams App",
+    "docsPath": "cmdlets/Get-PnPTeamsApp.html"
+  },
+  {
+    "name": "Get-PnPTeamsChannel",
+    "synopsis": "Gets PnP Teams Channel",
+    "docsPath": "cmdlets/Get-PnPTeamsChannel.html"
+  },
+  {
+    "name": "Get-PnPTeamsChannelFilesFolder",
+    "synopsis": "Gets PnP Teams Channel Files Folder",
+    "docsPath": "cmdlets/Get-PnPTeamsChannelFilesFolder.html"
+  },
+  {
+    "name": "Get-PnPTeamsChannelMessage",
+    "synopsis": "Gets PnP Teams Channel Message",
+    "docsPath": "cmdlets/Get-PnPTeamsChannelMessage.html"
+  },
+  {
+    "name": "Get-PnPTeamsChannelMessageReply",
+    "synopsis": "Gets PnP Teams Channel Message Reply",
+    "docsPath": "cmdlets/Get-PnPTeamsChannelMessageReply.html"
+  },
+  {
+    "name": "Get-PnPTeamsChannelUser",
+    "synopsis": "Gets PnP Teams Channel User",
+    "docsPath": "cmdlets/Get-PnPTeamsChannelUser.html"
+  },
+  {
+    "name": "Get-PnPTeamsPrimaryChannel",
+    "synopsis": "Gets PnP Teams Primary Channel",
+    "docsPath": "cmdlets/Get-PnPTeamsPrimaryChannel.html"
+  },
+  {
+    "name": "Get-PnPTeamsTab",
+    "synopsis": "Gets PnP Teams Tab",
+    "docsPath": "cmdlets/Get-PnPTeamsTab.html"
+  },
+  {
+    "name": "Get-PnPTeamsTag",
+    "synopsis": "Gets PnP Teams Tag",
+    "docsPath": "cmdlets/Get-PnPTeamsTag.html"
+  },
+  {
+    "name": "Get-PnPTeamsTeam",
+    "synopsis": "Gets PnP Teams Team",
+    "docsPath": "cmdlets/Get-PnPTeamsTeam.html"
+  },
+  {
+    "name": "Get-PnPTeamsUser",
+    "synopsis": "Gets PnP Teams User",
+    "docsPath": "cmdlets/Get-PnPTeamsUser.html"
+  },
+  {
+    "name": "Get-PnPTemporarilyDisableAppBar",
+    "synopsis": "Gets PnP Temporarily Disable App Bar",
+    "docsPath": "cmdlets/Get-PnPTemporarilyDisableAppBar.html"
+  },
+  {
+    "name": "Get-PnPTenant",
+    "synopsis": "Gets PnP Tenant",
+    "docsPath": "cmdlets/Get-PnPTenant.html"
+  },
+  {
+    "name": "Get-PnPTenantAppCatalogUrl",
+    "synopsis": "Gets PnP Tenant App Catalog Url",
+    "docsPath": "cmdlets/Get-PnPTenantAppCatalogUrl.html"
+  },
+  {
+    "name": "Get-PnPTenantCdnEnabled",
+    "synopsis": "Gets PnP Tenant Cdn Enabled",
+    "docsPath": "cmdlets/Get-PnPTenantCdnEnabled.html"
+  },
+  {
+    "name": "Get-PnPTenantCdnOrigin",
+    "synopsis": "Gets PnP Tenant Cdn Origin",
+    "docsPath": "cmdlets/Get-PnPTenantCdnOrigin.html"
+  },
+  {
+    "name": "Get-PnPTenantCdnPolicies",
+    "synopsis": "Gets PnP Tenant Cdn Policies",
+    "docsPath": "cmdlets/Get-PnPTenantCdnPolicies.html"
+  },
+  {
+    "name": "Get-PnPTenantDeletedSite",
+    "synopsis": "Gets PnP Tenant Deleted Site",
+    "docsPath": "cmdlets/Get-PnPTenantDeletedSite.html"
+  },
+  {
+    "name": "Get-PnPTenantId",
+    "synopsis": "Gets PnP Tenant Id",
+    "docsPath": "cmdlets/Get-PnPTenantId.html"
+  },
+  {
+    "name": "Get-PnPTenantInfo",
+    "synopsis": "Gets PnP Tenant Info",
+    "docsPath": "cmdlets/Get-PnPTenantInfo.html"
+  },
+  {
+    "name": "Get-PnPTenantInstance",
+    "synopsis": "Gets PnP Tenant Instance",
+    "docsPath": "cmdlets/Get-PnPTenantInstance.html"
+  },
+  {
+    "name": "Get-PnPTenantInternalSetting",
+    "synopsis": "Gets PnP Tenant Internal Setting",
+    "docsPath": "cmdlets/Get-PnPTenantInternalSetting.html"
+  },
+  {
+    "name": "Get-PnPTenantPronounsSetting",
+    "synopsis": "Gets PnP Tenant Pronouns Setting",
+    "docsPath": "cmdlets/Get-PnPTenantPronounsSetting.html"
+  },
+  {
+    "name": "Get-PnPTenantRecycleBinItem",
+    "synopsis": "Gets PnP Tenant Recycle Bin Item",
+    "docsPath": "cmdlets/Get-PnPTenantRecycleBinItem.html"
+  },
+  {
+    "name": "Get-PnPTenantRestrictedSearchAllowedList",
+    "synopsis": "Gets PnP Tenant Restricted Search Allowed List",
+    "docsPath": "cmdlets/Get-PnPTenantRestrictedSearchAllowedList.html"
+  },
+  {
+    "name": "Get-PnPTenantRestrictedSearchMode",
+    "synopsis": "Gets PnP Tenant Restricted Search Mode",
+    "docsPath": "cmdlets/Get-PnPTenantRestrictedSearchMode.html"
+  },
+  {
+    "name": "Get-PnPTenantRetentionLabel",
+    "synopsis": "Gets PnP Tenant Retention Label",
+    "docsPath": "cmdlets/Get-PnPTenantRetentionLabel.html"
+  },
+  {
+    "name": "Get-PnPTenantSequence",
+    "synopsis": "Gets PnP Tenant Sequence",
+    "docsPath": "cmdlets/Get-PnPTenantSequence.html"
+  },
+  {
+    "name": "Get-PnPTenantSequenceSite",
+    "synopsis": "Gets PnP Tenant Sequence Site",
+    "docsPath": "cmdlets/Get-PnPTenantSequenceSite.html"
+  },
+  {
+    "name": "Get-PnPTenantServicePrincipal",
+    "synopsis": "Gets PnP Tenant Service Principal",
+    "docsPath": "cmdlets/Get-PnPTenantServicePrincipal.html"
+  },
+  {
+    "name": "Get-PnPTenantServicePrincipalPermissionGrants",
+    "synopsis": "Gets PnP Tenant Service Principal Permission Grants",
+    "docsPath": "cmdlets/Get-PnPTenantServicePrincipalPermissionGrants.html"
+  },
+  {
+    "name": "Get-PnPTenantServicePrincipalPermissionRequests",
+    "synopsis": "Gets PnP Tenant Service Principal Permission Requests",
+    "docsPath": "cmdlets/Get-PnPTenantServicePrincipalPermissionRequests.html"
+  },
+  {
+    "name": "Get-PnPTenantSite",
+    "synopsis": "Gets PnP Tenant Site",
+    "docsPath": "cmdlets/Get-PnPTenantSite.html"
+  },
+  {
+    "name": "Get-PnPTenantSyncClientRestriction",
+    "synopsis": "Gets PnP Tenant Sync Client Restriction",
+    "docsPath": "cmdlets/Get-PnPTenantSyncClientRestriction.html"
+  },
+  {
+    "name": "Get-PnPTenantTemplate",
+    "synopsis": "Gets PnP Tenant Template",
+    "docsPath": "cmdlets/Get-PnPTenantTemplate.html"
+  },
+  {
+    "name": "Get-PnPTenantTheme",
+    "synopsis": "Gets PnP Tenant Theme",
+    "docsPath": "cmdlets/Get-PnPTenantTheme.html"
+  },
+  {
+    "name": "Get-PnPTerm",
+    "synopsis": "Gets PnP Term",
+    "docsPath": "cmdlets/Get-PnPTerm.html"
+  },
+  {
+    "name": "Get-PnPTermGroup",
+    "synopsis": "Gets PnP Term Group",
+    "docsPath": "cmdlets/Get-PnPTermGroup.html"
+  },
+  {
+    "name": "Get-PnPTermLabel",
+    "synopsis": "Gets PnP Term Label",
+    "docsPath": "cmdlets/Get-PnPTermLabel.html"
+  },
+  {
+    "name": "Get-PnPTermSet",
+    "synopsis": "Gets PnP Term Set",
+    "docsPath": "cmdlets/Get-PnPTermSet.html"
+  },
+  {
+    "name": "Get-PnPTheme",
+    "synopsis": "Gets PnP Theme",
+    "docsPath": "cmdlets/Get-PnPTheme.html"
+  },
+  {
+    "name": "Get-PnPTimeZoneId",
+    "synopsis": "Gets PnP Time Zone Id",
+    "docsPath": "cmdlets/Get-PnPTimeZoneId.html"
+  },
+  {
+    "name": "Get-PnPTodoList",
+    "synopsis": "Gets PnP Todo List",
+    "docsPath": "cmdlets/Get-PnPTodoList.html"
+  },
+  {
+    "name": "Get-PnPTodoTask",
+    "synopsis": "Gets PnP Todo Task",
+    "docsPath": "cmdlets/Get-PnPTodoTask.html"
+  },
+  {
+    "name": "Get-PnPTodoTaskChecklistItem",
+    "synopsis": "Gets PnP Todo Task Checklist Item",
+    "docsPath": "cmdlets/Get-PnPTodoTaskChecklistItem.html"
+  },
+  {
+    "name": "Get-PnPTodoTaskFileAttachment",
+    "synopsis": "Gets PnP Todo Task File Attachment",
+    "docsPath": "cmdlets/Get-PnPTodoTaskFileAttachment.html"
+  },
+  {
+    "name": "Get-PnPTodoTaskLinkedResource",
+    "synopsis": "Gets PnP Todo Task Linked Resource",
+    "docsPath": "cmdlets/Get-PnPTodoTaskLinkedResource.html"
+  },
+  {
+    "name": "Get-PnPTraceLog",
+    "synopsis": "Gets PnP Trace Log",
+    "docsPath": "cmdlets/Get-PnPTraceLog.html"
+  },
+  {
+    "name": "Get-PnPUnfurlLink",
+    "synopsis": "Gets PnP Unfurl Link",
+    "docsPath": "cmdlets/Get-PnPUnfurlLink.html"
+  },
+  {
+    "name": "Get-PnPUnifiedAuditLog",
+    "synopsis": "Gets PnP Unified Audit Log",
+    "docsPath": "cmdlets/Get-PnPUnifiedAuditLog.html"
+  },
+  {
+    "name": "Get-PnPUnifiedGroupMoveState",
+    "synopsis": "Gets PnP Unified Group Move State",
+    "docsPath": "cmdlets/Get-PnPUnifiedGroupMoveState.html"
+  },
+  {
+    "name": "Get-PnPUPABulkImportStatus",
+    "synopsis": "Gets PnP U P A Bulk Import Status",
+    "docsPath": "cmdlets/Get-PnPUPABulkImportStatus.html"
+  },
+  {
+    "name": "Get-PnPUser",
+    "synopsis": "Gets PnP User",
+    "docsPath": "cmdlets/Get-PnPUser.html"
+  },
+  {
+    "name": "Get-PnPUserAndContentMoveState",
+    "synopsis": "Gets PnP User And Content Move State",
+    "docsPath": "cmdlets/Get-PnPUserAndContentMoveState.html"
+  },
+  {
+    "name": "Get-PnPUserOneDriveLocation",
+    "synopsis": "Gets PnP User One Drive Location",
+    "docsPath": "cmdlets/Get-PnPUserOneDriveLocation.html"
+  },
+  {
+    "name": "Get-PnPUserOneDriveQuota",
+    "synopsis": "Gets PnP User One Drive Quota",
+    "docsPath": "cmdlets/Get-PnPUserOneDriveQuota.html"
+  },
+  {
+    "name": "Get-PnPUserProfilePhoto",
+    "synopsis": "Gets PnP User Profile Photo",
+    "docsPath": "cmdlets/Get-PnPUserProfilePhoto.html"
+  },
+  {
+    "name": "Get-PnPUserProfileProperty",
+    "synopsis": "Gets PnP User Profile Property",
+    "docsPath": "cmdlets/Get-PnPUserProfileProperty.html"
+  },
+  {
+    "name": "Get-PnPView",
+    "synopsis": "Gets PnP View",
+    "docsPath": "cmdlets/Get-PnPView.html"
+  },
+  {
+    "name": "Get-PnPVivaConnectionsDashboardACE",
+    "synopsis": "Gets PnP Viva Connections Dashboard A C E",
+    "docsPath": "cmdlets/Get-PnPVivaConnectionsDashboardACE.html"
+  },
+  {
+    "name": "Get-PnPVivaEngageCommunity",
+    "synopsis": "Gets PnP Viva Engage Community",
+    "docsPath": "cmdlets/Get-PnPVivaEngageCommunity.html"
+  },
+  {
+    "name": "Get-PnPWeb",
+    "synopsis": "Gets PnP Web",
+    "docsPath": "cmdlets/Get-PnPWeb.html"
+  },
+  {
+    "name": "Get-PnPWebAlert",
+    "synopsis": "Gets PnP Web Alert",
+    "docsPath": "cmdlets/Get-PnPWebAlert.html"
+  },
+  {
+    "name": "Get-PnPWebHeader",
+    "synopsis": "Gets PnP Web Header",
+    "docsPath": "cmdlets/Get-PnPWebHeader.html"
+  },
+  {
+    "name": "Get-PnPWebhookSubscription",
+    "synopsis": "Gets PnP Webhook Subscription",
+    "docsPath": "cmdlets/Get-PnPWebhookSubscription.html"
+  },
+  {
+    "name": "Get-PnPWebhookSubscriptions",
+    "synopsis": "Gets PnP Webhook Subscriptions",
+    "docsPath": "cmdlets/Get-PnPWebhookSubscriptions.html"
+  },
+  {
+    "name": "Get-PnPWebPart",
+    "synopsis": "Gets PnP Web Part",
+    "docsPath": "cmdlets/Get-PnPWebPart.html"
+  },
+  {
+    "name": "Get-PnPWebPartProperty",
+    "synopsis": "Gets PnP Web Part Property",
+    "docsPath": "cmdlets/Get-PnPWebPartProperty.html"
+  },
+  {
+    "name": "Get-PnPWebPartXml",
+    "synopsis": "Gets PnP Web Part Xml",
+    "docsPath": "cmdlets/Get-PnPWebPartXml.html"
+  },
+  {
+    "name": "Get-PnPWebPermission",
+    "synopsis": "Gets PnP Web Permission",
+    "docsPath": "cmdlets/Get-PnPWebPermission.html"
+  },
+  {
+    "name": "Get-PnPWebTemplates",
+    "synopsis": "Gets PnP Web Templates",
+    "docsPath": "cmdlets/Get-PnPWebTemplates.html"
+  },
+  {
+    "name": "Get-PnPWikiPageContent",
+    "synopsis": "Gets PnP Wiki Page Content",
+    "docsPath": "cmdlets/Get-PnPWikiPageContent.html"
+  },
+  {
+    "name": "Grant-PnPAzureADAppSitePermission",
+    "synopsis": "Grants PnP Azure A D App Site Permission",
+    "docsPath": "cmdlets/Grant-PnPAzureADAppSitePermission.html"
+  },
+  {
+    "name": "Grant-PnPEntraIDAppFilePermission",
+    "synopsis": "Grants PnP Entra I D App File Permission",
+    "docsPath": "cmdlets/Grant-PnPEntraIDAppFilePermission.html"
+  },
+  {
+    "name": "Grant-PnPEntraIDAppListItemPermission",
+    "synopsis": "Grants PnP Entra I D App List Item Permission",
+    "docsPath": "cmdlets/Grant-PnPEntraIDAppListItemPermission.html"
+  },
+  {
+    "name": "Grant-PnPEntraIDAppListPermission",
+    "synopsis": "Grants PnP Entra I D App List Permission",
+    "docsPath": "cmdlets/Grant-PnPEntraIDAppListPermission.html"
+  },
+  {
+    "name": "Grant-PnPEntraIDAppSitePermission",
+    "synopsis": "Grants PnP Entra I D App Site Permission",
+    "docsPath": "cmdlets/Grant-PnPEntraIDAppSitePermission.html"
+  },
+  {
+    "name": "Grant-PnPHubSiteRights",
+    "synopsis": "Grants PnP Hub Site Rights",
+    "docsPath": "cmdlets/Grant-PnPHubSiteRights.html"
+  },
+  {
+    "name": "Grant-PnPSiteDesignRights",
+    "synopsis": "Grants PnP Site Design Rights",
+    "docsPath": "cmdlets/Grant-PnPSiteDesignRights.html"
+  },
+  {
+    "name": "Grant-PnPTenantServicePrincipalPermission",
+    "synopsis": "Grants PnP Tenant Service Principal Permission",
+    "docsPath": "cmdlets/Grant-PnPTenantServicePrincipalPermission.html"
+  },
+  {
+    "name": "Import-PnPFlow",
+    "synopsis": "Imports PnP Flow",
+    "docsPath": "cmdlets/Import-PnPFlow.html"
+  },
+  {
+    "name": "Import-PnPTaxonomy",
+    "synopsis": "Imports PnP Taxonomy",
+    "docsPath": "cmdlets/Import-PnPTaxonomy.html"
+  },
+  {
+    "name": "Import-PnPTermGroupFromXml",
+    "synopsis": "Imports PnP Term Group From Xml",
+    "docsPath": "cmdlets/Import-PnPTermGroupFromXml.html"
+  },
+  {
+    "name": "Import-PnPTermSet",
+    "synopsis": "Imports PnP Term Set",
+    "docsPath": "cmdlets/Import-PnPTermSet.html"
+  },
+  {
+    "name": "Install-PnPApp",
+    "synopsis": "Installs PnP App",
+    "docsPath": "cmdlets/Install-PnPApp.html"
+  },
+  {
+    "name": "Invoke-PnPBatch",
+    "synopsis": "Invokes PnP Batch",
+    "docsPath": "cmdlets/Invoke-PnPBatch.html"
+  },
+  {
+    "name": "Invoke-PnPGraphMethod",
+    "synopsis": "Invokes PnP Graph Method",
+    "docsPath": "cmdlets/Invoke-PnPGraphMethod.html"
+  },
+  {
+    "name": "Invoke-PnPListDesign",
+    "synopsis": "Invokes PnP List Design",
+    "docsPath": "cmdlets/Invoke-PnPListDesign.html"
+  },
+  {
+    "name": "Invoke-PnPQuery",
+    "synopsis": "Invokes PnP Query",
+    "docsPath": "cmdlets/Invoke-PnPQuery.html"
+  },
+  {
+    "name": "Invoke-PnPSearchQuery",
+    "synopsis": "Invokes PnP Search Query",
+    "docsPath": "cmdlets/Invoke-PnPSearchQuery.html"
+  },
+  {
+    "name": "Invoke-PnPSiteDesign",
+    "synopsis": "Invokes PnP Site Design",
+    "docsPath": "cmdlets/Invoke-PnPSiteDesign.html"
+  },
+  {
+    "name": "Invoke-PnPSiteScript",
+    "synopsis": "Invokes PnP Site Script",
+    "docsPath": "cmdlets/Invoke-PnPSiteScript.html"
+  },
+  {
+    "name": "Invoke-PnPSiteSwap",
+    "synopsis": "Invokes PnP Site Swap",
+    "docsPath": "cmdlets/Invoke-PnPSiteSwap.html"
+  },
+  {
+    "name": "Invoke-PnPSiteTemplate",
+    "synopsis": "Invokes PnP Site Template",
+    "docsPath": "cmdlets/Invoke-PnPSiteTemplate.html"
+  },
+  {
+    "name": "Invoke-PnPSPRestMethod",
+    "synopsis": "Invokes PnP S P Rest Method",
+    "docsPath": "cmdlets/Invoke-PnPSPRestMethod.html"
+  },
+  {
+    "name": "Invoke-PnPTenantTemplate",
+    "synopsis": "Invokes PnP Tenant Template",
+    "docsPath": "cmdlets/Invoke-PnPTenantTemplate.html"
+  },
+  {
+    "name": "Invoke-PnPWebAction",
+    "synopsis": "Invokes PnP Web Action",
+    "docsPath": "cmdlets/Invoke-PnPWebAction.html"
+  },
+  {
+    "name": "Measure-PnPList",
+    "synopsis": "Measures PnP List",
+    "docsPath": "cmdlets/Measure-PnPList.html"
+  },
+  {
+    "name": "Measure-PnPWeb",
+    "synopsis": "Measures PnP Web",
+    "docsPath": "cmdlets/Measure-PnPWeb.html"
+  },
+  {
+    "name": "Merge-PnPTerm",
+    "synopsis": "Merges PnP Term",
+    "docsPath": "cmdlets/Merge-PnPTerm.html"
+  },
+  {
+    "name": "Move-PnPClientSideComponent",
+    "synopsis": "Moves PnP Client Side Component",
+    "docsPath": "cmdlets/Move-PnPClientSideComponent.html"
+  },
+  {
+    "name": "Move-PnPFile",
+    "synopsis": "Moves PnP File",
+    "docsPath": "cmdlets/Move-PnPFile.html"
+  },
+  {
+    "name": "Move-PnPFolder",
+    "synopsis": "Moves PnP Folder",
+    "docsPath": "cmdlets/Move-PnPFolder.html"
+  },
+  {
+    "name": "Move-PnPListItemToRecycleBin",
+    "synopsis": "Moves PnP List Item To Recycle Bin",
+    "docsPath": "cmdlets/Move-PnPListItemToRecycleBin.html"
+  },
+  {
+    "name": "Move-PnPPage",
+    "synopsis": "Moves PnP Page",
+    "docsPath": "cmdlets/Move-PnPPage.html"
+  },
+  {
+    "name": "Move-PnPPageComponent",
+    "synopsis": "Moves PnP Page Component",
+    "docsPath": "cmdlets/Move-PnPPageComponent.html"
+  },
+  {
+    "name": "Move-PnPTerm",
+    "synopsis": "Moves PnP Term",
+    "docsPath": "cmdlets/Move-PnPTerm.html"
+  },
+  {
+    "name": "Move-PnPTermSet",
+    "synopsis": "Moves PnP Term Set",
+    "docsPath": "cmdlets/Move-PnPTermSet.html"
+  },
+  {
+    "name": "New-PnPAzureADGroup",
+    "synopsis": "Creates PnP Azure A D Group",
+    "docsPath": "cmdlets/New-PnPAzureADGroup.html"
+  },
+  {
+    "name": "New-PnPAzureADUserTemporaryAccessPass",
+    "synopsis": "Creates PnP Azure A D User Temporary Access Pass",
+    "docsPath": "cmdlets/New-PnPAzureADUserTemporaryAccessPass.html"
+  },
+  {
+    "name": "New-PnPAzureCertificate",
+    "synopsis": "Creates PnP Azure Certificate",
+    "docsPath": "cmdlets/New-PnPAzureCertificate.html"
+  },
+  {
+    "name": "New-PnPBatch",
+    "synopsis": "Creates PnP Batch",
+    "docsPath": "cmdlets/New-PnPBatch.html"
+  },
+  {
+    "name": "New-PnPContainerType",
+    "synopsis": "Creates PnP Container Type",
+    "docsPath": "cmdlets/New-PnPContainerType.html"
+  },
+  {
+    "name": "New-PnPEntraIDGroup",
+    "synopsis": "Creates PnP Entra I D Group",
+    "docsPath": "cmdlets/New-PnPEntraIDGroup.html"
+  },
+  {
+    "name": "New-PnPEntraIDUserTemporaryAccessPass",
+    "synopsis": "Creates PnP Entra I D User Temporary Access Pass",
+    "docsPath": "cmdlets/New-PnPEntraIDUserTemporaryAccessPass.html"
+  },
+  {
+    "name": "New-PnPExtensibilityHandlerObject",
+    "synopsis": "Creates PnP Extensibility Handler Object",
+    "docsPath": "cmdlets/New-PnPExtensibilityHandlerObject.html"
+  },
+  {
+    "name": "New-PnPGraphSubscription",
+    "synopsis": "Creates PnP Graph Subscription",
+    "docsPath": "cmdlets/New-PnPGraphSubscription.html"
+  },
+  {
+    "name": "New-PnPGroup",
+    "synopsis": "Creates PnP Group",
+    "docsPath": "cmdlets/New-PnPGroup.html"
+  },
+  {
+    "name": "New-PnPLibraryFileVersionBatchDeleteJob",
+    "synopsis": "Creates PnP Library File Version Batch Delete Job",
+    "docsPath": "cmdlets/New-PnPLibraryFileVersionBatchDeleteJob.html"
+  },
+  {
+    "name": "New-PnPLibraryFileVersionExpirationReportJob",
+    "synopsis": "Creates PnP Library File Version Expiration Report Job",
+    "docsPath": "cmdlets/New-PnPLibraryFileVersionExpirationReportJob.html"
+  },
+  {
+    "name": "New-PnPList",
+    "synopsis": "Creates PnP List",
+    "docsPath": "cmdlets/New-PnPList.html"
+  },
+  {
+    "name": "New-PnPMicrosoft365Group",
+    "synopsis": "Creates PnP Microsoft365 Group",
+    "docsPath": "cmdlets/New-PnPMicrosoft365Group.html"
+  },
+  {
+    "name": "New-PnPMicrosoft365GroupSettings",
+    "synopsis": "Creates PnP Microsoft365 Group Settings",
+    "docsPath": "cmdlets/New-PnPMicrosoft365GroupSettings.html"
+  },
+  {
+    "name": "New-PnPPersonalSite",
+    "synopsis": "Creates PnP Personal Site",
+    "docsPath": "cmdlets/New-PnPPersonalSite.html"
+  },
+  {
+    "name": "New-PnPPlannerPlan",
+    "synopsis": "Creates PnP Planner Plan",
+    "docsPath": "cmdlets/New-PnPPlannerPlan.html"
+  },
+  {
+    "name": "New-PnPSdnProvider",
+    "synopsis": "Creates PnP Sdn Provider",
+    "docsPath": "cmdlets/New-PnPSdnProvider.html"
+  },
+  {
+    "name": "New-PnPSearchExternalConnection",
+    "synopsis": "Creates PnP Search External Connection",
+    "docsPath": "cmdlets/New-PnPSearchExternalConnection.html"
+  },
+  {
+    "name": "New-PnPSearchResultType",
+    "synopsis": "Creates PnP Search Result Type",
+    "docsPath": "cmdlets/New-PnPSearchResultType.html"
+  },
+  {
+    "name": "New-PnPSearchResultTypeRule",
+    "synopsis": "Creates PnP Search Result Type Rule",
+    "docsPath": "cmdlets/New-PnPSearchResultTypeRule.html"
+  },
+  {
+    "name": "New-PnPSearchVertical",
+    "synopsis": "Creates PnP Search Vertical",
+    "docsPath": "cmdlets/New-PnPSearchVertical.html"
+  },
+  {
+    "name": "New-PnPSite",
+    "synopsis": "Creates PnP Site",
+    "docsPath": "cmdlets/New-PnPSite.html"
+  },
+  {
+    "name": "New-PnPSiteCollectionTermStore",
+    "synopsis": "Creates PnP Site Collection Term Store",
+    "docsPath": "cmdlets/New-PnPSiteCollectionTermStore.html"
+  },
+  {
+    "name": "New-PnPSiteFileVersionBatchDeleteJob",
+    "synopsis": "Creates PnP Site File Version Batch Delete Job",
+    "docsPath": "cmdlets/New-PnPSiteFileVersionBatchDeleteJob.html"
+  },
+  {
+    "name": "New-PnPSiteFileVersionExpirationReportJob",
+    "synopsis": "Creates PnP Site File Version Expiration Report Job",
+    "docsPath": "cmdlets/New-PnPSiteFileVersionExpirationReportJob.html"
+  },
+  {
+    "name": "New-PnPSiteGroup",
+    "synopsis": "Creates PnP Site Group",
+    "docsPath": "cmdlets/New-PnPSiteGroup.html"
+  },
+  {
+    "name": "New-PnPSiteManageVersionPolicyJob",
+    "synopsis": "Creates PnP Site Manage Version Policy Job",
+    "docsPath": "cmdlets/New-PnPSiteManageVersionPolicyJob.html"
+  },
+  {
+    "name": "New-PnPSiteTemplate",
+    "synopsis": "Creates PnP Site Template",
+    "docsPath": "cmdlets/New-PnPSiteTemplate.html"
+  },
+  {
+    "name": "New-PnPSiteTemplateFromFolder",
+    "synopsis": "Creates PnP Site Template From Folder",
+    "docsPath": "cmdlets/New-PnPSiteTemplateFromFolder.html"
+  },
+  {
+    "name": "New-PnPTeamsApp",
+    "synopsis": "Creates PnP Teams App",
+    "docsPath": "cmdlets/New-PnPTeamsApp.html"
+  },
+  {
+    "name": "New-PnPTeamsTeam",
+    "synopsis": "Creates PnP Teams Team",
+    "docsPath": "cmdlets/New-PnPTeamsTeam.html"
+  },
+  {
+    "name": "New-PnPTenantSequence",
+    "synopsis": "Creates PnP Tenant Sequence",
+    "docsPath": "cmdlets/New-PnPTenantSequence.html"
+  },
+  {
+    "name": "New-PnPTenantSequenceCommunicationSite",
+    "synopsis": "Creates PnP Tenant Sequence Communication Site",
+    "docsPath": "cmdlets/New-PnPTenantSequenceCommunicationSite.html"
+  },
+  {
+    "name": "New-PnPTenantSequenceTeamNoGroupSite",
+    "synopsis": "Creates PnP Tenant Sequence Team No Group Site",
+    "docsPath": "cmdlets/New-PnPTenantSequenceTeamNoGroupSite.html"
+  },
+  {
+    "name": "New-PnPTenantSequenceTeamNoGroupSubSite",
+    "synopsis": "Creates PnP Tenant Sequence Team No Group Sub Site",
+    "docsPath": "cmdlets/New-PnPTenantSequenceTeamNoGroupSubSite.html"
+  },
+  {
+    "name": "New-PnPTenantSequenceTeamSite",
+    "synopsis": "Creates PnP Tenant Sequence Team Site",
+    "docsPath": "cmdlets/New-PnPTenantSequenceTeamSite.html"
+  },
+  {
+    "name": "New-PnPTenantSite",
+    "synopsis": "Creates PnP Tenant Site",
+    "docsPath": "cmdlets/New-PnPTenantSite.html"
+  },
+  {
+    "name": "New-PnPTenantTemplate",
+    "synopsis": "Creates PnP Tenant Template",
+    "docsPath": "cmdlets/New-PnPTenantTemplate.html"
+  },
+  {
+    "name": "New-PnPTerm",
+    "synopsis": "Creates PnP Term",
+    "docsPath": "cmdlets/New-PnPTerm.html"
+  },
+  {
+    "name": "New-PnPTermGroup",
+    "synopsis": "Creates PnP Term Group",
+    "docsPath": "cmdlets/New-PnPTermGroup.html"
+  },
+  {
+    "name": "New-PnPTermLabel",
+    "synopsis": "Creates PnP Term Label",
+    "docsPath": "cmdlets/New-PnPTermLabel.html"
+  },
+  {
+    "name": "New-PnPTermSet",
+    "synopsis": "Creates PnP Term Set",
+    "docsPath": "cmdlets/New-PnPTermSet.html"
+  },
+  {
+    "name": "New-PnPTodoList",
+    "synopsis": "Creates PnP Todo List",
+    "docsPath": "cmdlets/New-PnPTodoList.html"
+  },
+  {
+    "name": "New-PnPTodoTask",
+    "synopsis": "Creates PnP Todo Task",
+    "docsPath": "cmdlets/New-PnPTodoTask.html"
+  },
+  {
+    "name": "New-PnPTodoTaskChecklistItem",
+    "synopsis": "Creates PnP Todo Task Checklist Item",
+    "docsPath": "cmdlets/New-PnPTodoTaskChecklistItem.html"
+  },
+  {
+    "name": "New-PnPTodoTaskLinkedResource",
+    "synopsis": "Creates PnP Todo Task Linked Resource",
+    "docsPath": "cmdlets/New-PnPTodoTaskLinkedResource.html"
+  },
+  {
+    "name": "New-PnPUPABulkImportJob",
+    "synopsis": "Creates PnP U P A Bulk Import Job",
+    "docsPath": "cmdlets/New-PnPUPABulkImportJob.html"
+  },
+  {
+    "name": "New-PnPUser",
+    "synopsis": "Creates PnP User",
+    "docsPath": "cmdlets/New-PnPUser.html"
+  },
+  {
+    "name": "New-PnPVivaEngageCommunity",
+    "synopsis": "Creates PnP Viva Engage Community",
+    "docsPath": "cmdlets/New-PnPVivaEngageCommunity.html"
+  },
+  {
+    "name": "New-PnPWeb",
+    "synopsis": "Creates PnP Web",
+    "docsPath": "cmdlets/New-PnPWeb.html"
+  },
+  {
+    "name": "Publish-PnPApp",
+    "synopsis": "Publishes PnP App",
+    "docsPath": "cmdlets/Publish-PnPApp.html"
+  },
+  {
+    "name": "Publish-PnPContentType",
+    "synopsis": "Publishes PnP Content Type",
+    "docsPath": "cmdlets/Publish-PnPContentType.html"
+  },
+  {
+    "name": "Publish-PnPSyntexModel",
+    "synopsis": "Publishes PnP Syntex Model",
+    "docsPath": "cmdlets/Publish-PnPSyntexModel.html"
+  },
+  {
+    "name": "Read-PnPSiteTemplate",
+    "synopsis": "Reads PnP Site Template",
+    "docsPath": "cmdlets/Read-PnPSiteTemplate.html"
+  },
+  {
+    "name": "Read-PnPTenantTemplate",
+    "synopsis": "Reads PnP Tenant Template",
+    "docsPath": "cmdlets/Read-PnPTenantTemplate.html"
+  },
+  {
+    "name": "Receive-PnPCopyMoveJobStatus",
+    "synopsis": "Receives PnP Copy Move Job Status",
+    "docsPath": "cmdlets/Receive-PnPCopyMoveJobStatus.html"
+  },
+  {
+    "name": "Register-PnPAppCatalogSite",
+    "synopsis": "Registers PnP App Catalog Site",
+    "docsPath": "cmdlets/Register-PnPAppCatalogSite.html"
+  },
+  {
+    "name": "Register-PnPAzureADApp",
+    "synopsis": "Registers PnP Azure A D App",
+    "docsPath": "cmdlets/Register-PnPAzureADApp.html"
+  },
+  {
+    "name": "Register-PnPEntraIDApp",
+    "synopsis": "Registers PnP Entra I D App",
+    "docsPath": "cmdlets/Register-PnPEntraIDApp.html"
+  },
+  {
+    "name": "Register-PnPEntraIDAppForInteractiveLogin",
+    "synopsis": "Registers PnP Entra I D App For Interactive Login",
+    "docsPath": "cmdlets/Register-PnPEntraIDAppForInteractiveLogin.html"
+  },
+  {
+    "name": "Register-PnPHubSite",
+    "synopsis": "Registers PnP Hub Site",
+    "docsPath": "cmdlets/Register-PnPHubSite.html"
+  },
+  {
+    "name": "Remove-PnPAdaptiveScopeProperty",
+    "synopsis": "Removes PnP Adaptive Scope Property",
+    "docsPath": "cmdlets/Remove-PnPAdaptiveScopeProperty.html"
+  },
+  {
+    "name": "Remove-PnPAlert",
+    "synopsis": "Removes PnP Alert",
+    "docsPath": "cmdlets/Remove-PnPAlert.html"
+  },
+  {
+    "name": "Remove-PnPApp",
+    "synopsis": "Removes PnP App",
+    "docsPath": "cmdlets/Remove-PnPApp.html"
+  },
+  {
+    "name": "Remove-PnPApplicationCustomizer",
+    "synopsis": "Removes PnP Application Customizer",
+    "docsPath": "cmdlets/Remove-PnPApplicationCustomizer.html"
+  },
+  {
+    "name": "Remove-PnPAvailableSiteClassification",
+    "synopsis": "Removes PnP Available Site Classification",
+    "docsPath": "cmdlets/Remove-PnPAvailableSiteClassification.html"
+  },
+  {
+    "name": "Remove-PnPAzureADApp",
+    "synopsis": "Removes PnP Azure A D App",
+    "docsPath": "cmdlets/Remove-PnPAzureADApp.html"
+  },
+  {
+    "name": "Remove-PnPAzureADGroup",
+    "synopsis": "Removes PnP Azure A D Group",
+    "docsPath": "cmdlets/Remove-PnPAzureADGroup.html"
+  },
+  {
+    "name": "Remove-PnPAzureADGroupMember",
+    "synopsis": "Removes PnP Azure A D Group Member",
+    "docsPath": "cmdlets/Remove-PnPAzureADGroupMember.html"
+  },
+  {
+    "name": "Remove-PnPAzureADGroupOwner",
+    "synopsis": "Removes PnP Azure A D Group Owner",
+    "docsPath": "cmdlets/Remove-PnPAzureADGroupOwner.html"
+  },
+  {
+    "name": "Remove-PnPAzureADServicePrincipalAppRoleAssignment",
+    "synopsis": "Removes PnP Azure A D Service Principal App Role Assignment",
+    "docsPath": "cmdlets/Remove-PnPAzureADServicePrincipalAppRoleAssignment.html"
+  },
+  {
+    "name": "Remove-PnPAzureADServicePrincipalAssignedAppRole",
+    "synopsis": "Removes PnP Azure A D Service Principal Assigned App Role",
+    "docsPath": "cmdlets/Remove-PnPAzureADServicePrincipalAssignedAppRole.html"
+  },
+  {
+    "name": "Remove-PnPAzureADUser",
+    "synopsis": "Removes PnP Azure A D User",
+    "docsPath": "cmdlets/Remove-PnPAzureADUser.html"
+  },
+  {
+    "name": "Remove-PnPClientSidePage",
+    "synopsis": "Removes PnP Client Side Page",
+    "docsPath": "cmdlets/Remove-PnPClientSidePage.html"
+  },
+  {
+    "name": "Remove-PnPContainer",
+    "synopsis": "Removes PnP Container",
+    "docsPath": "cmdlets/Remove-PnPContainer.html"
+  },
+  {
+    "name": "Remove-PnPContainerType",
+    "synopsis": "Removes PnP Container Type",
+    "docsPath": "cmdlets/Remove-PnPContainerType.html"
+  },
+  {
+    "name": "Remove-PnPContentType",
+    "synopsis": "Removes PnP Content Type",
+    "docsPath": "cmdlets/Remove-PnPContentType.html"
+  },
+  {
+    "name": "Remove-PnPContentTypeFromDocumentSet",
+    "synopsis": "Removes PnP Content Type From Document Set",
+    "docsPath": "cmdlets/Remove-PnPContentTypeFromDocumentSet.html"
+  },
+  {
+    "name": "Remove-PnPContentTypeFromList",
+    "synopsis": "Removes PnP Content Type From List",
+    "docsPath": "cmdlets/Remove-PnPContentTypeFromList.html"
+  },
+  {
+    "name": "Remove-PnPCustomAction",
+    "synopsis": "Removes PnP Custom Action",
+    "docsPath": "cmdlets/Remove-PnPCustomAction.html"
+  },
+  {
+    "name": "Remove-PnPDeletedMicrosoft365Group",
+    "synopsis": "Removes PnP Deleted Microsoft365 Group",
+    "docsPath": "cmdlets/Remove-PnPDeletedMicrosoft365Group.html"
+  },
+  {
+    "name": "Remove-PnPEntraIDApp",
+    "synopsis": "Removes PnP Entra I D App",
+    "docsPath": "cmdlets/Remove-PnPEntraIDApp.html"
+  },
+  {
+    "name": "Remove-PnPEntraIDGroup",
+    "synopsis": "Removes PnP Entra I D Group",
+    "docsPath": "cmdlets/Remove-PnPEntraIDGroup.html"
+  },
+  {
+    "name": "Remove-PnPEntraIDGroupMember",
+    "synopsis": "Removes PnP Entra I D Group Member",
+    "docsPath": "cmdlets/Remove-PnPEntraIDGroupMember.html"
+  },
+  {
+    "name": "Remove-PnPEntraIDGroupOwner",
+    "synopsis": "Removes PnP Entra I D Group Owner",
+    "docsPath": "cmdlets/Remove-PnPEntraIDGroupOwner.html"
+  },
+  {
+    "name": "Remove-PnPEntraIDServicePrincipalAppRoleAssignment",
+    "synopsis": "Removes PnP Entra I D Service Principal App Role Assignment",
+    "docsPath": "cmdlets/Remove-PnPEntraIDServicePrincipalAppRoleAssignment.html"
+  },
+  {
+    "name": "Remove-PnPEntraIDServicePrincipalAssignedAppRole",
+    "synopsis": "Removes PnP Entra I D Service Principal Assigned App Role",
+    "docsPath": "cmdlets/Remove-PnPEntraIDServicePrincipalAssignedAppRole.html"
+  },
+  {
+    "name": "Remove-PnPEntraIDUser",
+    "synopsis": "Removes PnP Entra I D User",
+    "docsPath": "cmdlets/Remove-PnPEntraIDUser.html"
+  },
+  {
+    "name": "Remove-PnPEventReceiver",
+    "synopsis": "Removes PnP Event Receiver",
+    "docsPath": "cmdlets/Remove-PnPEventReceiver.html"
+  },
+  {
+    "name": "Remove-PnPExternalUser",
+    "synopsis": "Removes PnP External User",
+    "docsPath": "cmdlets/Remove-PnPExternalUser.html"
+  },
+  {
+    "name": "Remove-PnPField",
+    "synopsis": "Removes PnP Field",
+    "docsPath": "cmdlets/Remove-PnPField.html"
+  },
+  {
+    "name": "Remove-PnPFieldFromContentType",
+    "synopsis": "Removes PnP Field From Content Type",
+    "docsPath": "cmdlets/Remove-PnPFieldFromContentType.html"
+  },
+  {
+    "name": "Remove-PnPFile",
+    "synopsis": "Removes PnP File",
+    "docsPath": "cmdlets/Remove-PnPFile.html"
+  },
+  {
+    "name": "Remove-PnPFileFromSiteTemplate",
+    "synopsis": "Removes PnP File From Site Template",
+    "docsPath": "cmdlets/Remove-PnPFileFromSiteTemplate.html"
+  },
+  {
+    "name": "Remove-PnPFileSharingLink",
+    "synopsis": "Removes PnP File Sharing Link",
+    "docsPath": "cmdlets/Remove-PnPFileSharingLink.html"
+  },
+  {
+    "name": "Remove-PnPFileVersion",
+    "synopsis": "Removes PnP File Version",
+    "docsPath": "cmdlets/Remove-PnPFileVersion.html"
+  },
+  {
+    "name": "Remove-PnPFlow",
+    "synopsis": "Removes PnP Flow",
+    "docsPath": "cmdlets/Remove-PnPFlow.html"
+  },
+  {
+    "name": "Remove-PnPFlowOwner",
+    "synopsis": "Removes PnP Flow Owner",
+    "docsPath": "cmdlets/Remove-PnPFlowOwner.html"
+  },
+  {
+    "name": "Remove-PnPFolder",
+    "synopsis": "Removes PnP Folder",
+    "docsPath": "cmdlets/Remove-PnPFolder.html"
+  },
+  {
+    "name": "Remove-PnPFolderSharingLink",
+    "synopsis": "Removes PnP Folder Sharing Link",
+    "docsPath": "cmdlets/Remove-PnPFolderSharingLink.html"
+  },
+  {
+    "name": "Remove-PnPGeoAdministrator",
+    "synopsis": "Removes PnP Geo Administrator",
+    "docsPath": "cmdlets/Remove-PnPGeoAdministrator.html"
+  },
+  {
+    "name": "Remove-PnPGraphSubscription",
+    "synopsis": "Removes PnP Graph Subscription",
+    "docsPath": "cmdlets/Remove-PnPGraphSubscription.html"
+  },
+  {
+    "name": "Remove-PnPGroup",
+    "synopsis": "Removes PnP Group",
+    "docsPath": "cmdlets/Remove-PnPGroup.html"
+  },
+  {
+    "name": "Remove-PnPGroupMember",
+    "synopsis": "Removes PnP Group Member",
+    "docsPath": "cmdlets/Remove-PnPGroupMember.html"
+  },
+  {
+    "name": "Remove-PnPHomeSite",
+    "synopsis": "Removes PnP Home Site",
+    "docsPath": "cmdlets/Remove-PnPHomeSite.html"
+  },
+  {
+    "name": "Remove-PnPHubSiteAssociation",
+    "synopsis": "Removes PnP Hub Site Association",
+    "docsPath": "cmdlets/Remove-PnPHubSiteAssociation.html"
+  },
+  {
+    "name": "Remove-PnPHubToHubAssociation",
+    "synopsis": "Removes PnP Hub To Hub Association",
+    "docsPath": "cmdlets/Remove-PnPHubToHubAssociation.html"
+  },
+  {
+    "name": "Remove-PnPIndexedProperty",
+    "synopsis": "Removes PnP Indexed Property",
+    "docsPath": "cmdlets/Remove-PnPIndexedProperty.html"
+  },
+  {
+    "name": "Remove-PnPJavaScriptLink",
+    "synopsis": "Removes PnP Java Script Link",
+    "docsPath": "cmdlets/Remove-PnPJavaScriptLink.html"
+  },
+  {
+    "name": "Remove-PnPKnowledgeHubSite",
+    "synopsis": "Removes PnP Knowledge Hub Site",
+    "docsPath": "cmdlets/Remove-PnPKnowledgeHubSite.html"
+  },
+  {
+    "name": "Remove-PnPLibraryFileVersionBatchDeleteJob",
+    "synopsis": "Removes PnP Library File Version Batch Delete Job",
+    "docsPath": "cmdlets/Remove-PnPLibraryFileVersionBatchDeleteJob.html"
+  },
+  {
+    "name": "Remove-PnPList",
+    "synopsis": "Removes PnP List",
+    "docsPath": "cmdlets/Remove-PnPList.html"
+  },
+  {
+    "name": "Remove-PnPListDesign",
+    "synopsis": "Removes PnP List Design",
+    "docsPath": "cmdlets/Remove-PnPListDesign.html"
+  },
+  {
+    "name": "Remove-PnPListItem",
+    "synopsis": "Removes PnP List Item",
+    "docsPath": "cmdlets/Remove-PnPListItem.html"
+  },
+  {
+    "name": "Remove-PnPListItemAttachment",
+    "synopsis": "Removes PnP List Item Attachment",
+    "docsPath": "cmdlets/Remove-PnPListItemAttachment.html"
+  },
+  {
+    "name": "Remove-PnPListItemComment",
+    "synopsis": "Removes PnP List Item Comment",
+    "docsPath": "cmdlets/Remove-PnPListItemComment.html"
+  },
+  {
+    "name": "Remove-PnPListItemVersion",
+    "synopsis": "Removes PnP List Item Version",
+    "docsPath": "cmdlets/Remove-PnPListItemVersion.html"
+  },
+  {
+    "name": "Remove-PnPManagedAppId",
+    "synopsis": "Removes PnP Managed App Id",
+    "docsPath": "cmdlets/Remove-PnPManagedAppId.html"
+  },
+  {
+    "name": "Remove-PnPMicrosoft365Group",
+    "synopsis": "Removes PnP Microsoft365 Group",
+    "docsPath": "cmdlets/Remove-PnPMicrosoft365Group.html"
+  },
+  {
+    "name": "Remove-PnPMicrosoft365GroupMember",
+    "synopsis": "Removes PnP Microsoft365 Group Member",
+    "docsPath": "cmdlets/Remove-PnPMicrosoft365GroupMember.html"
+  },
+  {
+    "name": "Remove-PnPMicrosoft365GroupOwner",
+    "synopsis": "Removes PnP Microsoft365 Group Owner",
+    "docsPath": "cmdlets/Remove-PnPMicrosoft365GroupOwner.html"
+  },
+  {
+    "name": "Remove-PnPMicrosoft365GroupPhoto",
+    "synopsis": "Removes PnP Microsoft365 Group Photo",
+    "docsPath": "cmdlets/Remove-PnPMicrosoft365GroupPhoto.html"
+  },
+  {
+    "name": "Remove-PnPMicrosoft365GroupSettings",
+    "synopsis": "Removes PnP Microsoft365 Group Settings",
+    "docsPath": "cmdlets/Remove-PnPMicrosoft365GroupSettings.html"
+  },
+  {
+    "name": "Remove-PnPMultiGeoCompanyAllowedDataLocation",
+    "synopsis": "Removes PnP Multi Geo Company Allowed Data Location",
+    "docsPath": "cmdlets/Remove-PnPMultiGeoCompanyAllowedDataLocation.html"
+  },
+  {
+    "name": "Remove-PnPNavigationNode",
+    "synopsis": "Removes PnP Navigation Node",
+    "docsPath": "cmdlets/Remove-PnPNavigationNode.html"
+  },
+  {
+    "name": "Remove-PnPOrgAssetsLibrary",
+    "synopsis": "Removes PnP Org Assets Library",
+    "docsPath": "cmdlets/Remove-PnPOrgAssetsLibrary.html"
+  },
+  {
+    "name": "Remove-PnPOrgNewsSite",
+    "synopsis": "Removes PnP Org News Site",
+    "docsPath": "cmdlets/Remove-PnPOrgNewsSite.html"
+  },
+  {
+    "name": "Remove-PnPPage",
+    "synopsis": "Removes PnP Page",
+    "docsPath": "cmdlets/Remove-PnPPage.html"
+  },
+  {
+    "name": "Remove-PnPPageComponent",
+    "synopsis": "Removes PnP Page Component",
+    "docsPath": "cmdlets/Remove-PnPPageComponent.html"
+  },
+  {
+    "name": "Remove-PnPPlannerBucket",
+    "synopsis": "Removes PnP Planner Bucket",
+    "docsPath": "cmdlets/Remove-PnPPlannerBucket.html"
+  },
+  {
+    "name": "Remove-PnPPlannerPlan",
+    "synopsis": "Removes PnP Planner Plan",
+    "docsPath": "cmdlets/Remove-PnPPlannerPlan.html"
+  },
+  {
+    "name": "Remove-PnPPlannerRoster",
+    "synopsis": "Removes PnP Planner Roster",
+    "docsPath": "cmdlets/Remove-PnPPlannerRoster.html"
+  },
+  {
+    "name": "Remove-PnPPlannerRosterMember",
+    "synopsis": "Removes PnP Planner Roster Member",
+    "docsPath": "cmdlets/Remove-PnPPlannerRosterMember.html"
+  },
+  {
+    "name": "Remove-PnPPlannerTask",
+    "synopsis": "Removes PnP Planner Task",
+    "docsPath": "cmdlets/Remove-PnPPlannerTask.html"
+  },
+  {
+    "name": "Remove-PnPPowerAppPermission",
+    "synopsis": "Removes PnP Power App Permission",
+    "docsPath": "cmdlets/Remove-PnPPowerAppPermission.html"
+  },
+  {
+    "name": "Remove-PnPProfileCardProperty",
+    "synopsis": "Removes PnP Profile Card Property",
+    "docsPath": "cmdlets/Remove-PnPProfileCardProperty.html"
+  },
+  {
+    "name": "Remove-PnPPropertyBagValue",
+    "synopsis": "Removes PnP Property Bag Value",
+    "docsPath": "cmdlets/Remove-PnPPropertyBagValue.html"
+  },
+  {
+    "name": "Remove-PnPPublishingImageRendition",
+    "synopsis": "Removes PnP Publishing Image Rendition",
+    "docsPath": "cmdlets/Remove-PnPPublishingImageRendition.html"
+  },
+  {
+    "name": "Remove-PnPRoleDefinition",
+    "synopsis": "Removes PnP Role Definition",
+    "docsPath": "cmdlets/Remove-PnPRoleDefinition.html"
+  },
+  {
+    "name": "Remove-PnPSdnProvider",
+    "synopsis": "Removes PnP Sdn Provider",
+    "docsPath": "cmdlets/Remove-PnPSdnProvider.html"
+  },
+  {
+    "name": "Remove-PnPSearchConfiguration",
+    "synopsis": "Removes PnP Search Configuration",
+    "docsPath": "cmdlets/Remove-PnPSearchConfiguration.html"
+  },
+  {
+    "name": "Remove-PnPSearchExternalConnection",
+    "synopsis": "Removes PnP Search External Connection",
+    "docsPath": "cmdlets/Remove-PnPSearchExternalConnection.html"
+  },
+  {
+    "name": "Remove-PnPSearchExternalItem",
+    "synopsis": "Removes PnP Search External Item",
+    "docsPath": "cmdlets/Remove-PnPSearchExternalItem.html"
+  },
+  {
+    "name": "Remove-PnPSearchResultType",
+    "synopsis": "Removes PnP Search Result Type",
+    "docsPath": "cmdlets/Remove-PnPSearchResultType.html"
+  },
+  {
+    "name": "Remove-PnPSearchVertical",
+    "synopsis": "Removes PnP Search Vertical",
+    "docsPath": "cmdlets/Remove-PnPSearchVertical.html"
+  },
+  {
+    "name": "Remove-PnPSiteCollectionAdmin",
+    "synopsis": "Removes PnP Site Collection Admin",
+    "docsPath": "cmdlets/Remove-PnPSiteCollectionAdmin.html"
+  },
+  {
+    "name": "Remove-PnPSiteCollectionAppCatalog",
+    "synopsis": "Removes PnP Site Collection App Catalog",
+    "docsPath": "cmdlets/Remove-PnPSiteCollectionAppCatalog.html"
+  },
+  {
+    "name": "Remove-PnPSiteCollectionTermStore",
+    "synopsis": "Removes PnP Site Collection Term Store",
+    "docsPath": "cmdlets/Remove-PnPSiteCollectionTermStore.html"
+  },
+  {
+    "name": "Remove-PnPSiteDesign",
+    "synopsis": "Removes PnP Site Design",
+    "docsPath": "cmdlets/Remove-PnPSiteDesign.html"
+  },
+  {
+    "name": "Remove-PnPSiteDesignTask",
+    "synopsis": "Removes PnP Site Design Task",
+    "docsPath": "cmdlets/Remove-PnPSiteDesignTask.html"
+  },
+  {
+    "name": "Remove-PnPSiteFileVersionBatchDeleteJob",
+    "synopsis": "Removes PnP Site File Version Batch Delete Job",
+    "docsPath": "cmdlets/Remove-PnPSiteFileVersionBatchDeleteJob.html"
+  },
+  {
+    "name": "Remove-PnPSiteGroup",
+    "synopsis": "Removes PnP Site Group",
+    "docsPath": "cmdlets/Remove-PnPSiteGroup.html"
+  },
+  {
+    "name": "Remove-PnPSiteScript",
+    "synopsis": "Removes PnP Site Script",
+    "docsPath": "cmdlets/Remove-PnPSiteScript.html"
+  },
+  {
+    "name": "Remove-PnPSiteUserInvitations",
+    "synopsis": "Removes PnP Site User Invitations",
+    "docsPath": "cmdlets/Remove-PnPSiteUserInvitations.html"
+  },
+  {
+    "name": "Remove-PnPStorageEntity",
+    "synopsis": "Removes PnP Storage Entity",
+    "docsPath": "cmdlets/Remove-PnPStorageEntity.html"
+  },
+  {
+    "name": "Remove-PnPStoredCredential",
+    "synopsis": "Removes PnP Stored Credential",
+    "docsPath": "cmdlets/Remove-PnPStoredCredential.html"
+  },
+  {
+    "name": "Remove-PnPTaxonomyItem",
+    "synopsis": "Removes PnP Taxonomy Item",
+    "docsPath": "cmdlets/Remove-PnPTaxonomyItem.html"
+  },
+  {
+    "name": "Remove-PnPTeamsApp",
+    "synopsis": "Removes PnP Teams App",
+    "docsPath": "cmdlets/Remove-PnPTeamsApp.html"
+  },
+  {
+    "name": "Remove-PnPTeamsChannel",
+    "synopsis": "Removes PnP Teams Channel",
+    "docsPath": "cmdlets/Remove-PnPTeamsChannel.html"
+  },
+  {
+    "name": "Remove-PnPTeamsChannelUser",
+    "synopsis": "Removes PnP Teams Channel User",
+    "docsPath": "cmdlets/Remove-PnPTeamsChannelUser.html"
+  },
+  {
+    "name": "Remove-PnPTeamsTab",
+    "synopsis": "Removes PnP Teams Tab",
+    "docsPath": "cmdlets/Remove-PnPTeamsTab.html"
+  },
+  {
+    "name": "Remove-PnPTeamsTag",
+    "synopsis": "Removes PnP Teams Tag",
+    "docsPath": "cmdlets/Remove-PnPTeamsTag.html"
+  },
+  {
+    "name": "Remove-PnPTeamsTeam",
+    "synopsis": "Removes PnP Teams Team",
+    "docsPath": "cmdlets/Remove-PnPTeamsTeam.html"
+  },
+  {
+    "name": "Remove-PnPTeamsUser",
+    "synopsis": "Removes PnP Teams User",
+    "docsPath": "cmdlets/Remove-PnPTeamsUser.html"
+  },
+  {
+    "name": "Remove-PnPTenantCdnOrigin",
+    "synopsis": "Removes PnP Tenant Cdn Origin",
+    "docsPath": "cmdlets/Remove-PnPTenantCdnOrigin.html"
+  },
+  {
+    "name": "Remove-PnPTenantDeletedSite",
+    "synopsis": "Removes PnP Tenant Deleted Site",
+    "docsPath": "cmdlets/Remove-PnPTenantDeletedSite.html"
+  },
+  {
+    "name": "Remove-PnPTenantRestrictedSearchAllowedList",
+    "synopsis": "Removes PnP Tenant Restricted Search Allowed List",
+    "docsPath": "cmdlets/Remove-PnPTenantRestrictedSearchAllowedList.html"
+  },
+  {
+    "name": "Remove-PnPTenantSite",
+    "synopsis": "Removes PnP Tenant Site",
+    "docsPath": "cmdlets/Remove-PnPTenantSite.html"
+  },
+  {
+    "name": "Remove-PnPTenantSyncClientRestriction",
+    "synopsis": "Removes PnP Tenant Sync Client Restriction",
+    "docsPath": "cmdlets/Remove-PnPTenantSyncClientRestriction.html"
+  },
+  {
+    "name": "Remove-PnPTenantTheme",
+    "synopsis": "Removes PnP Tenant Theme",
+    "docsPath": "cmdlets/Remove-PnPTenantTheme.html"
+  },
+  {
+    "name": "Remove-PnPTerm",
+    "synopsis": "Removes PnP Term",
+    "docsPath": "cmdlets/Remove-PnPTerm.html"
+  },
+  {
+    "name": "Remove-PnPTermGroup",
+    "synopsis": "Removes PnP Term Group",
+    "docsPath": "cmdlets/Remove-PnPTermGroup.html"
+  },
+  {
+    "name": "Remove-PnPTermLabel",
+    "synopsis": "Removes PnP Term Label",
+    "docsPath": "cmdlets/Remove-PnPTermLabel.html"
+  },
+  {
+    "name": "Remove-PnPTodoList",
+    "synopsis": "Removes PnP Todo List",
+    "docsPath": "cmdlets/Remove-PnPTodoList.html"
+  },
+  {
+    "name": "Remove-PnPTodoTask",
+    "synopsis": "Removes PnP Todo Task",
+    "docsPath": "cmdlets/Remove-PnPTodoTask.html"
+  },
+  {
+    "name": "Remove-PnPTodoTaskChecklistItem",
+    "synopsis": "Removes PnP Todo Task Checklist Item",
+    "docsPath": "cmdlets/Remove-PnPTodoTaskChecklistItem.html"
+  },
+  {
+    "name": "Remove-PnPTodoTaskFileAttachment",
+    "synopsis": "Removes PnP Todo Task File Attachment",
+    "docsPath": "cmdlets/Remove-PnPTodoTaskFileAttachment.html"
+  },
+  {
+    "name": "Remove-PnPTodoTaskLinkedResource",
+    "synopsis": "Removes PnP Todo Task Linked Resource",
+    "docsPath": "cmdlets/Remove-PnPTodoTaskLinkedResource.html"
+  },
+  {
+    "name": "Remove-PnPUser",
+    "synopsis": "Removes PnP User",
+    "docsPath": "cmdlets/Remove-PnPUser.html"
+  },
+  {
+    "name": "Remove-PnPUserInfo",
+    "synopsis": "Removes PnP User Info",
+    "docsPath": "cmdlets/Remove-PnPUserInfo.html"
+  },
+  {
+    "name": "Remove-PnPUserProfile",
+    "synopsis": "Removes PnP User Profile",
+    "docsPath": "cmdlets/Remove-PnPUserProfile.html"
+  },
+  {
+    "name": "Remove-PnPUserProfilePhoto",
+    "synopsis": "Removes PnP User Profile Photo",
+    "docsPath": "cmdlets/Remove-PnPUserProfilePhoto.html"
+  },
+  {
+    "name": "Remove-PnPView",
+    "synopsis": "Removes PnP View",
+    "docsPath": "cmdlets/Remove-PnPView.html"
+  },
+  {
+    "name": "Remove-PnPVivaConnectionsDashboardACE",
+    "synopsis": "Removes PnP Viva Connections Dashboard A C E",
+    "docsPath": "cmdlets/Remove-PnPVivaConnectionsDashboardACE.html"
+  },
+  {
+    "name": "Remove-PnPVivaEngageCommunity",
+    "synopsis": "Removes PnP Viva Engage Community",
+    "docsPath": "cmdlets/Remove-PnPVivaEngageCommunity.html"
+  },
+  {
+    "name": "Remove-PnPWeb",
+    "synopsis": "Removes PnP Web",
+    "docsPath": "cmdlets/Remove-PnPWeb.html"
+  },
+  {
+    "name": "Remove-PnPWebAlert",
+    "synopsis": "Removes PnP Web Alert",
+    "docsPath": "cmdlets/Remove-PnPWebAlert.html"
+  },
+  {
+    "name": "Remove-PnPWebhookSubscription",
+    "synopsis": "Removes PnP Webhook Subscription",
+    "docsPath": "cmdlets/Remove-PnPWebhookSubscription.html"
+  },
+  {
+    "name": "Remove-PnPWebPart",
+    "synopsis": "Removes PnP Web Part",
+    "docsPath": "cmdlets/Remove-PnPWebPart.html"
+  },
+  {
+    "name": "Remove-PnPWikiPage",
+    "synopsis": "Removes PnP Wiki Page",
+    "docsPath": "cmdlets/Remove-PnPWikiPage.html"
+  },
+  {
+    "name": "Rename-PnPFile",
+    "synopsis": "Renames PnP File",
+    "docsPath": "cmdlets/Rename-PnPFile.html"
+  },
+  {
+    "name": "Rename-PnPFolder",
+    "synopsis": "Renames PnP Folder",
+    "docsPath": "cmdlets/Rename-PnPFolder.html"
+  },
+  {
+    "name": "Rename-PnPTenantSite",
+    "synopsis": "Renames PnP Tenant Site",
+    "docsPath": "cmdlets/Rename-PnPTenantSite.html"
+  },
+  {
+    "name": "Repair-PnPSite",
+    "synopsis": "Repairs PnP Site",
+    "docsPath": "cmdlets/Repair-PnPSite.html"
+  },
+  {
+    "name": "Request-PnPPersonalSite",
+    "synopsis": "Requests PnP Personal Site",
+    "docsPath": "cmdlets/Request-PnPPersonalSite.html"
+  },
+  {
+    "name": "Request-PnPReIndexList",
+    "synopsis": "Requests PnP Re Index List",
+    "docsPath": "cmdlets/Request-PnPReIndexList.html"
+  },
+  {
+    "name": "Request-PnPReIndexWeb",
+    "synopsis": "Requests PnP Re Index Web",
+    "docsPath": "cmdlets/Request-PnPReIndexWeb.html"
+  },
+  {
+    "name": "Request-PnPSyntexClassifyAndExtract",
+    "synopsis": "Requests PnP Syntex Classify And Extract",
+    "docsPath": "cmdlets/Request-PnPSyntexClassifyAndExtract.html"
+  },
+  {
+    "name": "Reset-PnPDocumentId",
+    "synopsis": "Resets PnP Document Id",
+    "docsPath": "cmdlets/Reset-PnPDocumentId.html"
+  },
+  {
+    "name": "Reset-PnPFileVersion",
+    "synopsis": "Resets PnP File Version",
+    "docsPath": "cmdlets/Reset-PnPFileVersion.html"
+  },
+  {
+    "name": "Reset-PnPMicrosoft365GroupExpiration",
+    "synopsis": "Resets PnP Microsoft365 Group Expiration",
+    "docsPath": "cmdlets/Reset-PnPMicrosoft365GroupExpiration.html"
+  },
+  {
+    "name": "Reset-PnPRetentionLabel",
+    "synopsis": "Resets PnP Retention Label",
+    "docsPath": "cmdlets/Reset-PnPRetentionLabel.html"
+  },
+  {
+    "name": "Reset-PnPUserOneDriveQuotaToDefault",
+    "synopsis": "Resets PnP User One Drive Quota To Default",
+    "docsPath": "cmdlets/Reset-PnPUserOneDriveQuotaToDefault.html"
+  },
+  {
+    "name": "Resolve-PnPFolder",
+    "synopsis": "Resolves PnP Folder",
+    "docsPath": "cmdlets/Resolve-PnPFolder.html"
+  },
+  {
+    "name": "Restart-PnPFlowRun",
+    "synopsis": "Restarts PnP Flow Run",
+    "docsPath": "cmdlets/Restart-PnPFlowRun.html"
+  },
+  {
+    "name": "Restore-PnPDeletedContainer",
+    "synopsis": "Restores PnP Deleted Container",
+    "docsPath": "cmdlets/Restore-PnPDeletedContainer.html"
+  },
+  {
+    "name": "Restore-PnPDeletedMicrosoft365Group",
+    "synopsis": "Restores PnP Deleted Microsoft365 Group",
+    "docsPath": "cmdlets/Restore-PnPDeletedMicrosoft365Group.html"
+  },
+  {
+    "name": "Restore-PnPFileVersion",
+    "synopsis": "Restores PnP File Version",
+    "docsPath": "cmdlets/Restore-PnPFileVersion.html"
+  },
+  {
+    "name": "Restore-PnPFlow",
+    "synopsis": "Restores PnP Flow",
+    "docsPath": "cmdlets/Restore-PnPFlow.html"
+  },
+  {
+    "name": "Restore-PnPListItemVersion",
+    "synopsis": "Restores PnP List Item Version",
+    "docsPath": "cmdlets/Restore-PnPListItemVersion.html"
+  },
+  {
+    "name": "Restore-PnPRecycleBinItem",
+    "synopsis": "Restores PnP Recycle Bin Item",
+    "docsPath": "cmdlets/Restore-PnPRecycleBinItem.html"
+  },
+  {
+    "name": "Restore-PnPTenantRecycleBinItem",
+    "synopsis": "Restores PnP Tenant Recycle Bin Item",
+    "docsPath": "cmdlets/Restore-PnPTenantRecycleBinItem.html"
+  },
+  {
+    "name": "Restore-PnPTenantSite",
+    "synopsis": "Restores PnP Tenant Site",
+    "docsPath": "cmdlets/Restore-PnPTenantSite.html"
+  },
+  {
+    "name": "Revoke-PnPAzureADAppSitePermission",
+    "synopsis": "Revokes PnP Azure A D App Site Permission",
+    "docsPath": "cmdlets/Revoke-PnPAzureADAppSitePermission.html"
+  },
+  {
+    "name": "Revoke-PnPEntraIDAppFilePermission",
+    "synopsis": "Revokes PnP Entra I D App File Permission",
+    "docsPath": "cmdlets/Revoke-PnPEntraIDAppFilePermission.html"
+  },
+  {
+    "name": "Revoke-PnPEntraIDAppListItemPermission",
+    "synopsis": "Revokes PnP Entra I D App List Item Permission",
+    "docsPath": "cmdlets/Revoke-PnPEntraIDAppListItemPermission.html"
+  },
+  {
+    "name": "Revoke-PnPEntraIDAppListPermission",
+    "synopsis": "Revokes PnP Entra I D App List Permission",
+    "docsPath": "cmdlets/Revoke-PnPEntraIDAppListPermission.html"
+  },
+  {
+    "name": "Revoke-PnPEntraIDAppSitePermission",
+    "synopsis": "Revokes PnP Entra I D App Site Permission",
+    "docsPath": "cmdlets/Revoke-PnPEntraIDAppSitePermission.html"
+  },
+  {
+    "name": "Revoke-PnPHubSiteRights",
+    "synopsis": "Revokes PnP Hub Site Rights",
+    "docsPath": "cmdlets/Revoke-PnPHubSiteRights.html"
+  },
+  {
+    "name": "Revoke-PnPSiteDesignRights",
+    "synopsis": "Revokes PnP Site Design Rights",
+    "docsPath": "cmdlets/Revoke-PnPSiteDesignRights.html"
+  },
+  {
+    "name": "Revoke-PnPTenantServicePrincipalPermission",
+    "synopsis": "Revokes PnP Tenant Service Principal Permission",
+    "docsPath": "cmdlets/Revoke-PnPTenantServicePrincipalPermission.html"
+  },
+  {
+    "name": "Revoke-PnPUserSession",
+    "synopsis": "Revokes PnP User Session",
+    "docsPath": "cmdlets/Revoke-PnPUserSession.html"
+  },
+  {
+    "name": "Save-PnPPageConversionLog",
+    "synopsis": "Saves PnP Page Conversion Log",
+    "docsPath": "cmdlets/Save-PnPPageConversionLog.html"
+  },
+  {
+    "name": "Save-PnPSiteTemplate",
+    "synopsis": "Saves PnP Site Template",
+    "docsPath": "cmdlets/Save-PnPSiteTemplate.html"
+  },
+  {
+    "name": "Save-PnPTenantTemplate",
+    "synopsis": "Saves PnP Tenant Template",
+    "docsPath": "cmdlets/Save-PnPTenantTemplate.html"
+  },
+  {
+    "name": "Send-PnPMail",
+    "synopsis": "Sends PnP Mail",
+    "docsPath": "cmdlets/Send-PnPMail.html"
+  },
+  {
+    "name": "Set-PnPAdaptiveScopeProperty",
+    "synopsis": "Sets PnP Adaptive Scope Property",
+    "docsPath": "cmdlets/Set-PnPAdaptiveScopeProperty.html"
+  },
+  {
+    "name": "Set-PnPApplicationCustomizer",
+    "synopsis": "Sets PnP Application Customizer",
+    "docsPath": "cmdlets/Set-PnPApplicationCustomizer.html"
+  },
+  {
+    "name": "Set-PnPAppSideLoading",
+    "synopsis": "Sets PnP App Side Loading",
+    "docsPath": "cmdlets/Set-PnPAppSideLoading.html"
+  },
+  {
+    "name": "Set-PnPAuditing",
+    "synopsis": "Sets PnP Auditing",
+    "docsPath": "cmdlets/Set-PnPAuditing.html"
+  },
+  {
+    "name": "Set-PnPAvailablePageLayouts",
+    "synopsis": "Sets PnP Available Page Layouts",
+    "docsPath": "cmdlets/Set-PnPAvailablePageLayouts.html"
+  },
+  {
+    "name": "Set-PnPAzureADAppSitePermission",
+    "synopsis": "Sets PnP Azure A D App Site Permission",
+    "docsPath": "cmdlets/Set-PnPAzureADAppSitePermission.html"
+  },
+  {
+    "name": "Set-PnPAzureADGroup",
+    "synopsis": "Sets PnP Azure A D Group",
+    "docsPath": "cmdlets/Set-PnPAzureADGroup.html"
+  },
+  {
+    "name": "Set-PnPBrowserIdleSignout",
+    "synopsis": "Sets PnP Browser Idle Signout",
+    "docsPath": "cmdlets/Set-PnPBrowserIdleSignout.html"
+  },
+  {
+    "name": "Set-PnPBuiltInDesignPackageVisibility",
+    "synopsis": "Sets PnP Built In Design Package Visibility",
+    "docsPath": "cmdlets/Set-PnPBuiltInDesignPackageVisibility.html"
+  },
+  {
+    "name": "Set-PnPBuiltInSiteTemplateSettings",
+    "synopsis": "Sets PnP Built In Site Template Settings",
+    "docsPath": "cmdlets/Set-PnPBuiltInSiteTemplateSettings.html"
+  },
+  {
+    "name": "Set-PnPClientSidePage",
+    "synopsis": "Sets PnP Client Side Page",
+    "docsPath": "cmdlets/Set-PnPClientSidePage.html"
+  },
+  {
+    "name": "Set-PnPContentType",
+    "synopsis": "Sets PnP Content Type",
+    "docsPath": "cmdlets/Set-PnPContentType.html"
+  },
+  {
+    "name": "Set-PnPContext",
+    "synopsis": "Sets PnP Context",
+    "docsPath": "cmdlets/Set-PnPContext.html"
+  },
+  {
+    "name": "Set-PnPCopilotAdminLimitedMode",
+    "synopsis": "Sets PnP Copilot Admin Limited Mode",
+    "docsPath": "cmdlets/Set-PnPCopilotAdminLimitedMode.html"
+  },
+  {
+    "name": "Set-PnPDefaultColumnValues",
+    "synopsis": "Sets PnP Default Column Values",
+    "docsPath": "cmdlets/Set-PnPDefaultColumnValues.html"
+  },
+  {
+    "name": "Set-PnPDefaultContentTypeToList",
+    "synopsis": "Sets PnP Default Content Type To List",
+    "docsPath": "cmdlets/Set-PnPDefaultContentTypeToList.html"
+  },
+  {
+    "name": "Set-PnPDefaultPageLayout",
+    "synopsis": "Sets PnP Default Page Layout",
+    "docsPath": "cmdlets/Set-PnPDefaultPageLayout.html"
+  },
+  {
+    "name": "Set-PnPDisableSpacesActivation",
+    "synopsis": "Sets PnP Disable Spaces Activation",
+    "docsPath": "cmdlets/Set-PnPDisableSpacesActivation.html"
+  },
+  {
+    "name": "Set-PnPDocumentSetField",
+    "synopsis": "Sets PnP Document Set Field",
+    "docsPath": "cmdlets/Set-PnPDocumentSetField.html"
+  },
+  {
+    "name": "Set-PnPEntraIDAppFilePermission",
+    "synopsis": "Sets PnP Entra I D App File Permission",
+    "docsPath": "cmdlets/Set-PnPEntraIDAppFilePermission.html"
+  },
+  {
+    "name": "Set-PnPEntraIDAppListItemPermission",
+    "synopsis": "Sets PnP Entra I D App List Item Permission",
+    "docsPath": "cmdlets/Set-PnPEntraIDAppListItemPermission.html"
+  },
+  {
+    "name": "Set-PnPEntraIDAppListPermission",
+    "synopsis": "Sets PnP Entra I D App List Permission",
+    "docsPath": "cmdlets/Set-PnPEntraIDAppListPermission.html"
+  },
+  {
+    "name": "Set-PnPEntraIDAppSitePermission",
+    "synopsis": "Sets PnP Entra I D App Site Permission",
+    "docsPath": "cmdlets/Set-PnPEntraIDAppSitePermission.html"
+  },
+  {
+    "name": "Set-PnPEntraIDGroup",
+    "synopsis": "Sets PnP Entra I D Group",
+    "docsPath": "cmdlets/Set-PnPEntraIDGroup.html"
+  },
+  {
+    "name": "Set-PnPField",
+    "synopsis": "Sets PnP Field",
+    "docsPath": "cmdlets/Set-PnPField.html"
+  },
+  {
+    "name": "Set-PnPFileArchiveState",
+    "synopsis": "Sets PnP File Archive State",
+    "docsPath": "cmdlets/Set-PnPFileArchiveState.html"
+  },
+  {
+    "name": "Set-PnPFileCheckedIn",
+    "synopsis": "Sets PnP File Checked In",
+    "docsPath": "cmdlets/Set-PnPFileCheckedIn.html"
+  },
+  {
+    "name": "Set-PnPFileCheckedOut",
+    "synopsis": "Sets PnP File Checked Out",
+    "docsPath": "cmdlets/Set-PnPFileCheckedOut.html"
+  },
+  {
+    "name": "Set-PnPFileRetentionLabel",
+    "synopsis": "Sets PnP File Retention Label",
+    "docsPath": "cmdlets/Set-PnPFileRetentionLabel.html"
+  },
+  {
+    "name": "Set-PnPFileVersion",
+    "synopsis": "Sets PnP File Version",
+    "docsPath": "cmdlets/Set-PnPFileVersion.html"
+  },
+  {
+    "name": "Set-PnPFolderArchiveState",
+    "synopsis": "Sets PnP Folder Archive State",
+    "docsPath": "cmdlets/Set-PnPFolderArchiveState.html"
+  },
+  {
+    "name": "Set-PnPFolderPermission",
+    "synopsis": "Sets PnP Folder Permission",
+    "docsPath": "cmdlets/Set-PnPFolderPermission.html"
+  },
+  {
+    "name": "Set-PnPFooter",
+    "synopsis": "Sets PnP Footer",
+    "docsPath": "cmdlets/Set-PnPFooter.html"
+  },
+  {
+    "name": "Set-PnPGeoStorageQuota",
+    "synopsis": "Sets PnP Geo Storage Quota",
+    "docsPath": "cmdlets/Set-PnPGeoStorageQuota.html"
+  },
+  {
+    "name": "Set-PnPGraphSubscription",
+    "synopsis": "Sets PnP Graph Subscription",
+    "docsPath": "cmdlets/Set-PnPGraphSubscription.html"
+  },
+  {
+    "name": "Set-PnPGroup",
+    "synopsis": "Sets PnP Group",
+    "docsPath": "cmdlets/Set-PnPGroup.html"
+  },
+  {
+    "name": "Set-PnPGroupPermissions",
+    "synopsis": "Sets PnP Group Permissions",
+    "docsPath": "cmdlets/Set-PnPGroupPermissions.html"
+  },
+  {
+    "name": "Set-PnPHideDefaultThemes",
+    "synopsis": "Sets PnP Hide Default Themes",
+    "docsPath": "cmdlets/Set-PnPHideDefaultThemes.html"
+  },
+  {
+    "name": "Set-PnPHomePage",
+    "synopsis": "Sets PnP Home Page",
+    "docsPath": "cmdlets/Set-PnPHomePage.html"
+  },
+  {
+    "name": "Set-PnPHomeSite",
+    "synopsis": "Sets PnP Home Site",
+    "docsPath": "cmdlets/Set-PnPHomeSite.html"
+  },
+  {
+    "name": "Set-PnPHubSite",
+    "synopsis": "Sets PnP Hub Site",
+    "docsPath": "cmdlets/Set-PnPHubSite.html"
+  },
+  {
+    "name": "Set-PnPImageListItemColumn",
+    "synopsis": "Sets PnP Image List Item Column",
+    "docsPath": "cmdlets/Set-PnPImageListItemColumn.html"
+  },
+  {
+    "name": "Set-PnPIndexedProperties",
+    "synopsis": "Sets PnP Indexed Properties",
+    "docsPath": "cmdlets/Set-PnPIndexedProperties.html"
+  },
+  {
+    "name": "Set-PnPInPlaceRecordsManagement",
+    "synopsis": "Sets PnP In Place Records Management",
+    "docsPath": "cmdlets/Set-PnPInPlaceRecordsManagement.html"
+  },
+  {
+    "name": "Set-PnPKnowledgeHubSite",
+    "synopsis": "Sets PnP Knowledge Hub Site",
+    "docsPath": "cmdlets/Set-PnPKnowledgeHubSite.html"
+  },
+  {
+    "name": "Set-PnPList",
+    "synopsis": "Sets PnP List",
+    "docsPath": "cmdlets/Set-PnPList.html"
+  },
+  {
+    "name": "Set-PnPListInformationRightsManagement",
+    "synopsis": "Sets PnP List Information Rights Management",
+    "docsPath": "cmdlets/Set-PnPListInformationRightsManagement.html"
+  },
+  {
+    "name": "Set-PnPListItem",
+    "synopsis": "Sets PnP List Item",
+    "docsPath": "cmdlets/Set-PnPListItem.html"
+  },
+  {
+    "name": "Set-PnPListItemAsRecord",
+    "synopsis": "Sets PnP List Item As Record",
+    "docsPath": "cmdlets/Set-PnPListItemAsRecord.html"
+  },
+  {
+    "name": "Set-PnPListItemPermission",
+    "synopsis": "Sets PnP List Item Permission",
+    "docsPath": "cmdlets/Set-PnPListItemPermission.html"
+  },
+  {
+    "name": "Set-PnPListPermission",
+    "synopsis": "Sets PnP List Permission",
+    "docsPath": "cmdlets/Set-PnPListPermission.html"
+  },
+  {
+    "name": "Set-PnPListRecordDeclaration",
+    "synopsis": "Sets PnP List Record Declaration",
+    "docsPath": "cmdlets/Set-PnPListRecordDeclaration.html"
+  },
+  {
+    "name": "Set-PnPListVersionPolicy",
+    "synopsis": "Sets PnP List Version Policy",
+    "docsPath": "cmdlets/Set-PnPListVersionPolicy.html"
+  },
+  {
+    "name": "Set-PnPManagedAppId",
+    "synopsis": "Sets PnP Managed App Id",
+    "docsPath": "cmdlets/Set-PnPManagedAppId.html"
+  },
+  {
+    "name": "Set-PnPMasterPage",
+    "synopsis": "Sets PnP Master Page",
+    "docsPath": "cmdlets/Set-PnPMasterPage.html"
+  },
+  {
+    "name": "Set-PnPMessageCenterAnnouncementAsArchived",
+    "synopsis": "Sets PnP Message Center Announcement As Archived",
+    "docsPath": "cmdlets/Set-PnPMessageCenterAnnouncementAsArchived.html"
+  },
+  {
+    "name": "Set-PnPMessageCenterAnnouncementAsFavorite",
+    "synopsis": "Sets PnP Message Center Announcement As Favorite",
+    "docsPath": "cmdlets/Set-PnPMessageCenterAnnouncementAsFavorite.html"
+  },
+  {
+    "name": "Set-PnPMessageCenterAnnouncementAsNotArchived",
+    "synopsis": "Sets PnP Message Center Announcement As Not Archived",
+    "docsPath": "cmdlets/Set-PnPMessageCenterAnnouncementAsNotArchived.html"
+  },
+  {
+    "name": "Set-PnPMessageCenterAnnouncementAsNotFavorite",
+    "synopsis": "Sets PnP Message Center Announcement As Not Favorite",
+    "docsPath": "cmdlets/Set-PnPMessageCenterAnnouncementAsNotFavorite.html"
+  },
+  {
+    "name": "Set-PnPMessageCenterAnnouncementAsRead",
+    "synopsis": "Sets PnP Message Center Announcement As Read",
+    "docsPath": "cmdlets/Set-PnPMessageCenterAnnouncementAsRead.html"
+  },
+  {
+    "name": "Set-PnPMessageCenterAnnouncementAsUnread",
+    "synopsis": "Sets PnP Message Center Announcement As Unread",
+    "docsPath": "cmdlets/Set-PnPMessageCenterAnnouncementAsUnread.html"
+  },
+  {
+    "name": "Set-PnPMicrosoft365Group",
+    "synopsis": "Sets PnP Microsoft365 Group",
+    "docsPath": "cmdlets/Set-PnPMicrosoft365Group.html"
+  },
+  {
+    "name": "Set-PnPMicrosoft365GroupSettings",
+    "synopsis": "Sets PnP Microsoft365 Group Settings",
+    "docsPath": "cmdlets/Set-PnPMicrosoft365GroupSettings.html"
+  },
+  {
+    "name": "Set-PnPMultiGeoCompanyAllowedDataLocation",
+    "synopsis": "Sets PnP Multi Geo Company Allowed Data Location",
+    "docsPath": "cmdlets/Set-PnPMultiGeoCompanyAllowedDataLocation.html"
+  },
+  {
+    "name": "Set-PnPMultiGeoExperience",
+    "synopsis": "Sets PnP Multi Geo Experience",
+    "docsPath": "cmdlets/Set-PnPMultiGeoExperience.html"
+  },
+  {
+    "name": "Set-PnPOrgAssetsLibrary",
+    "synopsis": "Sets PnP Org Assets Library",
+    "docsPath": "cmdlets/Set-PnPOrgAssetsLibrary.html"
+  },
+  {
+    "name": "Set-PnPPage",
+    "synopsis": "Sets PnP Page",
+    "docsPath": "cmdlets/Set-PnPPage.html"
+  },
+  {
+    "name": "Set-PnPPageTextPart",
+    "synopsis": "Sets PnP Page Text Part",
+    "docsPath": "cmdlets/Set-PnPPageTextPart.html"
+  },
+  {
+    "name": "Set-PnPPageWebPart",
+    "synopsis": "Sets PnP Page Web Part",
+    "docsPath": "cmdlets/Set-PnPPageWebPart.html"
+  },
+  {
+    "name": "Set-PnPPlannerBucket",
+    "synopsis": "Sets PnP Planner Bucket",
+    "docsPath": "cmdlets/Set-PnPPlannerBucket.html"
+  },
+  {
+    "name": "Set-PnPPlannerConfiguration",
+    "synopsis": "Sets PnP Planner Configuration",
+    "docsPath": "cmdlets/Set-PnPPlannerConfiguration.html"
+  },
+  {
+    "name": "Set-PnPPlannerPlan",
+    "synopsis": "Sets PnP Planner Plan",
+    "docsPath": "cmdlets/Set-PnPPlannerPlan.html"
+  },
+  {
+    "name": "Set-PnPPlannerTask",
+    "synopsis": "Sets PnP Planner Task",
+    "docsPath": "cmdlets/Set-PnPPlannerTask.html"
+  },
+  {
+    "name": "Set-PnPPlannerUserPolicy",
+    "synopsis": "Sets PnP Planner User Policy",
+    "docsPath": "cmdlets/Set-PnPPlannerUserPolicy.html"
+  },
+  {
+    "name": "Set-PnPPowerAppByPassConsent",
+    "synopsis": "Sets PnP Power App By Pass Consent",
+    "docsPath": "cmdlets/Set-PnPPowerAppByPassConsent.html"
+  },
+  {
+    "name": "Set-PnPPropertyBagValue",
+    "synopsis": "Sets PnP Property Bag Value",
+    "docsPath": "cmdlets/Set-PnPPropertyBagValue.html"
+  },
+  {
+    "name": "Set-PnPRequestAccessEmails",
+    "synopsis": "Sets PnP Request Access Emails",
+    "docsPath": "cmdlets/Set-PnPRequestAccessEmails.html"
+  },
+  {
+    "name": "Set-PnPRetentionLabel",
+    "synopsis": "Sets PnP Retention Label",
+    "docsPath": "cmdlets/Set-PnPRetentionLabel.html"
+  },
+  {
+    "name": "Set-PnPRoleDefinition",
+    "synopsis": "Sets PnP Role Definition",
+    "docsPath": "cmdlets/Set-PnPRoleDefinition.html"
+  },
+  {
+    "name": "Set-PnPSearchConfiguration",
+    "synopsis": "Sets PnP Search Configuration",
+    "docsPath": "cmdlets/Set-PnPSearchConfiguration.html"
+  },
+  {
+    "name": "Set-PnPSearchExternalConnection",
+    "synopsis": "Sets PnP Search External Connection",
+    "docsPath": "cmdlets/Set-PnPSearchExternalConnection.html"
+  },
+  {
+    "name": "Set-PnPSearchExternalItem",
+    "synopsis": "Sets PnP Search External Item",
+    "docsPath": "cmdlets/Set-PnPSearchExternalItem.html"
+  },
+  {
+    "name": "Set-PnPSearchExternalSchema",
+    "synopsis": "Sets PnP Search External Schema",
+    "docsPath": "cmdlets/Set-PnPSearchExternalSchema.html"
+  },
+  {
+    "name": "Set-PnPSearchResultType",
+    "synopsis": "Sets PnP Search Result Type",
+    "docsPath": "cmdlets/Set-PnPSearchResultType.html"
+  },
+  {
+    "name": "Set-PnPSearchSettings",
+    "synopsis": "Sets PnP Search Settings",
+    "docsPath": "cmdlets/Set-PnPSearchSettings.html"
+  },
+  {
+    "name": "Set-PnPSearchVertical",
+    "synopsis": "Sets PnP Search Vertical",
+    "docsPath": "cmdlets/Set-PnPSearchVertical.html"
+  },
+  {
+    "name": "Set-PnPSearchVerticalOrder",
+    "synopsis": "Sets PnP Search Vertical Order",
+    "docsPath": "cmdlets/Set-PnPSearchVerticalOrder.html"
+  },
+  {
+    "name": "Set-PnPSite",
+    "synopsis": "Sets PnP Site",
+    "docsPath": "cmdlets/Set-PnPSite.html"
+  },
+  {
+    "name": "Set-PnPSiteArchiveState",
+    "synopsis": "Sets PnP Site Archive State",
+    "docsPath": "cmdlets/Set-PnPSiteArchiveState.html"
+  },
+  {
+    "name": "Set-PnPSiteClassification",
+    "synopsis": "Sets PnP Site Classification",
+    "docsPath": "cmdlets/Set-PnPSiteClassification.html"
+  },
+  {
+    "name": "Set-PnPSiteClosure",
+    "synopsis": "Sets PnP Site Closure",
+    "docsPath": "cmdlets/Set-PnPSiteClosure.html"
+  },
+  {
+    "name": "Set-PnPSiteDesign",
+    "synopsis": "Sets PnP Site Design",
+    "docsPath": "cmdlets/Set-PnPSiteDesign.html"
+  },
+  {
+    "name": "Set-PnPSiteDocumentIdPrefix",
+    "synopsis": "Sets PnP Site Document Id Prefix",
+    "docsPath": "cmdlets/Set-PnPSiteDocumentIdPrefix.html"
+  },
+  {
+    "name": "Set-PnPSiteGroup",
+    "synopsis": "Sets PnP Site Group",
+    "docsPath": "cmdlets/Set-PnPSiteGroup.html"
+  },
+  {
+    "name": "Set-PnPSitePolicy",
+    "synopsis": "Sets PnP Site Policy",
+    "docsPath": "cmdlets/Set-PnPSitePolicy.html"
+  },
+  {
+    "name": "Set-PnPSiteScript",
+    "synopsis": "Sets PnP Site Script",
+    "docsPath": "cmdlets/Set-PnPSiteScript.html"
+  },
+  {
+    "name": "Set-PnPSiteScriptPackage",
+    "synopsis": "Sets PnP Site Script Package",
+    "docsPath": "cmdlets/Set-PnPSiteScriptPackage.html"
+  },
+  {
+    "name": "Set-PnPSiteSensitivityLabel",
+    "synopsis": "Sets PnP Site Sensitivity Label",
+    "docsPath": "cmdlets/Set-PnPSiteSensitivityLabel.html"
+  },
+  {
+    "name": "Set-PnPSiteTemplateMetadata",
+    "synopsis": "Sets PnP Site Template Metadata",
+    "docsPath": "cmdlets/Set-PnPSiteTemplateMetadata.html"
+  },
+  {
+    "name": "Set-PnPSiteVersionPolicy",
+    "synopsis": "Sets PnP Site Version Policy",
+    "docsPath": "cmdlets/Set-PnPSiteVersionPolicy.html"
+  },
+  {
+    "name": "Set-PnPStorageEntity",
+    "synopsis": "Sets PnP Storage Entity",
+    "docsPath": "cmdlets/Set-PnPStorageEntity.html"
+  },
+  {
+    "name": "Set-PnPStructuralNavigationCacheSiteState",
+    "synopsis": "Sets PnP Structural Navigation Cache Site State",
+    "docsPath": "cmdlets/Set-PnPStructuralNavigationCacheSiteState.html"
+  },
+  {
+    "name": "Set-PnPStructuralNavigationCacheWebState",
+    "synopsis": "Sets PnP Structural Navigation Cache Web State",
+    "docsPath": "cmdlets/Set-PnPStructuralNavigationCacheWebState.html"
+  },
+  {
+    "name": "Set-PnPTaxonomyFieldValue",
+    "synopsis": "Sets PnP Taxonomy Field Value",
+    "docsPath": "cmdlets/Set-PnPTaxonomyFieldValue.html"
+  },
+  {
+    "name": "Set-PnPTeamifyPromptHidden",
+    "synopsis": "Sets PnP Teamify Prompt Hidden",
+    "docsPath": "cmdlets/Set-PnPTeamifyPromptHidden.html"
+  },
+  {
+    "name": "Set-PnPTeamsChannel",
+    "synopsis": "Sets PnP Teams Channel",
+    "docsPath": "cmdlets/Set-PnPTeamsChannel.html"
+  },
+  {
+    "name": "Set-PnPTeamsTab",
+    "synopsis": "Sets PnP Teams Tab",
+    "docsPath": "cmdlets/Set-PnPTeamsTab.html"
+  },
+  {
+    "name": "Set-PnPTeamsTag",
+    "synopsis": "Sets PnP Teams Tag",
+    "docsPath": "cmdlets/Set-PnPTeamsTag.html"
+  },
+  {
+    "name": "Set-PnPTeamsTeam",
+    "synopsis": "Sets PnP Teams Team",
+    "docsPath": "cmdlets/Set-PnPTeamsTeam.html"
+  },
+  {
+    "name": "Set-PnPTeamsTeamArchivedState",
+    "synopsis": "Sets PnP Teams Team Archived State",
+    "docsPath": "cmdlets/Set-PnPTeamsTeamArchivedState.html"
+  },
+  {
+    "name": "Set-PnPTeamsTeamPicture",
+    "synopsis": "Sets PnP Teams Team Picture",
+    "docsPath": "cmdlets/Set-PnPTeamsTeamPicture.html"
+  },
+  {
+    "name": "Set-PnPTemporarilyDisableAppBar",
+    "synopsis": "Sets PnP Temporarily Disable App Bar",
+    "docsPath": "cmdlets/Set-PnPTemporarilyDisableAppBar.html"
+  },
+  {
+    "name": "Set-PnPTenant",
+    "synopsis": "Sets PnP Tenant",
+    "docsPath": "cmdlets/Set-PnPTenant.html"
+  },
+  {
+    "name": "Set-PnPTenantAppCatalogUrl",
+    "synopsis": "Sets PnP Tenant App Catalog Url",
+    "docsPath": "cmdlets/Set-PnPTenantAppCatalogUrl.html"
+  },
+  {
+    "name": "Set-PnPTenantCdnEnabled",
+    "synopsis": "Sets PnP Tenant Cdn Enabled",
+    "docsPath": "cmdlets/Set-PnPTenantCdnEnabled.html"
+  },
+  {
+    "name": "Set-PnPTenantCdnPolicy",
+    "synopsis": "Sets PnP Tenant Cdn Policy",
+    "docsPath": "cmdlets/Set-PnPTenantCdnPolicy.html"
+  },
+  {
+    "name": "Set-PnPTenantPronounsSetting",
+    "synopsis": "Sets PnP Tenant Pronouns Setting",
+    "docsPath": "cmdlets/Set-PnPTenantPronounsSetting.html"
+  },
+  {
+    "name": "Set-PnPTenantRestrictedSearchMode",
+    "synopsis": "Sets PnP Tenant Restricted Search Mode",
+    "docsPath": "cmdlets/Set-PnPTenantRestrictedSearchMode.html"
+  },
+  {
+    "name": "Set-PnPTenantSite",
+    "synopsis": "Sets PnP Tenant Site",
+    "docsPath": "cmdlets/Set-PnPTenantSite.html"
+  },
+  {
+    "name": "Set-PnPTenantSyncClientRestriction",
+    "synopsis": "Sets PnP Tenant Sync Client Restriction",
+    "docsPath": "cmdlets/Set-PnPTenantSyncClientRestriction.html"
+  },
+  {
+    "name": "Set-PnPTerm",
+    "synopsis": "Sets PnP Term",
+    "docsPath": "cmdlets/Set-PnPTerm.html"
+  },
+  {
+    "name": "Set-PnPTermGroup",
+    "synopsis": "Sets PnP Term Group",
+    "docsPath": "cmdlets/Set-PnPTermGroup.html"
+  },
+  {
+    "name": "Set-PnPTermSet",
+    "synopsis": "Sets PnP Term Set",
+    "docsPath": "cmdlets/Set-PnPTermSet.html"
+  },
+  {
+    "name": "Set-PnPTheme",
+    "synopsis": "Sets PnP Theme",
+    "docsPath": "cmdlets/Set-PnPTheme.html"
+  },
+  {
+    "name": "Set-PnPUserOneDriveQuota",
+    "synopsis": "Sets PnP User One Drive Quota",
+    "docsPath": "cmdlets/Set-PnPUserOneDriveQuota.html"
+  },
+  {
+    "name": "Set-PnPUserProfilePhoto",
+    "synopsis": "Sets PnP User Profile Photo",
+    "docsPath": "cmdlets/Set-PnPUserProfilePhoto.html"
+  },
+  {
+    "name": "Set-PnPUserProfileProperty",
+    "synopsis": "Sets PnP User Profile Property",
+    "docsPath": "cmdlets/Set-PnPUserProfileProperty.html"
+  },
+  {
+    "name": "Set-PnPView",
+    "synopsis": "Sets PnP View",
+    "docsPath": "cmdlets/Set-PnPView.html"
+  },
+  {
+    "name": "Set-PnPVivaConnectionsDashboardACE",
+    "synopsis": "Sets PnP Viva Connections Dashboard A C E",
+    "docsPath": "cmdlets/Set-PnPVivaConnectionsDashboardACE.html"
+  },
+  {
+    "name": "Set-PnPVivaEngageCommunity",
+    "synopsis": "Sets PnP Viva Engage Community",
+    "docsPath": "cmdlets/Set-PnPVivaEngageCommunity.html"
+  },
+  {
+    "name": "Set-PnPWeb",
+    "synopsis": "Sets PnP Web",
+    "docsPath": "cmdlets/Set-PnPWeb.html"
+  },
+  {
+    "name": "Set-PnPWebHeader",
+    "synopsis": "Sets PnP Web Header",
+    "docsPath": "cmdlets/Set-PnPWebHeader.html"
+  },
+  {
+    "name": "Set-PnPWebhookSubscription",
+    "synopsis": "Sets PnP Webhook Subscription",
+    "docsPath": "cmdlets/Set-PnPWebhookSubscription.html"
+  },
+  {
+    "name": "Set-PnPWebPartProperty",
+    "synopsis": "Sets PnP Web Part Property",
+    "docsPath": "cmdlets/Set-PnPWebPartProperty.html"
+  },
+  {
+    "name": "Set-PnPWebPermission",
+    "synopsis": "Sets PnP Web Permission",
+    "docsPath": "cmdlets/Set-PnPWebPermission.html"
+  },
+  {
+    "name": "Set-PnPWebTheme",
+    "synopsis": "Sets PnP Web Theme",
+    "docsPath": "cmdlets/Set-PnPWebTheme.html"
+  },
+  {
+    "name": "Set-PnPWikiPageContent",
+    "synopsis": "Sets PnP Wiki Page Content",
+    "docsPath": "cmdlets/Set-PnPWikiPageContent.html"
+  },
+  {
+    "name": "Start-PnPEnterpriseAppInsightsReport",
+    "synopsis": "Start PnP Enterprise App Insights Report",
+    "docsPath": "cmdlets/Start-PnPEnterpriseAppInsightsReport.html"
+  },
+  {
+    "name": "Start-PnPSiteContentMove",
+    "synopsis": "Start PnP Site Content Move",
+    "docsPath": "cmdlets/Start-PnPSiteContentMove.html"
+  },
+  {
+    "name": "Start-PnPTenantRename",
+    "synopsis": "Start PnP Tenant Rename",
+    "docsPath": "cmdlets/Start-PnPTenantRename.html"
+  },
+  {
+    "name": "Start-PnPTraceLog",
+    "synopsis": "Start PnP Trace Log",
+    "docsPath": "cmdlets/Start-PnPTraceLog.html"
+  },
+  {
+    "name": "Start-PnPUnifiedGroupMove",
+    "synopsis": "Start PnP Unified Group Move",
+    "docsPath": "cmdlets/Start-PnPUnifiedGroupMove.html"
+  },
+  {
+    "name": "Start-PnPUserAndContentMove",
+    "synopsis": "Start PnP User And Content Move",
+    "docsPath": "cmdlets/Start-PnPUserAndContentMove.html"
+  },
+  {
+    "name": "Stop-PnPFlowRun",
+    "synopsis": "Stop PnP Flow Run",
+    "docsPath": "cmdlets/Stop-PnPFlowRun.html"
+  },
+  {
+    "name": "Stop-PnPSiteContentMove",
+    "synopsis": "Stop PnP Site Content Move",
+    "docsPath": "cmdlets/Stop-PnPSiteContentMove.html"
+  },
+  {
+    "name": "Stop-PnPTraceLog",
+    "synopsis": "Stop PnP Trace Log",
+    "docsPath": "cmdlets/Stop-PnPTraceLog.html"
+  },
+  {
+    "name": "Stop-PnPUserAndContentMove",
+    "synopsis": "Stop PnP User And Content Move",
+    "docsPath": "cmdlets/Stop-PnPUserAndContentMove.html"
+  },
+  {
+    "name": "Submit-PnPSearchQuery",
+    "synopsis": "Submits PnP Search Query",
+    "docsPath": "cmdlets/Submit-PnPSearchQuery.html"
+  },
+  {
+    "name": "Submit-PnPTeamsChannelMessage",
+    "synopsis": "Submits PnP Teams Channel Message",
+    "docsPath": "cmdlets/Submit-PnPTeamsChannelMessage.html"
+  },
+  {
+    "name": "Sync-PnPAppToTeams",
+    "synopsis": "Sync PnP App To Teams",
+    "docsPath": "cmdlets/Sync-PnPAppToTeams.html"
+  },
+  {
+    "name": "Sync-PnPSharePointUserProfilesFromAzureActiveDirectory",
+    "synopsis": "Sync PnP Share Point User Profiles From Azure Active Directory",
+    "docsPath": "cmdlets/Sync-PnPSharePointUserProfilesFromAzureActiveDirectory.html"
+  },
+  {
+    "name": "Test-PnPListItemIsRecord",
+    "synopsis": "Tests PnP List Item Is Record",
+    "docsPath": "cmdlets/Test-PnPListItemIsRecord.html"
+  },
+  {
+    "name": "Test-PnPMicrosoft365GroupAliasIsUsed",
+    "synopsis": "Tests PnP Microsoft365 Group Alias Is Used",
+    "docsPath": "cmdlets/Test-PnPMicrosoft365GroupAliasIsUsed.html"
+  },
+  {
+    "name": "Test-PnPSite",
+    "synopsis": "Tests PnP Site",
+    "docsPath": "cmdlets/Test-PnPSite.html"
+  },
+  {
+    "name": "Test-PnPTenantTemplate",
+    "synopsis": "Tests PnP Tenant Template",
+    "docsPath": "cmdlets/Test-PnPTenantTemplate.html"
+  },
+  {
+    "name": "Undo-PnPFileCheckedOut",
+    "synopsis": "Undo PnP File Checked Out",
+    "docsPath": "cmdlets/Undo-PnPFileCheckedOut.html"
+  },
+  {
+    "name": "Uninstall-PnPApp",
+    "synopsis": "Uninstalls PnP App",
+    "docsPath": "cmdlets/Uninstall-PnPApp.html"
+  },
+  {
+    "name": "Unlock-PnPSensitivityLabelEncryptedFile",
+    "synopsis": "Unlock PnP Sensitivity Label Encrypted File",
+    "docsPath": "cmdlets/Unlock-PnPSensitivityLabelEncryptedFile.html"
+  },
+  {
+    "name": "Unpublish-PnPApp",
+    "synopsis": "Unpublish PnP App",
+    "docsPath": "cmdlets/Unpublish-PnPApp.html"
+  },
+  {
+    "name": "Unpublish-PnPContentType",
+    "synopsis": "Unpublish PnP Content Type",
+    "docsPath": "cmdlets/Unpublish-PnPContentType.html"
+  },
+  {
+    "name": "Unpublish-PnPSyntexModel",
+    "synopsis": "Unpublish PnP Syntex Model",
+    "docsPath": "cmdlets/Unpublish-PnPSyntexModel.html"
+  },
+  {
+    "name": "Unregister-PnPHubSite",
+    "synopsis": "Unregisters PnP Hub Site",
+    "docsPath": "cmdlets/Unregister-PnPHubSite.html"
+  },
+  {
+    "name": "Update-PnPApp",
+    "synopsis": "Updates PnP App",
+    "docsPath": "cmdlets/Update-PnPApp.html"
+  },
+  {
+    "name": "Update-PnPAvailableSiteClassification",
+    "synopsis": "Updates PnP Available Site Classification",
+    "docsPath": "cmdlets/Update-PnPAvailableSiteClassification.html"
+  },
+  {
+    "name": "Update-PnPSiteDesignFromWeb",
+    "synopsis": "Updates PnP Site Design From Web",
+    "docsPath": "cmdlets/Update-PnPSiteDesignFromWeb.html"
+  },
+  {
+    "name": "Update-PnPTeamsApp",
+    "synopsis": "Updates PnP Teams App",
+    "docsPath": "cmdlets/Update-PnPTeamsApp.html"
+  },
+  {
+    "name": "Update-PnPTeamsUser",
+    "synopsis": "Updates PnP Teams User",
+    "docsPath": "cmdlets/Update-PnPTeamsUser.html"
+  },
+  {
+    "name": "Update-PnPTodoList",
+    "synopsis": "Updates PnP Todo List",
+    "docsPath": "cmdlets/Update-PnPTodoList.html"
+  },
+  {
+    "name": "Update-PnPTodoTask",
+    "synopsis": "Updates PnP Todo Task",
+    "docsPath": "cmdlets/Update-PnPTodoTask.html"
+  },
+  {
+    "name": "Update-PnPTodoTaskChecklistItem",
+    "synopsis": "Updates PnP Todo Task Checklist Item",
+    "docsPath": "cmdlets/Update-PnPTodoTaskChecklistItem.html"
+  },
+  {
+    "name": "Update-PnPUserType",
+    "synopsis": "Updates PnP User Type",
+    "docsPath": "cmdlets/Update-PnPUserType.html"
+  },
+  {
+    "name": "Update-PnPVivaConnectionsDashboardACE",
+    "synopsis": "Updates PnP Viva Connections Dashboard A C E",
+    "docsPath": "cmdlets/Update-PnPVivaConnectionsDashboardACE.html"
+  },
+  {
+    "name": "Use-PnPBrandCenterFontPackage",
+    "synopsis": "Use PnP Brand Center Font Package",
+    "docsPath": "cmdlets/Use-PnPBrandCenterFontPackage.html"
+  },
+  {
+    "name": "Write-PnPTraceLog",
+    "synopsis": "Write PnP Trace Log",
+    "docsPath": "cmdlets/Write-PnPTraceLog.html"
+  }
+]
