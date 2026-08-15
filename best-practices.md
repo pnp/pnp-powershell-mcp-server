@@ -14,18 +14,48 @@ Use this flow for reliable execution:
 
 ## Prerequisites
 
-- **PowerShell 7+** (`pwsh`) must be installed and available on `PATH`. Every tool in this server shells out to `pwsh` to run PnP PowerShell — if it's missing, tools will return an actionable error telling you to install it.
+- **PowerShell 7+** (`pwsh`) must be installed and available on `PATH`. This server runs PnP PowerShell in a `pwsh` session — if it's missing, tools will return an actionable error telling you to install it.
 - **The `PnP.PowerShell` module** must be installed:
   ```powershell
   Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force
   ```
-  Every tool checks for the module before running and returns a clear error with the install command above if it's missing, instead of a raw PowerShell exception.
+  The module is imported once when a session starts, and a clear error with the install command above is returned if it is missing, instead of a raw PowerShell exception.
+
+## Sessions
+
+Commands run inside a **persistent PowerShell session**, so state created by one call is still there
+on the next one. In particular, a connection made with `Connect-PnPOnline` stays alive — connect
+once, then keep running commands against it.
+
+- **Reuse the connection.** Do not re-run `Connect-PnPOnline` before every command. Check with
+  `pnp_get_connection_status` and connect only when it reports you are not connected.
+- **`sessionId`.** `pnp_run_command` and `pnp_get_connection_status` accept an optional `sessionId`.
+  Leave it unset for normal work. Use a second name (e.g. `tenant-b`) only when you genuinely need
+  two connections at once — each session has its own independent connection and variables.
+- **Ending a session.** Use `pnp_reset_session` to sign out, switch accounts, or recover a session
+  that has stopped responding. Everything in that session is discarded.
+- **Idle sessions** are ended automatically after 30 minutes; just reconnect if that happens.
+- **Timeouts.** A single command is capped at 10 minutes, after which the session is terminated and
+  the connection is lost. Override with the `PNP_MCP_COMMAND_TIMEOUT_SECONDS` environment variable.
+  Clients that support the MCP Tasks extension can run `pnp_run_command` as a task and poll it
+  instead of holding the call open.
+
+## Destructive Commands
+
+Commands using a destructive verb — `Remove-*`, `Clear-*`, `Reset-*`, `Uninstall-*`, `Revoke-*`,
+`Deny-*`, `Restore-*`, `Move-*`, `Rename-*`, `Disable-*` — are **not run without confirmation**.
+
+- On clients that support prompting, you will be asked to confirm the exact command first.
+- On clients that do not, the command is blocked and must be re-sent with `confirmDestructive: true`.
+  Always show the user the exact command and get a real answer before doing that.
+- Set `PNP_MCP_CONFIRM_DESTRUCTIVE=false` to disable the check entirely (not recommended outside
+  automation where the commands are already reviewed).
 
 ## Authentication Best Practices
 
 ### Connect to SharePoint Online
 
-Before running any PnP PowerShell commands, establish a connection:
+Establish a connection once per session; it persists across later commands:
 
 ```powershell
 # Interactive login (recommended for local/manual use, supports MFA)

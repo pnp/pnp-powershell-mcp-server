@@ -1,31 +1,46 @@
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
+using PnPPowerShell.MCPServer.Services;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace PnPPowerShell.MCPServer.Tools;
 
 [McpServerToolType]
-internal class PnPPowerShellTools
+internal partial class PnPPowerShellTools
 {
-    private const int DefaultTimeout = 120_000; // 2 minutes
+    private static readonly TimeSpan MetadataTimeout = TimeSpan.FromMinutes(2);
 
-    // Shared preamble injected into every script that needs the module. Fails fast with an
-    // actionable message instead of letting Import-Module surface a raw PowerShell error.
-    private const string ModuleCheckPreamble = """
-        $ErrorActionPreference = 'Stop'
-        if (-not (Get-Module -ListAvailable -Name PnP.PowerShell)) {
-          Write-Output 'ERROR: The PnP.PowerShell module is not installed. Install it by running: Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force'
-          exit 1
-        }
-        Import-Module PnP.PowerShell -ErrorAction Stop
-        """;
+    /// <summary>
+    /// Verbs that destroy, overwrite, or revoke. These require explicit confirmation before running;
+    /// ordinary mutating verbs (Set, Add, New, Enable, Grant, ...) do not, or the prompt would fire
+    /// so often it would be clicked through without being read.
+    /// </summary>
+    [GeneratedRegex(@"\b(Remove|Clear|Reset|Uninstall|Revoke|Deny|Restore|Move|Rename|Disable)-PnP\w+",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex DestructiveCommandRegex();
 
-    [McpServerTool(Name = "pnp_search_commands")]
+    /// <summary>
+    /// Per-command wall-clock limit. Generous by default because long tenant-wide operations are the
+    /// normal case here; clients that support the Tasks extension avoid the wait entirely by running
+    /// the call as a task.
+    /// </summary>
+    private static TimeSpan CommandTimeout =>
+        int.TryParse(Environment.GetEnvironmentVariable("PNP_MCP_COMMAND_TIMEOUT_SECONDS"), out var seconds) && seconds > 0
+            ? TimeSpan.FromSeconds(seconds)
+            : TimeSpan.FromMinutes(10);
+
+    private static bool ConfirmationDisabled =>
+        string.Equals(Environment.GetEnvironmentVariable("PNP_MCP_CONFIRM_DESTRUCTIVE"), "false", StringComparison.OrdinalIgnoreCase);
+
+    [McpServerTool(Name = "pnp_search_commands", ReadOnly = true, OpenWorld = false)]
     [Description("Searches PnP PowerShell commands using keyword matching against command names, verbs, and nouns. Use this tool first to find relevant commands before getting full command documentation.")]
-    public async Task<string> SearchPnpCommands(
+    public static async Task<string> SearchPnpCommands(
+        PowerShellSessionManager sessions,
         [Description("One or more space-separated keywords to find relevant commands (e.g., \"site\", \"list item\", \"teams channel\", \"user add\")")] string query,
-        [Description("Maximum number of results to return (default: 20, max: 100)")] int limit = 20)
+        [Description("Maximum number of results to return (default: 20, max: 100)")] int limit = 20,
+        CancellationToken cancellationToken = default)
     {
         limit = Math.Clamp(limit, 1, 100);
 
@@ -42,7 +57,6 @@ internal class PnPPowerShellTools
         var termArray = "@(" + string.Join(",", terms.Select(t => $"'{t}'")) + ")";
 
         var script = $$"""
-            {{ModuleCheckPreamble}}
             $terms = {{termArray}}
             Get-Command -Module PnP.PowerShell |
               ForEach-Object {
@@ -62,7 +76,7 @@ internal class PnPPowerShellTools
               ConvertTo-Json -Depth 5 -Compress
             """;
 
-        var result = await RunPowerShellScriptAsync(script);
+        var result = await sessions.Get(null).ExecuteAsync(script, MetadataTimeout, cancellationToken);
 
         return $"""
             {result}
@@ -72,15 +86,16 @@ internal class PnPPowerShellTools
             """;
     }
 
-    [McpServerTool(Name = "pnp_get_command_docs")]
+    [McpServerTool(Name = "pnp_get_command_docs", ReadOnly = true, OpenWorld = false)]
     [Description("Gets detailed documentation for a specific PnP PowerShell command including syntax, parameters, and examples. Use this after searching for commands to understand how to use them correctly.")]
-    public async Task<string> GetPnpCommandDocs(
-        [Description("The full PnP PowerShell command name (e.g., \"Get-PnPWeb\", \"Connect-PnPOnline\", \"Get-PnPList\")")] string commandName)
+    public static async Task<string> GetPnpCommandDocs(
+        PowerShellSessionManager sessions,
+        [Description("The full PnP PowerShell command name (e.g., \"Get-PnPWeb\", \"Connect-PnPOnline\", \"Get-PnPList\")")] string commandName,
+        CancellationToken cancellationToken = default)
     {
         var safeCommandName = EscapeSingleQuotedPowerShell(commandName ?? string.Empty);
 
         var script = $$"""
-            {{ModuleCheckPreamble}}
             $helpText = Get-Help '{{safeCommandName}}' -Full | Out-String
             if ([string]::IsNullOrWhiteSpace($helpText)) {
               Write-Output "No documentation found for '{{safeCommandName}}'. Verify the command name using 'pnp_search_commands'."
@@ -89,13 +104,19 @@ internal class PnPPowerShellTools
             }
             """;
 
-        return await RunPowerShellScriptAsync(script);
+        return await sessions.Get(null).ExecuteAsync(script, MetadataTimeout, cancellationToken);
     }
 
-    [McpServerTool(Name = "pnp_run_command")]
-    [Description("Executes one or more PnP PowerShell commands and returns the result. Commands can be chained with semicolons or newlines. Always ensure you are connected first using Connect-PnPOnline. This tool can be used repeatedly to accomplish complex multi-step tasks.")]
-    public async Task<string> RunPnpCommand(
-        [Description("PnP PowerShell command(s) to execute (e.g., \"Get-PnPSite\", \"Get-PnPList | Select-Object Title, ItemCount\")")] string command)
+    [McpServerTool(Name = "pnp_run_command", Destructive = true, OpenWorld = true)]
+    [Description("Executes one or more PnP PowerShell commands and returns the result. Commands can be chained with semicolons or newlines. The connection established by Connect-PnPOnline persists across calls that use the same sessionId, so you only need to connect once. This tool can be used repeatedly to accomplish complex multi-step tasks.")]
+    public static async Task<string> RunPnpCommand(
+        PowerShellSessionManager sessions,
+        McpServer server,
+        RequestContext<CallToolRequestParams> context,
+        [Description("PnP PowerShell command(s) to execute (e.g., \"Get-PnPSite\", \"Get-PnPList | Select-Object Title, ItemCount\")")] string command,
+        [Description("Session to run in. Sessions keep their own PnP connection, so use a second name only when working against two tenants at once (default: \"default\")")] string? sessionId = null,
+        [Description("Set to true to approve a destructive command (Remove-*, Clear-*, Reset-*, ...) without an interactive confirmation prompt")] bool confirmDestructive = false,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(command))
         {
@@ -111,43 +132,119 @@ internal class PnPPowerShellTools
                 """;
         }
 
-        // Base64-encode the command to avoid escaping issues
+        var destructiveMatch = DestructiveCommandRegex().Match(command);
+        if (destructiveMatch.Success && !confirmDestructive && !ConfirmationDisabled)
+        {
+            var refusal = await ConfirmDestructiveAsync(server, context, command, destructiveMatch.Value);
+            if (refusal is not null)
+            {
+                return refusal;
+            }
+        }
+
+        // Base64-encode the command so quoting inside it cannot break the wrapper.
         var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(command));
 
         var script = $$"""
-            {{ModuleCheckPreamble}}
             $decodedCommand = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{{encoded}}'))
-            try {
-              $result = Invoke-Expression $decodedCommand
-              if ($null -ne $result) {
-                try {
-                  $result | ConvertTo-Json -Depth 20 -Compress
-                }
-                catch {
-                  $result | Out-String
-                }
-              } else {
-                Write-Output 'Command completed successfully (no output).'
+            $result = Invoke-Expression $decodedCommand
+            if ($null -ne $result) {
+              try {
+                $result | ConvertTo-Json -Depth 20 -Compress
               }
-            }
-            catch {
-              Write-Error "Command failed: $_"
-              exit 1
+              catch {
+                $result | Out-String
+              }
+            } else {
+              Write-Output 'Command completed successfully (no output).'
             }
             """;
 
-        return await RunPowerShellScriptAsync(script);
+        return await sessions.Get(sessionId).ExecuteAsync(script, CommandTimeout, cancellationToken);
     }
 
-    [McpServerTool(Name = "pnp_get_connection_status")]
-    [Description("Checks the current PnP PowerShell connection status. Use this to verify if you are already connected to a SharePoint site or Microsoft 365 tenant before running commands.")]
-    public async Task<string> GetPnpConnectionStatus()
+    /// <summary>
+    /// Returns <see langword="null"/> when the command is approved, or the message to return to the
+    /// caller when it is not.
+    /// </summary>
+    private static async Task<string?> ConfirmDestructiveAsync(
+        McpServer server,
+        RequestContext<CallToolRequestParams> context,
+        string command,
+        string matchedCmdlet)
     {
-        var script = $$"""
-            {{ModuleCheckPreamble}}
+        // A retry carries the answer to the prompt raised by the previous attempt.
+        if (context.Params?.InputResponses?.TryGetValue("confirmDestructive", out var response) is true)
+        {
+            var elicited = response.Deserialize(InputResponse.ElicitResultJsonTypeInfo);
+
+            if (elicited?.IsAccepted is not true)
+            {
+                return $"Cancelled: '{matchedCmdlet}' was not confirmed, so nothing was run.";
+            }
+
+            if (elicited.Content?.TryGetValue("confirm", out var confirmValue) is true &&
+                confirmValue.ValueKind is System.Text.Json.JsonValueKind.False)
+            {
+                return $"Cancelled: '{matchedCmdlet}' was declined, so nothing was run.";
+            }
+
+            return null;
+        }
+
+        // IsMrtrSupported only says the round-trip can be represented; on the legacy bridge the client
+        // must additionally be able to elicit, or the SDK fails the call with an opaque error instead
+        // of letting us fall back.
+        if (server.IsMrtrSupported && server.ClientCapabilities?.Elicitation is not null)
+        {
+            throw new InputRequiredException(
+                inputRequests: new Dictionary<string, InputRequest>
+                {
+                    ["confirmDestructive"] = InputRequest.ForElicitation(new ElicitRequestParams
+                    {
+                        Message =
+                            $"This will run a destructive PnP PowerShell command ({matchedCmdlet}) against the connected tenant:\n\n{command}\n\nThis cannot be undone. Continue?",
+                        RequestedSchema = new()
+                        {
+                            Properties =
+                            {
+                                ["confirm"] = new ElicitRequestParams.BooleanSchema
+                                {
+                                    Title = "Run this command",
+                                    Description = $"Confirm execution of {matchedCmdlet}",
+                                    Default = false,
+                                },
+                            },
+                        },
+                    }),
+                },
+                requestState: command);
+        }
+
+        // Clients that cannot prompt still get a way through, just not a silent one.
+        return $"""
+            Blocked: '{matchedCmdlet}' is a destructive command and has not been confirmed. Nothing was run.
+
+            Command:
+            {command}
+
+            Show this command to the user and, once they confirm, call 'pnp_run_command' again with confirmDestructive set to true.
+            Set the environment variable PNP_MCP_CONFIRM_DESTRUCTIVE=false to turn this check off entirely.
+            """;
+    }
+
+    [McpServerTool(Name = "pnp_get_connection_status", ReadOnly = true, OpenWorld = false)]
+    [Description("Checks the current PnP PowerShell connection status for a session. Use this to verify if you are already connected to a SharePoint site or Microsoft 365 tenant before running commands.")]
+    public static async Task<string> GetPnpConnectionStatus(
+        PowerShellSessionManager sessions,
+        [Description("Session to inspect (default: \"default\")")] string? sessionId = null,
+        CancellationToken cancellationToken = default)
+    {
+        const string script = """
             try {
               $conn = Get-PnPConnection
               $info = @{
+                Connected = $true
                 Url = $conn.Url
                 TenantAdminUrl = $conn.TenantAdminUrl
                 ConnectionType = $conn.ConnectionType.ToString()
@@ -160,12 +257,37 @@ internal class PnPPowerShellTools
             }
             """;
 
-        return await RunPowerShellScriptAsync(script);
+        var result = await sessions.Get(sessionId).ExecuteAsync(script, MetadataTimeout, cancellationToken);
+
+        return $"""
+            Session: {(string.IsNullOrWhiteSpace(sessionId) ? PowerShellSessionManager.DefaultSessionId : sessionId.Trim())}
+
+            {result}
+            """;
     }
 
-    [McpServerTool(Name = "pnp_get_best_practices")]
-    [Description("Returns recommended best practices and guidance for using this MCP server with PnP PowerShell commands, including authentication, error handling, and execution tips.")]
-    public async Task<string> GetPnpBestPractices()
+    [McpServerTool(Name = "pnp_reset_session", Destructive = true, Idempotent = true, OpenWorld = false)]
+    [Description("Ends a PowerShell session and its PnP connection, discarding all in-session state. Use this to sign out, to recover a session that has stopped responding, or to switch the connected account.")]
+    public static async Task<string> ResetPnpSession(
+        PowerShellSessionManager sessions,
+        [Description("Session to end (default: \"default\")")] string? sessionId = null)
+    {
+        var name = string.IsNullOrWhiteSpace(sessionId) ? PowerShellSessionManager.DefaultSessionId : sessionId.Trim();
+        var existed = await sessions.ResetAsync(sessionId);
+
+        var active = sessions.Describe();
+        var summary = active.Count == 0
+            ? "No sessions are currently running."
+            : "Sessions: " + string.Join(", ", active.Select(s => $"{s.Id} ({(s.IsAlive ? "running" : "stopped")})"));
+
+        return existed
+            ? $"Session '{name}' was ended. The next command will start a fresh session and will need to reconnect with Connect-PnPOnline.\n\n{summary}"
+            : $"No session named '{name}' was running, so there was nothing to end.\n\n{summary}";
+    }
+
+    [McpServerTool(Name = "pnp_get_best_practices", ReadOnly = true, Idempotent = true, OpenWorld = false)]
+    [Description("Returns recommended best practices and guidance for using this MCP server with PnP PowerShell commands, including authentication, session handling, error handling, and execution tips.")]
+    public static async Task<string> GetPnpBestPractices()
     {
         // Try to load best-practices.md from the application directory
         var bestPracticesPath = Path.Combine(AppContext.BaseDirectory, "best-practices.md");
@@ -198,12 +320,28 @@ internal class PnPPowerShellTools
             3. Read syntax and examples with `pnp_get_command_docs`.
             4. Execute with `pnp_run_command` in small, verifiable steps.
 
+            ## Sessions
+
+            - Commands run in a persistent PowerShell session, so a `Connect-PnPOnline` connection
+              stays alive across calls. Connect once, then reuse it.
+            - Pass the same `sessionId` to keep working in one session. Use a second `sessionId` only
+              when you need connections to two tenants at the same time.
+            - Use `pnp_reset_session` to sign out, switch accounts, or recover a stuck session.
+            - A session is dropped after 30 minutes of inactivity; simply reconnect if that happens.
+
             ## Authentication
 
             - Always start sessions with `Connect-PnPOnline`.
             - Prefer secure auth methods: `-Interactive`, certificate-based (`-ClientId`, `-Tenant`, `-Thumbprint`), or managed identity.
             - Avoid storing credentials in scripts; use Azure Key Vault or environment variables.
             - Check connection status before running commands to avoid auth errors.
+
+            ## Destructive Commands
+
+            - Destructive verbs (`Remove-*`, `Clear-*`, `Reset-*`, `Revoke-*`, `Disable-*`, ...) require
+              confirmation before they run. On clients that support prompting you will be asked directly;
+              elsewhere the command is blocked until it is re-sent with `confirmDestructive: true`.
+            - Always show the user the exact command before asking them to confirm it.
 
             ## Execution Tips
 
@@ -248,71 +386,5 @@ internal class PnPPowerShellTools
     private static string EscapeSingleQuotedPowerShell(string value)
     {
         return value.Replace("'", "''");
-    }
-
-    private static async Task<string> RunPowerShellScriptAsync(string script)
-    {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "pwsh",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        startInfo.ArgumentList.Add("-NoLogo");
-        startInfo.ArgumentList.Add("-NoProfile");
-        startInfo.ArgumentList.Add("-NonInteractive");
-        startInfo.ArgumentList.Add("-Command");
-        startInfo.ArgumentList.Add(script);
-
-        Process? process;
-        try
-        {
-            process = Process.Start(startInfo);
-        }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or PlatformNotSupportedException)
-        {
-            return "Error: Could not launch 'pwsh'. Install PowerShell 7+ from https://aka.ms/powershell and ensure it is available on PATH.";
-        }
-
-        if (process is null)
-        {
-            return "Error: Failed to start PowerShell process. Ensure 'pwsh' (PowerShell 7+) is installed and available on PATH.";
-        }
-
-        using var cts = new CancellationTokenSource(DefaultTimeout);
-        var stdOutTask = process.StandardOutput.ReadToEndAsync(cts.Token);
-        var stdErrTask = process.StandardError.ReadToEndAsync(cts.Token);
-
-        try
-        {
-            await process.WaitForExitAsync(cts.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            process.Kill(entireProcessTree: true);
-            return "Error: Command timed out after 2 minutes. Consider breaking the operation into smaller steps.";
-        }
-
-        var output = (await stdOutTask).Trim();
-        var error = (await stdErrTask).Trim();
-
-        if (process.ExitCode != 0)
-        {
-            return string.IsNullOrWhiteSpace(error)
-                ? $"Error: PowerShell command failed with exit code {process.ExitCode}."
-                : $"Error: {error}";
-        }
-
-        if (!string.IsNullOrWhiteSpace(error))
-        {
-            return string.IsNullOrWhiteSpace(output)
-                ? error
-                : $"{output}\n\nWarnings:\n{error}";
-        }
-
-        return string.IsNullOrWhiteSpace(output) ? "Command completed successfully." : output;
     }
 }

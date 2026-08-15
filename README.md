@@ -170,12 +170,31 @@ prompt:
 | --- | --- |
 | pnp_search_commands | Searches PnP PowerShell commands using keyword matching against command names, verbs, and nouns. Use this tool first to find relevant commands. |
 | pnp_get_command_docs | Gets detailed documentation for a specific PnP PowerShell command including syntax, parameters, and examples. |
-| pnp_run_command | Executes one or more PnP PowerShell commands and returns the result. Can be used repeatedly to accomplish complex multi-step tasks. |
+| pnp_run_command | Executes one or more PnP PowerShell commands and returns the result. Runs in a persistent session, so a `Connect-PnPOnline` connection is reused across calls. Destructive commands require confirmation first. |
 | pnp_get_connection_status | Checks the current PnP PowerShell connection status before running commands. |
-| pnp_get_best_practices | Returns recommended best practices for using PnP PowerShell via this MCP server, including authentication, error handling, and execution tips. |
+| pnp_reset_session | Ends a session and its PnP connection. Use it to sign out, switch accounts, or recover a session that has stopped responding. |
+| pnp_get_best_practices | Returns recommended best practices for using PnP PowerShell via this MCP server, including authentication, sessions, error handling, and execution tips. |
 | pnp_search_script_samples | Searches the community [PnP Script Samples](https://pnp.github.io/script-samples/) index for scripts matching a keyword or use case. |
 | pnp_get_script_sample | Retrieves the full PnP PowerShell script code for a specific script sample by name, fetched live from GitHub. |
 | pnp_suggest_script | Finds the most relevant community script samples for a task and returns their full script code plus adaptation guidance, in one call. |
+
+### Sessions
+
+Commands run in a persistent `pwsh` session, so a connection made with `Connect-PnPOnline` stays
+alive across tool calls — you connect once rather than on every command. Pass an optional `sessionId`
+to `pnp_run_command` / `pnp_get_connection_status` when you need two tenant connections side by side;
+otherwise leave it unset. Idle sessions end after 30 minutes.
+
+### Configuration
+
+| Environment variable | Default | Description |
+| --- | --- | --- |
+| `PNP_MCP_COMMAND_TIMEOUT_SECONDS` | `600` | Wall-clock limit for a single `pnp_run_command` call. On timeout the session is terminated and the connection is lost. |
+| `PNP_MCP_CONFIRM_DESTRUCTIVE` | `true` | Set to `false` to run destructive commands (`Remove-*`, `Clear-*`, ...) without asking for confirmation. |
+| `PNP_SCRIPT_SAMPLES_PATH` | _(unset)_ | Path to a local clone of the PnP script samples repository, used as a fallback when GitHub is unreachable. |
+
+Clients that support the MCP **Tasks** extension can run `pnp_run_command` as a task and poll for the
+result, rather than holding the request open for the duration of a long tenant operation.
 
 ## 🏗️ How to build and run it locally
 
