@@ -1,0 +1,309 @@
+name: Release
+
+# Builds and publishes the complete set of NuGet packages for this tool.
+#
+# IMPORTANT — this project packs as a RID-specific .NET tool (see <RuntimeIdentifiers>
+# and <PublishAot> in PnPPowerShell.MCPServer.csproj), which means a release is NOT one
+# package but EIGHT:
+#
+#   PnP.PowerShell.McpServer                  <- tiny RID-agnostic "wrapper" (no binaries)
+#   PnP.PowerShell.McpServer.win-x64          <- the actual executable, one per RID
+#   PnP.PowerShell.McpServer.win-arm64
+#   PnP.PowerShell.McpServer.osx-arm64
+#   PnP.PowerShell.McpServer.osx-x64
+#   PnP.PowerShell.McpServer.linux-x64
+#   PnP.PowerShell.McpServer.linux-arm64
+#   PnP.PowerShell.McpServer.linux-musl-x64
+#
+# `dotnet tool install --global PnP.PowerShell.McpServer` resolves the wrapper, reads the
+# RID list out of its tools/net10.0/any/DotnetToolSettings.xml, and then downloads the
+# package matching the user's machine. If the RID packages are not on NuGet, install fails
+# with "Version X of package pnp.powershell.mcpserver.win-x64 is not found in NuGet feeds".
+#
+# The trap: with <PublishAot>true</PublishAot>, a plain `dotnet pack` builds ONLY the
+# wrapper and silently skips all 7 RID packages (native AOT cannot cross-compile between
+# operating systems, so the SDK does not even try). That is how 0.1.1-beta shipped broken.
+# Each RID package therefore has to be packed on its own matching OS — hence the matrix
+# below.
+#
+# See RELEASING.md for the manual equivalent of this workflow.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package version to build (defaults to <PackageVersion> in the csproj)'
+        required: false
+        type: string
+      publish:
+        description: 'Push the packages to NuGet.org (otherwise they are only built and uploaded as workflow artifacts)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  PROJECT: PnPPowerShell.MCPServer.csproj
+  DOTNET_VERSION: '10.0.x'
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+
+jobs:
+  version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: resolve
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -n "${INPUT_VERSION:-}" ]; then
+            version="$INPUT_VERSION"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version="${GITHUB_REF#refs/tags/v}"
+          else
+            version="$(sed -n 's:.*<PackageVersion>\(.*\)</PackageVersion>.*:\1:p' "$PROJECT" | head -n1)"
+          fi
+          if [ -z "$version" ]; then
+            echo "::error::Could not resolve a package version"
+            exit 1
+          fi
+          echo "Building version $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  pack-rid:
+    # One leg per RID, each on its own native OS. Native AOT cannot cross-compile between
+    # operating systems, so these cannot be collapsed onto a single runner.
+    name: Pack ${{ matrix.rid }}
+    needs: version
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            os: windows-latest
+          - rid: win-arm64
+            os: windows-11-arm
+          - rid: osx-arm64
+            os: macos-latest
+          - rid: osx-x64
+            os: macos-15-intel     # last Intel macOS image; macos-13 was retired in Dec 2025
+          - rid: linux-x64
+            os: ubuntu-latest
+          - rid: linux-arm64
+            os: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install native AOT prerequisites (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang zlib1g-dev
+
+      - name: Pack ${{ matrix.rid }}
+        shell: bash
+        run: |
+          dotnet pack "$PROJECT" \
+            --configuration Release \
+            --runtime ${{ matrix.rid }} \
+            -p:PackageVersion=${{ needs.version.outputs.version }} \
+            --output artifacts
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nupkg-${{ matrix.rid }}
+          path: artifacts/*.nupkg
+          if-no-files-found: error
+
+  pack-musl:
+    # linux-musl-x64 needs an Alpine toolchain. Built via `docker run` rather than a job
+    # `container:` so that checkout/upload-artifact keep running on the host runner.
+    # The `-aot` image variant already ships clang/zlib/build-base.
+    name: Pack linux-musl-x64
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Pack linux-musl-x64 in an Alpine container
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          docker run --rm \
+            --volume "$PWD":/src \
+            --workdir /src \
+            --env PROJECT \
+            --env VERSION \
+            --env DOTNET_NOLOGO \
+            --env DOTNET_CLI_TELEMETRY_OPTOUT \
+            mcr.microsoft.com/dotnet/sdk:10.0-alpine-aot \
+            sh -ec 'dotnet pack "$PROJECT" --configuration Release --runtime linux-musl-x64 -p:PackageVersion="$VERSION" --output artifacts'
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nupkg-linux-musl-x64
+          path: artifacts/*.nupkg
+          if-no-files-found: error
+
+  pack-wrapper:
+    # The RID-agnostic wrapper package. With PublishAot=true the SDK packs only this one
+    # here (no implementation binaries), so it can be built on any runner.
+    name: Pack wrapper
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Pack wrapper
+        shell: bash
+        run: |
+          dotnet pack "$PROJECT" \
+            --configuration Release \
+            -p:PackageVersion=${{ needs.version.outputs.version }} \
+            --output artifacts
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nupkg-wrapper
+          path: artifacts/*.nupkg
+          if-no-files-found: error
+
+  verify:
+    # Guard against re-shipping the 0.1.1-beta failure: every RID the wrapper advertises
+    # must have a matching package in this build, or nothing gets published.
+    name: Verify package set
+    needs: [version, pack-rid, pack-musl, pack-wrapper]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: staging
+          pattern: nupkg-*
+          merge-multiple: true
+
+      - name: Check every advertised RID package is present
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          wrapper="staging/PnP.PowerShell.McpServer.${VERSION}.nupkg"
+          if [ ! -f "$wrapper" ]; then
+            echo "::error::Wrapper package $wrapper was not built"
+            exit 1
+          fi
+
+          unzip -q -o "$wrapper" -d wrapper
+          settings="$(find wrapper/tools -name DotnetToolSettings.xml | head -n1)"
+          if [ -z "$settings" ]; then
+            echo "::error::No DotnetToolSettings.xml inside the wrapper package"
+            exit 1
+          fi
+
+          echo "Wrapper advertises these RID packages:"
+          ids="$(grep -o 'RuntimeIdentifierPackage[^>]*Id="[^"]*"' "$settings" | sed 's/.*Id="\([^"]*\)".*/\1/')"
+          if [ -z "$ids" ]; then
+            echo "::error::Wrapper advertises no RID packages — is <RuntimeIdentifiers> still set in the csproj?"
+            exit 1
+          fi
+
+          missing=0
+          for id in $ids; do
+            # NuGet ids are case-insensitive, so match the file name that way too.
+            if [ -n "$(find staging -maxdepth 1 -iname "${id}.${VERSION}.nupkg" -print -quit)" ]; then
+              echo "  ok      $id"
+            else
+              echo "  MISSING $id"
+              echo "::error::${id}.${VERSION}.nupkg was not built — installs on that platform would fail"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Summarise
+        shell: bash
+        run: |
+          {
+            echo "### Packages built"
+            echo ''
+            echo '```'
+            ls -1sh staging/*.nupkg
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    name: Publish to NuGet.org
+    needs: [version, verify]
+    if: ${{ github.event_name == 'push' || inputs.publish }}
+    runs-on: ubuntu-latest
+    # Consider creating a protected "nuget" environment in the repo settings and holding
+    # NUGET_API_KEY there, so pushes require an approval:
+    # environment: nuget
+    steps:
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: staging
+          pattern: nupkg-*
+          merge-multiple: true
+
+      - name: Check API key is configured
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          if [ -z "${NUGET_API_KEY:-}" ]; then
+            echo "::error::Repository secret NUGET_API_KEY is not set"
+            exit 1
+          fi
+
+      - name: Push packages
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          set -euo pipefail
+          wrapper="staging/PnP.PowerShell.McpServer.${VERSION}.nupkg"
+
+          push() {
+            echo "Pushing $1"
+            dotnet nuget push "$1" \
+              --source https://api.nuget.org/v3/index.json \
+              --api-key "$NUGET_API_KEY" \
+              --skip-duplicate
+          }
+
+          # Order matters: the RID packages go first. The wrapper is what `dotnet tool
+          # install` resolves, so if it lands before the packages it points at, every
+          # install in that window fails. --skip-duplicate keeps re-runs (and back-filling
+          # RID packages for an already-published wrapper version) safe.
+          for f in staging/*.nupkg; do
+            [ "$f" = "$wrapper" ] && continue
+            push "$f"
+          done
+          push "$wrapper"
