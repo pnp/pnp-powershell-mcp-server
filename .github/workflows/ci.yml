@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - dev
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PROJECT: PnPPowerShell.MCPServer.csproj
+  DOTNET_VERSION: '10.0.x'
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+
+jobs:
+  build:
+    # Packs the host RID on each OS family. This is the cheap smoke test that the native
+    # AOT build still works — a full 7-RID matrix only runs at release time.
+    name: Build ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-x64
+            os: ubuntu-latest
+          - rid: win-x64
+            os: windows-latest
+          - rid: osx-arm64
+            os: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install native AOT prerequisites (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang zlib1g-dev
+
+      - name: Build
+        run: dotnet build "$PROJECT" --configuration Release
+        shell: bash
+
+      - name: Pack ${{ matrix.rid }}
+        shell: bash
+        run: dotnet pack "$PROJECT" --configuration Release --runtime ${{ matrix.rid }} --output artifacts
+
+      - name: Verify the RID package actually contains the executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          rid='${{ matrix.rid }}'
+          pkg="$(find artifacts -name "*.${rid}.*.nupkg" -print -quit)"
+          if [ -z "$pkg" ]; then
+            echo "::error::No ${rid} package was produced"
+            exit 1
+          fi
+          # Expected layout: tools/any/<rid>/PnPPowerShell.MCPServer[.exe]
+          if ! unzip -l "$pkg" | grep -qE "tools/[^/]+/${rid}/PnPPowerShell\.MCPServer(\.exe)?$"; then
+            echo "::error::$pkg contains no executable for ${rid}"
+            unzip -l "$pkg"
+            exit 1
+          fi
+          echo "ok: $pkg ($(du -h "$pkg" | cut -f1))"
+
+  rid-coverage:
+    # The release workflow must build a package for every RID the csproj declares.
+    # If a RID is added to <RuntimeIdentifiers> without a matching release matrix leg,
+    # the wrapper will advertise a package that is never published — which is exactly the
+    # failure mode that broke 0.1.1-beta.
+    name: Release matrix covers all RIDs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compare csproj RIDs against the release matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          rids="$(sed -n 's:.*<RuntimeIdentifiers>\(.*\)</RuntimeIdentifiers>.*:\1:p' "$PROJECT" | head -n1 | tr ';' ' ')"
+          if [ -z "$rids" ]; then
+            echo "::notice::No <RuntimeIdentifiers> in $PROJECT — nothing to check"
+            exit 0
+          fi
+
+          # Only count RIDs that are actually packed — i.e. a `rid:` matrix entry or a
+          # `--runtime <rid>` argument. Mentions in comments do not count.
+          covered="$(grep -vE '^[[:space:]]*#' .github/workflows/release.yml \
+            | grep -oE '(rid: |--runtime )[A-Za-z0-9.-]+' \
+            | sed -E 's/^(rid: |--runtime )//' \
+            | sort -u)"
+          echo "Packed by release.yml: $(echo $covered)"
+
+          missing=0
+          for rid in $rids; do
+            if echo "$covered" | grep -qx "$rid"; then
+              echo "  ok      $rid"
+            else
+              echo "  MISSING $rid"
+              echo "::error::RID '$rid' is declared in $PROJECT but never packed by .github/workflows/release.yml"
+              missing=1
+            fi
+          done
+          exit "$missing"
