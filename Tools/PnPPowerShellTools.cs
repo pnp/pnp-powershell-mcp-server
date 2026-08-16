@@ -102,7 +102,12 @@ internal partial class PnPPowerShellTools
         [Description("The full PnP PowerShell command name (e.g., \"Get-PnPWeb\", \"Connect-PnPOnline\", \"Get-PnPList\")")] string commandName,
         CancellationToken cancellationToken = default)
     {
-        var safeCommandName = EscapeSingleQuotedPowerShell(commandName ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(commandName))
+        {
+            return "Error: No command name provided. Use 'pnp_search_commands' to find one, then pass its full name (e.g., \"Get-PnPWeb\").";
+        }
+
+        var safeCommandName = EscapeSingleQuotedPowerShell(commandName.Trim());
 
         var script = $$"""
             $__pnpHelpText = Get-Help '{{safeCommandName}}' -Full | Out-String

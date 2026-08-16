@@ -212,9 +212,13 @@ internal sealed class PowerShellSession : IAsyncDisposable
         // The payload is base64-encoded so that a multi-line or quote-heavy script cannot break the
         // one-statement-per-line stdin protocol or the surrounding try/catch.
         var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(script));
+        // $__pnpScript is removed once the command finishes so the session does not hold on to the
+        // last script text. Cleanup cannot prevent a collision with a user variable of the same name
+        // — the assignment above already overwrote it — which is what the __pnp prefix is for.
         var wrapped =
             $"$__pnpScript = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{encoded}')); " +
             $"try {{ Invoke-Expression $__pnpScript }} catch {{ Write-Output '{ErrorMarker}'; Write-Output ($_ | Out-String) }}; " +
+            $"Remove-Variable -Name __pnpScript -ErrorAction SilentlyContinue; " +
             $"Write-Output '{EndMarker}'";
 
         // Captured under the lock. ResetAsync and idle eviction can terminate without holding the
