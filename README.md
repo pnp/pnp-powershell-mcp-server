@@ -18,15 +18,27 @@ This MCP server allows the use of natural language to run [PnP PowerShell](https
 
 This MCP server shells out to the locally installed [PnP PowerShell](https://pnp.github.io/powershell/) module — it does not do any authentication for you. Authenticate first using `Connect-PnPOnline` (see [Best Practices](./best-practices.md) for the recommended auth methods), then the MCP server will reuse the same PnP PowerShell connection context.
 
-### Install as a .NET global tool
+- **TYPE**: `Local` (stdio)
+- **INSTALL**: [![Install PnP PowerShell MCP in VS Code](https://img.shields.io/badge/VS_Code-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=pnp-powershell&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22pnp-powershell-mcp-server%22%7D) [![Install PnP PowerShell MCP in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=pnp-powershell&config=%7B%22type%22%3A%22stdio%22%2C%22command%22%3A%22pnp-powershell-mcp-server%22%7D&quality=insiders) [![Install PnP PowerShell MCP in Visual Studio](https://img.shields.io/badge/Visual_Studio-C16FDE?style=flat-square&logo=visualstudio&logoColor=white)](https://aka.ms/vs/mcp-install?%7B%22name%22%3A%22pnp-powershell%22%2C%22type%22%3A%22stdio%22%2C%22command%22%3A%22pnp-powershell-mcp-server%22%7D) [![Install PnP PowerShell MCP in Cursor](https://img.shields.io/badge/Cursor-000000?style=flat-square&logo=cursor&logoColor=white)](https://cursor.com/install-mcp?name=pnp-powershell&config=eyJ0eXBlIjoic3RkaW8iLCJjb21tYW5kIjoicG5wLXBvd2Vyc2hlbGwtbWNwLXNlcnZlciJ9) [![Install PnP PowerShell MCP in Claude Code](https://img.shields.io/badge/Claude_Code-Install-orange?style=flat-square&logo=claude&logoColor=white)](#add-to-claude-code)
 
-Once published to NuGet:
+> The one-click buttons above register the server under the name `pnp-powershell` and point it at the `pnp-powershell-mcp-server` command, so **install the tool first** (below) — otherwise the client will register a server it cannot start.
+
+### Install as a .NET global tool
 
 ```bash
 dotnet tool install --global PnP.PowerShell.McpServer --prerelease
 ```
 
-This installs a self-contained, native AOT executable named `pnp-powershell-mcp-server` on your `PATH`.
+This installs a self-contained, native AOT executable named `pnp-powershell-mcp-server` on your `PATH`. Supported platforms: Windows (x64, arm64), macOS (arm64, x64) and Linux (x64, arm64, musl x64).
+
+To update an existing install:
+
+```bash
+dotnet tool update --global PnP.PowerShell.McpServer --prerelease
+```
+
+> **Hitting `Version <x> of package pnp.powershell.mcpserver.<rid> is not found in NuGet feeds`?**
+> This tool ships as a small wrapper package plus one package per platform, and that error means the platform package for your machine was never published for that version. It affects `0.1.1-beta` and earlier — install `0.1.2-beta` or later, or [build and run from source](#-how-to-build-and-run-it-locally). Maintainers: see [RELEASING.md](./RELEASING.md).
 
 ### Add to VS Code
 
@@ -78,6 +90,14 @@ If you are using [GitHub Copilot CLI](https://docs.github.com/en/copilot/concept
    - Arguments: leave empty
 
 After that click `Ctrl+S` to save and `q` to exit the MCP form. You can now use the PnP PowerShell MCP server in GitHub Copilot CLI, e.g. "Using PnP PowerShell, I want you to...".
+
+### Add to Claude Code
+
+```bash
+claude mcp add pnp-powershell --scope user -- pnp-powershell-mcp-server
+```
+
+`--scope user` makes the server available in every project; drop it to register it for the current project only. Check it was picked up with `claude mcp list`.
 
 ### Add to Claude Desktop
 
@@ -150,12 +170,31 @@ prompt:
 | --- | --- |
 | pnp_search_commands | Searches PnP PowerShell commands using keyword matching against command names, verbs, and nouns. Use this tool first to find relevant commands. |
 | pnp_get_command_docs | Gets detailed documentation for a specific PnP PowerShell command including syntax, parameters, and examples. |
-| pnp_run_command | Executes one or more PnP PowerShell commands and returns the result. Can be used repeatedly to accomplish complex multi-step tasks. |
+| pnp_run_command | Executes one or more PnP PowerShell commands and returns the result. Runs in a persistent session, so a `Connect-PnPOnline` connection is reused across calls. Destructive commands require confirmation first. |
 | pnp_get_connection_status | Checks the current PnP PowerShell connection status before running commands. |
-| pnp_get_best_practices | Returns recommended best practices for using PnP PowerShell via this MCP server, including authentication, error handling, and execution tips. |
+| pnp_reset_session | Ends a session and its PnP connection. Use it to sign out, switch accounts, or recover a session that has stopped responding. |
+| pnp_get_best_practices | Returns recommended best practices for using PnP PowerShell via this MCP server, including authentication, sessions, error handling, and execution tips. |
 | pnp_search_script_samples | Searches the community [PnP Script Samples](https://pnp.github.io/script-samples/) index for scripts matching a keyword or use case. |
 | pnp_get_script_sample | Retrieves the full PnP PowerShell script code for a specific script sample by name, fetched live from GitHub. |
 | pnp_suggest_script | Finds the most relevant community script samples for a task and returns their full script code plus adaptation guidance, in one call. |
+
+### Sessions
+
+Commands run in a persistent `pwsh` session, so a connection made with `Connect-PnPOnline` stays
+alive across tool calls — you connect once rather than on every command. Pass an optional `sessionId`
+to `pnp_run_command` / `pnp_get_connection_status` when you need two tenant connections side by side;
+otherwise leave it unset. Idle sessions end after 30 minutes.
+
+### Configuration
+
+| Environment variable | Default | Description |
+| --- | --- | --- |
+| `PNP_MCP_COMMAND_TIMEOUT_SECONDS` | `600` | Wall-clock limit for a single `pnp_run_command` call. On timeout the session is terminated and the connection is lost. |
+| `PNP_MCP_CONFIRM_DESTRUCTIVE` | `true` | Set to `false` to run destructive commands (`Remove-*`, `Clear-*`, ...) without asking for confirmation. |
+| `PNP_SCRIPT_SAMPLES_PATH` | _(unset)_ | Path to a local clone of the PnP script samples repository, used as a fallback when GitHub is unreachable. |
+
+Clients that support the MCP **Tasks** extension can run `pnp_run_command` as a task and poll for the
+result, rather than holding the request open for the duration of a long tenant operation.
 
 ## 🏗️ How to build and run it locally
 
@@ -194,6 +233,12 @@ dotnet publish -c Release -r win-x64 --self-contained
 ```
 
 Replace `win-x64` with your target [RuntimeIdentifier](https://learn.microsoft.com/dotnet/core/rid-catalog) (`linux-x64`, `osx-arm64`, etc.). The output is a single native executable with no .NET runtime dependency.
+
+Native AOT needs a platform toolchain: the "Desktop development with C++" workload on Windows, Xcode command line tools on macOS, or `clang` and `zlib1g-dev` on Linux.
+
+### Releasing to NuGet
+
+A release is **eight** packages — a small wrapper plus one per platform — and a plain `dotnet pack` builds only the wrapper. Do not publish by hand; see [RELEASING.md](./RELEASING.md) and use the [Release workflow](./.github/workflows/release.yml).
 
 ## 🔗 Resources
 
