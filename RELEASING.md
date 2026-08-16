@@ -8,22 +8,22 @@ This project is packed as a **RID-specific .NET tool**: the csproj sets
 
 | Package | Size | Contents |
 | --- | --- | --- |
-| `PnP.PowerShell.McpServer` | ~20 KB | The **wrapper**. No binaries — just `tools/net10.0/any/DotnetToolSettings.xml`, which lists the RID package for each platform. |
-| `PnP.PowerShell.McpServer.win-x64` | ~35–80 MB | The real native executable, at `tools/any/win-x64/PnPPowerShell.MCPServer.exe` |
-| `PnP.PowerShell.McpServer.win-arm64` | " | " |
-| `PnP.PowerShell.McpServer.osx-arm64` | " | " |
-| `PnP.PowerShell.McpServer.osx-x64` | " | " |
-| `PnP.PowerShell.McpServer.linux-x64` | " | " |
-| `PnP.PowerShell.McpServer.linux-arm64` | " | " |
-| `PnP.PowerShell.McpServer.linux-musl-x64` | " | " |
+| `PnP.PowerShell.MCPServer` | ~20 KB | The **wrapper**. No binaries — just `tools/net10.0/any/DotnetToolSettings.xml`, which lists the RID package for each platform. |
+| `PnP.PowerShell.MCPServer.win-x64` | ~35–80 MB | The real native executable, at `tools/any/win-x64/PnPPowerShell.MCPServer.exe` |
+| `PnP.PowerShell.MCPServer.win-arm64` | " | " |
+| `PnP.PowerShell.MCPServer.osx-arm64` | " | " |
+| `PnP.PowerShell.MCPServer.osx-x64` | " | " |
+| `PnP.PowerShell.MCPServer.linux-x64` | " | " |
+| `PnP.PowerShell.MCPServer.linux-arm64` | " | " |
+| `PnP.PowerShell.MCPServer.linux-musl-x64` | " | " |
 
-`dotnet tool install --global PnP.PowerShell.McpServer` resolves the wrapper, reads the
+`dotnet tool install --global PnP.PowerShell.MCPServer` resolves the wrapper, reads the
 RID list out of `DotnetToolSettings.xml`, and downloads the package matching the user's
 machine. **All eight must be on NuGet.org.** If a RID package is missing, users on that
 platform get:
 
 ```text
-Version 0.1.1-beta of package pnp.powershell.mcpserver.win-x64 is not found in NuGet feeds ...
+Version 0.1.1-beta of package PnP.PowerShell.MCPServer.win-x64 is not found in NuGet feeds ...
 ```
 
 ## The trap
@@ -66,10 +66,10 @@ builds all eight and uploads them as workflow artifacts without pushing anything
 
 | Secret | Purpose |
 | --- | --- |
-| `NUGET_API_KEY` | NuGet.org API key with push rights on `PnP.PowerShell.McpServer*`. Use a glob-scoped key so it also covers the RID package IDs. |
+| `NUGET_API_KEY` | NuGet.org API key with push rights on `PnP.PowerShell.MCPServer*`. Use a glob-scoped key so it also covers the RID package IDs. |
 
 The key's package glob **must** cover the RID ids. A key scoped only to the exact id
-`PnP.PowerShell.McpServer` will push the wrapper and reject all seven RID packages —
+`PnP.PowerShell.MCPServer` will push the wrapper and reject all seven RID packages —
 reproducing the original bug.
 
 ## The broken 0.1.0-beta / 0.1.1-beta releases
@@ -118,21 +118,21 @@ dotnet pack PnPPowerShell.MCPServer.csproj -c Release -o artifacts
 Then push the RID packages **before** the wrapper:
 
 ```bash
-dotnet nuget push "artifacts/PnP.PowerShell.McpServer.*-*.nupkg" \
+dotnet nuget push "artifacts/PnP.PowerShell.MCPServer.*-*.nupkg" \
   -s https://api.nuget.org/v3/index.json -k "$NUGET_API_KEY" --skip-duplicate
-dotnet nuget push "artifacts/PnP.PowerShell.McpServer.<version>.nupkg" \
+dotnet nuget push "artifacts/PnP.PowerShell.MCPServer.<version>.nupkg" \
   -s https://api.nuget.org/v3/index.json -k "$NUGET_API_KEY" --skip-duplicate
 ```
 
 ## Verifying a release
 
 ```bash
-dotnet tool install --global PnP.PowerShell.McpServer --prerelease
+dotnet tool install --global PnP.PowerShell.MCPServer --prerelease
 pnp-powershell-mcp-server --help
 ```
 
 Or check the feed directly — this must return `200`, not `404`:
 
 ```bash
-curl -sI https://api.nuget.org/v3-flatcontainer/pnp.powershell.mcpserver.win-x64/index.json
+curl -sI https://api.nuget.org/v3-flatcontainer/PnP.PowerShell.MCPServer.win-x64/index.json
 ```
