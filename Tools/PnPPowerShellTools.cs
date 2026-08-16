@@ -2,7 +2,9 @@ using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using PnPPowerShell.MCPServer.Services;
 using System.ComponentModel;
+using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace PnPPowerShell.MCPServer.Tools;
@@ -17,7 +19,13 @@ internal partial class PnPPowerShellTools
     /// ordinary mutating verbs (Set, Add, New, Enable, Grant, ...) do not, or the prompt would fire
     /// so often it would be clicked through without being read.
     /// </summary>
-    [GeneratedRegex(@"\b(Remove|Clear|Reset|Uninstall|Revoke|Deny|Restore|Move|Rename|Disable)-PnP\w+",
+    /// <remarks>
+    /// Deliberately not limited to <c>-PnP</c> cmdlets. Reaching this tool only requires <c>-PnP</c>
+    /// somewhere in the script, so a destructive non-PnP command riding along in the same string
+    /// (<c>Remove-Item -Recurse -Force ...; Get-PnPWeb</c>) has to be caught too. This is still a
+    /// textual check and can be evaded; parsing the AST is the real fix.
+    /// </remarks>
+    [GeneratedRegex(@"\b(Remove|Clear|Reset|Uninstall|Revoke|Deny|Restore|Move|Rename|Disable)-[A-Za-z]\w*",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex DestructiveCommandRegex();
 
@@ -57,23 +65,24 @@ internal partial class PnPPowerShellTools
         var termArray = "@(" + string.Join(",", terms.Select(t => $"'{t}'")) + ")";
 
         var script = $$"""
-            $terms = {{termArray}}
+            $__pnpTerms = {{termArray}}
             Get-Command -Module PnP.PowerShell |
               ForEach-Object {
-                $cmd = $_
-                $score = 0
-                foreach ($term in $terms) {
-                  if ($cmd.Name -like "*$term*") { $score += 10 }
-                  if ($cmd.Verb -like "*$term*") { $score += 4 }
-                  if ($cmd.Noun -like "*$term*") { $score += 6 }
+                $__pnpCmd = $_
+                $__pnpScore = 0
+                foreach ($__pnpTerm in $__pnpTerms) {
+                  if ($__pnpCmd.Name -like "*$__pnpTerm*") { $__pnpScore += 10 }
+                  if ($__pnpCmd.Verb -like "*$__pnpTerm*") { $__pnpScore += 4 }
+                  if ($__pnpCmd.Noun -like "*$__pnpTerm*") { $__pnpScore += 6 }
                 }
-                if ($score -gt 0) {
-                  [PSCustomObject]@{ Name = $cmd.Name; Verb = $cmd.Verb; Noun = $cmd.Noun; Score = $score }
+                if ($__pnpScore -gt 0) {
+                  [PSCustomObject]@{ Name = $__pnpCmd.Name; Verb = $__pnpCmd.Verb; Noun = $__pnpCmd.Noun; Score = $__pnpScore }
                 }
               } |
               Sort-Object -Property Score -Descending |
               Select-Object -First {{limit}} Name, Verb, Noun |
               ConvertTo-Json -Depth 5 -Compress
+            Remove-Variable -Name __pnpTerms, __pnpCmd, __pnpScore, __pnpTerm -ErrorAction SilentlyContinue
             """;
 
         var result = await sessions.Get(null).ExecuteAsync(script, MetadataTimeout, cancellationToken);
@@ -96,12 +105,13 @@ internal partial class PnPPowerShellTools
         var safeCommandName = EscapeSingleQuotedPowerShell(commandName ?? string.Empty);
 
         var script = $$"""
-            $helpText = Get-Help '{{safeCommandName}}' -Full | Out-String
-            if ([string]::IsNullOrWhiteSpace($helpText)) {
+            $__pnpHelpText = Get-Help '{{safeCommandName}}' -Full | Out-String
+            if ([string]::IsNullOrWhiteSpace($__pnpHelpText)) {
               Write-Output "No documentation found for '{{safeCommandName}}'. Verify the command name using 'pnp_search_commands'."
             } else {
-              Write-Output $helpText
+              Write-Output $__pnpHelpText
             }
+            Remove-Variable -Name __pnpHelpText -ErrorAction SilentlyContinue
             """;
 
         return await sessions.Get(null).ExecuteAsync(script, MetadataTimeout, cancellationToken);
@@ -145,19 +155,24 @@ internal partial class PnPPowerShellTools
         // Base64-encode the command so quoting inside it cannot break the wrapper.
         var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(command));
 
+        // Wrapper variables are __pnp-prefixed and removed afterwards. The session is shared and
+        // long-lived now, so a plain name like $result would silently overwrite the caller's own
+        // variable between calls — which is exactly the assign-then-shape pattern best-practices.md
+        // tells them to use.
         var script = $$"""
-            $decodedCommand = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{{encoded}}'))
-            $result = Invoke-Expression $decodedCommand
-            if ($null -ne $result) {
+            $__pnpCommandText = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{{encoded}}'))
+            $__pnpCommandResult = Invoke-Expression $__pnpCommandText
+            if ($null -ne $__pnpCommandResult) {
               try {
-                $result | ConvertTo-Json -Depth 20 -Compress
+                $__pnpCommandResult | ConvertTo-Json -Depth 20 -Compress
               }
               catch {
-                $result | Out-String
+                $__pnpCommandResult | Out-String
               }
             } else {
               Write-Output 'Command completed successfully (no output).'
             }
+            Remove-Variable -Name __pnpCommandText, __pnpCommandResult -ErrorAction SilentlyContinue
             """;
 
         return await sessions.Get(sessionId).ExecuteAsync(script, CommandTimeout, cancellationToken);
@@ -176,6 +191,15 @@ internal partial class PnPPowerShellTools
         // A retry carries the answer to the prompt raised by the previous attempt.
         if (context.Params?.InputResponses?.TryGetValue("confirmDestructive", out var response) is true)
         {
+            // The approval is only valid for the command the user was actually shown. Without this
+            // check the retry could carry different arguments and still arrive pre-approved.
+            if (!string.Equals(context.Params.RequestState, Fingerprint(command), StringComparison.Ordinal))
+            {
+                return
+                    $"Cancelled: the command changed after it was approved, so nothing was run. " +
+                    $"Re-run 'pnp_run_command' and confirm the new command.";
+            }
+
             var elicited = response.Deserialize(InputResponse.ElicitResultJsonTypeInfo);
 
             if (elicited?.IsAccepted is not true)
@@ -183,13 +207,15 @@ internal partial class PnPPowerShellTools
                 return $"Cancelled: '{matchedCmdlet}' was not confirmed, so nothing was run.";
             }
 
-            if (elicited.Content?.TryGetValue("confirm", out var confirmValue) is true &&
-                confirmValue.ValueKind is System.Text.Json.JsonValueKind.False)
-            {
-                return $"Cancelled: '{matchedCmdlet}' was declined, so nothing was run.";
-            }
+            // Requires an explicit true. The field carries Default = false, so an accepted response
+            // that omits it means the user left the box unticked — treating that as approval would
+            // run a destructive command nobody agreed to.
+            var confirmed = elicited.Content?.TryGetValue("confirm", out var confirmValue) is true &&
+                            confirmValue.ValueKind is JsonValueKind.True;
 
-            return null;
+            return confirmed
+                ? null
+                : $"Cancelled: '{matchedCmdlet}' was not explicitly confirmed, so nothing was run. To proceed, call 'pnp_run_command' again with confirmDestructive set to true.";
         }
 
         // IsMrtrSupported only says the round-trip can be represented; on the legacy bridge the client
@@ -206,6 +232,7 @@ internal partial class PnPPowerShellTools
                             $"This will run a destructive PnP PowerShell command ({matchedCmdlet}) against the connected tenant:\n\n{command}\n\nThis cannot be undone. Continue?",
                         RequestedSchema = new()
                         {
+                            Required = ["confirm"],
                             Properties =
                             {
                                 ["confirm"] = new ElicitRequestParams.BooleanSchema
@@ -218,7 +245,7 @@ internal partial class PnPPowerShellTools
                         },
                     }),
                 },
-                requestState: command);
+                requestState: Fingerprint(command));
         }
 
         // Clients that cannot prompt still get a way through, just not a silent one.
@@ -242,19 +269,20 @@ internal partial class PnPPowerShellTools
     {
         const string script = """
             try {
-              $conn = Get-PnPConnection
-              $info = @{
-                Connected = $true
-                Url = $conn.Url
-                TenantAdminUrl = $conn.TenantAdminUrl
-                ConnectionType = $conn.ConnectionType.ToString()
-                PSCredential = if ($conn.PSCredential) { $conn.PSCredential.UserName } else { $null }
+              $__pnpConn = Get-PnPConnection
+              $__pnpInfo = [ordered]@{
+                connected = $true
+                url = $__pnpConn.Url
+                tenantAdminUrl = $__pnpConn.TenantAdminUrl
+                connectionType = $__pnpConn.ConnectionType.ToString()
+                account = if ($__pnpConn.PSCredential) { $__pnpConn.PSCredential.UserName } else { $null }
               }
-              $info | ConvertTo-Json -Depth 5 -Compress
+              $__pnpInfo | ConvertTo-Json -Depth 5 -Compress
             }
             catch {
               Write-Output '{"connected":false,"message":"Not connected. Use Connect-PnPOnline to establish a connection. Run pnp_get_command_docs with commandName Connect-PnPOnline for usage details."}'
             }
+            Remove-Variable -Name __pnpConn, __pnpInfo -ErrorAction SilentlyContinue
             """;
 
         var result = await sessions.Get(sessionId).ExecuteAsync(script, MetadataTimeout, cancellationToken);
@@ -377,6 +405,13 @@ internal partial class PnPPowerShellTools
             ```
             """;
     }
+
+    /// <summary>
+    /// Identifies the exact command text an approval was granted for. A hash rather than the text
+    /// itself, so the round-trip stays small regardless of script size.
+    /// </summary>
+    private static string Fingerprint(string command) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(command)));
 
     private static bool LooksLikePnpCommand(string command)
     {

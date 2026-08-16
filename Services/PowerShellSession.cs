@@ -36,6 +36,7 @@ internal sealed class PowerShellSession : IAsyncDisposable
 
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly Lock _stderrLock = new();
+    private readonly Lock _processLock = new();
     private readonly StringBuilder _stderr = new();
 
     private Channel<string> _stdout = Channel.CreateUnbounded<string>();
@@ -60,7 +61,15 @@ internal sealed class PowerShellSession : IAsyncDisposable
     /// </summary>
     public async Task<string> ExecuteAsync(string script, TimeSpan timeout, CancellationToken cancellationToken = default)
     {
-        await _gate.WaitAsync(cancellationToken);
+        // The wait for the session is bounded by the same timeout as the command. Without this, a
+        // quick metadata lookup queues behind a long-running command with no limit of its own.
+        if (!await _gate.WaitAsync(timeout, cancellationToken))
+        {
+            return
+                "Error: This session is busy running another command. Wait for it to finish, or end it with 'pnp_reset_session'. " +
+                "To work in parallel, use a different sessionId.";
+        }
+
         try
         {
             LastUsedUtc = DateTimeOffset.UtcNow;
@@ -75,6 +84,9 @@ internal sealed class PowerShellSession : IAsyncDisposable
         }
         finally
         {
+            // Stamped on completion as well as on entry: a command that runs for longer than the idle
+            // window would otherwise leave the session looking abandoned to the evictor.
+            LastUsedUtc = DateTimeOffset.UtcNow;
             _gate.Release();
         }
     }
@@ -85,14 +97,20 @@ internal sealed class PowerShellSession : IAsyncDisposable
     /// </summary>
     public async Task ResetAsync()
     {
-        await _gate.WaitAsync();
+        // Only a bounded wait for the gate. The usual reason to reset is a command that has wedged
+        // while holding it, so blocking here would make recovery impossible exactly when it is needed;
+        // terminating under a held gate is safe because the in-flight read fails and reports itself.
+        var acquired = await _gate.WaitAsync(TimeSpan.FromSeconds(2));
         try
         {
             Terminate();
         }
         finally
         {
-            _gate.Release();
+            if (acquired)
+            {
+                _gate.Release();
+            }
         }
     }
 
@@ -200,6 +218,12 @@ internal sealed class PowerShellSession : IAsyncDisposable
             Terminate();
             return "Error: The PowerShell session ended unexpectedly. Retry the command; the PnP connection will need to be re-established.";
         }
+        catch (OperationCanceledException)
+        {
+            // A partially written statement would be interpreted as a command of its own.
+            Terminate();
+            throw;
+        }
 
         var output = new StringBuilder();
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -223,7 +247,15 @@ internal sealed class PowerShellSession : IAsyncDisposable
             Terminate();
             return "Error: The PowerShell session ended unexpectedly. Retry the command; the PnP connection will need to be re-established.";
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // The caller gave up. The abandoned command keeps running and its output — including the
+            // end marker — is still in flight, so leaving the session alive would hand that output to
+            // whichever command runs next and desynchronize every read after it.
+            Terminate();
+            throw;
+        }
+        catch (OperationCanceledException)
         {
             // A pwsh process reading from a pipe cannot be interrupted the way Ctrl+C interrupts a
             // console, so the only way out of a runaway command is to end the session.
@@ -238,8 +270,10 @@ internal sealed class PowerShellSession : IAsyncDisposable
                 "Consider narrowing the operation (-PageSize, Select-Object, a filtered query), or ask the client to run this tool as a task so it can run without a wall-clock limit.";
         }
 
-        // Give the stderr pump a moment to catch up with output already flushed on stdout.
-        await Task.Delay(25, cancellationToken);
+        // Give the stderr pump a moment to catch up with output already flushed on stdout. Not
+        // cancellable: the end marker has been consumed, so the stream is clean and abandoning the
+        // result here would throw away a command that actually completed.
+        await Task.Delay(25, CancellationToken.None);
 
         string errors;
         lock (_stderrLock)
@@ -311,9 +345,15 @@ internal sealed class PowerShellSession : IAsyncDisposable
 
     private void Terminate()
     {
-        var process = _process;
-        _process = null;
-        _stdin = null;
+        // Guarded because ResetAsync may terminate without holding the gate, concurrently with a
+        // command that is mid-read.
+        Process? process;
+        lock (_processLock)
+        {
+            process = _process;
+            _process = null;
+            _stdin = null;
+        }
 
         if (process is null)
         {
@@ -339,14 +379,19 @@ internal sealed class PowerShellSession : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        await _gate.WaitAsync();
+        // Bounded for the same reason as ResetAsync: shutdown must not hang behind a wedged command.
+        var acquired = await _gate.WaitAsync(TimeSpan.FromSeconds(2));
         try
         {
             Terminate();
         }
         finally
         {
-            _gate.Release();
+            if (acquired)
+            {
+                _gate.Release();
+            }
+
             _gate.Dispose();
         }
     }
