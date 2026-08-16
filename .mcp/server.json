@@ -2,13 +2,13 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
   "description": "MCP server for PnP PowerShell that allows using natural language to manage your Microsoft 365 tenant and to author complex PnP PowerShell scripts.",
   "name": "io.github.pnp/pnp-powershell-mcp-server",
-  "version": "0.1.2-beta",
+  "version": "0.1.3-beta",
   "packages": [
     {
       "registryType": "nuget",
       "registryBaseUrl": "https://api.nuget.org",
       "identifier": "PnP.PowerShell.MCPServer",
-      "version": "0.1.2-beta",
+      "version": "0.1.3-beta",
       "transport": {
         "type": "stdio"
       },

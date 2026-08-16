@@ -38,7 +38,7 @@ dotnet tool update --global PnP.PowerShell.MCPServer --prerelease
 ```
 
 > **Hitting `Version <x> of package PnP.PowerShell.MCPServer.<rid> is not found in NuGet feeds`?**
-> This tool ships as a small wrapper package plus one package per platform, and that error means the platform package for your machine was never published for that version. It affects `0.1.1-beta` and earlier — install `0.1.2-beta` or later, or [build and run from source](#-how-to-build-and-run-it-locally). Maintainers: see [RELEASING.md](./RELEASING.md).
+> This tool ships as a small wrapper package plus one package per platform, and that error means the platform package for your machine was never published for that version. It affects `0.1.1-beta` and earlier — install `0.1.3-beta` or later, or [build and run from source](#-how-to-build-and-run-it-locally). Maintainers: see [RELEASING.md](./RELEASING.md).
 
 ### Add to VS Code
 

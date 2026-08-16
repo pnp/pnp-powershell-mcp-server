@@ -50,8 +50,8 @@ packed **on its own matching OS**, with `--runtime <rid>`.
 2. Push a tag:
 
    ```bash
-   git tag v0.1.2-beta
-   git push origin v0.1.2-beta
+   git tag v0.1.3-beta
+   git push origin v0.1.3-beta
    ```
 
 3. [`release.yml`](./.github/workflows/release.yml) then packs each RID on its own runner,
@@ -75,7 +75,7 @@ reproducing the original bug.
 ## The broken 0.1.0-beta / 0.1.1-beta releases
 
 Both of those versions published only the 20 KB wrapper, so `dotnet tool install` fails on
-every platform. **`0.1.2-beta` is the first release that ships the full set** — that is the
+every platform. **`0.1.3-beta` is the first release that ships the full set** — that is the
 fix, and new installs should use it (`--prerelease` already resolves to the newest).
 
 The two broken versions are still on NuGet.org, and anyone who pins them will still hit the
