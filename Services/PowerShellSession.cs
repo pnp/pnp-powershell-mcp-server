@@ -30,6 +30,9 @@ internal sealed class PowerShellSession : IAsyncDisposable
     private const string ModuleMissingMessage =
         "Error: The PnP.PowerShell module is not installed. Install it by running: Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force";
 
+    private const string SessionEndedMessage =
+        "Error: The PowerShell session ended unexpectedly. Retry the command; the PnP connection will need to be re-established.";
+
     // Sentinels are per-session so that script output echoing a marker from another session
     // cannot terminate this session's read loop early.
     private readonly string _token = Guid.NewGuid().ToString("N");
@@ -50,6 +53,12 @@ internal sealed class PowerShellSession : IAsyncDisposable
     public DateTimeOffset LastUsedUtc { get; private set; } = DateTimeOffset.UtcNow;
 
     public bool IsAlive => _process is { HasExited: false };
+
+    /// <summary>
+    /// True while a command holds the session. Used to keep the idle evictor off a session that is
+    /// still working — a command may legitimately outrun the idle window.
+    /// </summary>
+    public bool IsBusy => _gate.CurrentCount == 0;
 
     private string EndMarker => $"__PNP_END_{_token}__";
 
@@ -208,15 +217,29 @@ internal sealed class PowerShellSession : IAsyncDisposable
             $"try {{ Invoke-Expression $__pnpScript }} catch {{ Write-Output '{ErrorMarker}'; Write-Output ($_ | Out-String) }}; " +
             $"Write-Output '{EndMarker}'";
 
+        // Captured under the lock. ResetAsync and idle eviction can terminate without holding the
+        // gate, so the writer may be torn down between the check and the write; reading the field
+        // directly would surface that as a NullReferenceException instead of a clean message.
+        StreamWriter? stdin;
+        lock (_processLock)
+        {
+            stdin = _stdin;
+        }
+
+        if (stdin is null)
+        {
+            return SessionEndedMessage;
+        }
+
         try
         {
-            await _stdin!.WriteLineAsync(wrapped.AsMemory(), cancellationToken);
-            await _stdin.FlushAsync(cancellationToken);
+            await stdin.WriteLineAsync(wrapped.AsMemory(), cancellationToken);
+            await stdin.FlushAsync(cancellationToken);
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException)
         {
             Terminate();
-            return "Error: The PowerShell session ended unexpectedly. Retry the command; the PnP connection will need to be re-established.";
+            return SessionEndedMessage;
         }
         catch (OperationCanceledException)
         {
@@ -245,7 +268,7 @@ internal sealed class PowerShellSession : IAsyncDisposable
         catch (ChannelClosedException)
         {
             Terminate();
-            return "Error: The PowerShell session ended unexpectedly. Retry the command; the PnP connection will need to be re-established.";
+            return SessionEndedMessage;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -391,8 +414,12 @@ internal sealed class PowerShellSession : IAsyncDisposable
             {
                 _gate.Release();
             }
-
-            _gate.Dispose();
         }
+
+        // _gate is deliberately not disposed. A command may still be in flight (that is precisely the
+        // case the bounded wait above exists for) and would then hit ObjectDisposedException on its
+        // Release, or on a pending WaitAsync, taking the server down during shutdown. SemaphoreSlim
+        // only holds a disposable resource once AvailableWaitHandle is touched, which this never does,
+        // so skipping Dispose costs nothing.
     }
 }

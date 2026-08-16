@@ -55,7 +55,9 @@ internal sealed class PowerShellSessionManager : IAsyncDisposable
 
         foreach (var session in _sessions.Values)
         {
-            if (session.LastUsedUtc >= cutoff || !_sessions.TryRemove(session.Id, out var removed))
+            // A command that runs longer than the idle window is still working, not abandoned:
+            // LastUsedUtc only advances when it finishes, so busy sessions must be skipped explicitly.
+            if (session.IsBusy || session.LastUsedUtc >= cutoff || !_sessions.TryRemove(session.Id, out var removed))
             {
                 continue;
             }
