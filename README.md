@@ -26,7 +26,7 @@ This MCP server shells out to the locally installed [PnP PowerShell](https://pnp
 ### Install as a .NET global tool
 
 ```bash
-dotnet tool install --global PnP.PowerShell.McpServer --prerelease
+dotnet tool install --global PnP.PowerShell.MCPServer --prerelease
 ```
 
 This installs a self-contained, native AOT executable named `pnp-powershell-mcp-server` on your `PATH`. Supported platforms: Windows (x64, arm64), macOS (arm64, x64) and Linux (x64, arm64, musl x64).
@@ -34,10 +34,10 @@ This installs a self-contained, native AOT executable named `pnp-powershell-mcp-
 To update an existing install:
 
 ```bash
-dotnet tool update --global PnP.PowerShell.McpServer --prerelease
+dotnet tool update --global PnP.PowerShell.MCPServer --prerelease
 ```
 
-> **Hitting `Version <x> of package pnp.powershell.mcpserver.<rid> is not found in NuGet feeds`?**
+> **Hitting `Version <x> of package PnP.PowerShell.MCPServer.<rid> is not found in NuGet feeds`?**
 > This tool ships as a small wrapper package plus one package per platform, and that error means the platform package for your machine was never published for that version. It affects `0.1.1-beta` and earlier — install `0.1.2-beta` or later, or [build and run from source](#-how-to-build-and-run-it-locally). Maintainers: see [RELEASING.md](./RELEASING.md).
 
 ### Add to VS Code

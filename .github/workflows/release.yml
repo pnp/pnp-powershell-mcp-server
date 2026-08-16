@@ -6,19 +6,19 @@ name: Release
 # and <PublishAot> in PnPPowerShell.MCPServer.csproj), which means a release is NOT one
 # package but EIGHT:
 #
-#   PnP.PowerShell.McpServer                  <- tiny RID-agnostic "wrapper" (no binaries)
-#   PnP.PowerShell.McpServer.win-x64          <- the actual executable, one per RID
-#   PnP.PowerShell.McpServer.win-arm64
-#   PnP.PowerShell.McpServer.osx-arm64
-#   PnP.PowerShell.McpServer.osx-x64
-#   PnP.PowerShell.McpServer.linux-x64
-#   PnP.PowerShell.McpServer.linux-arm64
-#   PnP.PowerShell.McpServer.linux-musl-x64
+#   PnP.PowerShell.MCPServer                  <- tiny RID-agnostic "wrapper" (no binaries)
+#   PnP.PowerShell.MCPServer.win-x64          <- the actual executable, one per RID
+#   PnP.PowerShell.MCPServer.win-arm64
+#   PnP.PowerShell.MCPServer.osx-arm64
+#   PnP.PowerShell.MCPServer.osx-x64
+#   PnP.PowerShell.MCPServer.linux-x64
+#   PnP.PowerShell.MCPServer.linux-arm64
+#   PnP.PowerShell.MCPServer.linux-musl-x64
 #
-# `dotnet tool install --global PnP.PowerShell.McpServer` resolves the wrapper, reads the
+# `dotnet tool install --global PnP.PowerShell.MCPServer` resolves the wrapper, reads the
 # RID list out of its tools/net10.0/any/DotnetToolSettings.xml, and then downloads the
 # package matching the user's machine. If the RID packages are not on NuGet, install fails
-# with "Version X of package pnp.powershell.mcpserver.win-x64 is not found in NuGet feeds".
+# with "Version X of package PnP.PowerShell.MCPServer.win-x64 is not found in NuGet feeds".
 #
 # The trap: with <PublishAot>true</PublishAot>, a plain `dotnet pack` builds ONLY the
 # wrapper and silently skips all 7 RID packages (native AOT cannot cross-compile between
@@ -209,7 +209,7 @@ jobs:
           VERSION: ${{ needs.version.outputs.version }}
         run: |
           set -euo pipefail
-          wrapper="staging/PnP.PowerShell.McpServer.${VERSION}.nupkg"
+          wrapper="staging/PnP.PowerShell.MCPServer.${VERSION}.nupkg"
           if [ ! -f "$wrapper" ]; then
             echo "::error::Wrapper package $wrapper was not built"
             exit 1
@@ -258,8 +258,10 @@ jobs:
     needs: [version, verify]
     if: ${{ github.event_name == 'push' || inputs.publish }}
     runs-on: ubuntu-latest
-    # Consider creating a protected "nuget" environment in the repo settings and holding
-    # NUGET_API_KEY there, so pushes require an approval:
+    permissions:
+      contents: read
+      id-token: write
+    # Optional: if you want the release to require a GitHub environment approval, enable this:
     # environment: nuget
     steps:
       - uses: actions/setup-dotnet@v6
@@ -272,23 +274,20 @@ jobs:
           pattern: nupkg-*
           merge-multiple: true
 
-      - name: Check API key is configured
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-        run: |
-          if [ -z "${NUGET_API_KEY:-}" ]; then
-            echo "::error::Repository secret NUGET_API_KEY is not set"
-            exit 1
-          fi
+      - name: NuGet login (OIDC → temporary API key)
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}
 
       - name: Push packages
         shell: bash
         env:
           VERSION: ${{ needs.version.outputs.version }}
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
         run: |
           set -euo pipefail
-          wrapper="staging/PnP.PowerShell.McpServer.${VERSION}.nupkg"
+          wrapper="staging/PnP.PowerShell.MCPServer.${VERSION}.nupkg"
 
           push() {
             echo "Pushing $1"

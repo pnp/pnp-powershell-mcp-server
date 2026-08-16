@@ -7,7 +7,7 @@
     {
       "registryType": "nuget",
       "registryBaseUrl": "https://api.nuget.org",
-      "identifier": "PnP.PowerShell.McpServer",
+      "identifier": "PnP.PowerShell.MCPServer",
       "version": "0.1.2-beta",
       "transport": {
         "type": "stdio"
