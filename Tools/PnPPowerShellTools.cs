@@ -14,26 +14,14 @@ internal partial class PnPPowerShellTools
 {
     private static readonly TimeSpan MetadataTimeout = TimeSpan.FromMinutes(2);
 
-    /// <summary>
-    /// Verbs that destroy, overwrite, or revoke. These require explicit confirmation before running;
-    /// ordinary mutating verbs (Set, Add, New, Enable, Grant, ...) do not, or the prompt would fire
-    /// so often it would be clicked through without being read.
-    /// </summary>
-    /// <remarks>
-    /// Deliberately not limited to <c>-PnP</c> cmdlets. Reaching this tool only requires <c>-PnP</c>
-    /// somewhere in the script, so a destructive non-PnP command riding along in the same string
-    /// (<c>Remove-Item -Recurse -Force ...; Get-PnPWeb</c>) has to be caught too. This is still a
-    /// textual check and can be evaded; parsing the AST is the real fix.
-    /// </remarks>
+    /// <summary>Textual destructive-verb check, run alongside the parsed check in <see cref="CommandPolicy"/>.</summary>
+    // Not limited to -PnP cmdlets: reaching this tool only needs -PnP somewhere in the script, so a
+    // destructive non-PnP command riding along ("Remove-Item -Recurse -Force ...; Get-PnPWeb") counts too.
     [GeneratedRegex(@"\b(Remove|Clear|Reset|Uninstall|Revoke|Deny|Restore|Move|Rename|Disable)-[A-Za-z]\w*",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex DestructiveCommandRegex();
 
-    /// <summary>
-    /// Per-command wall-clock limit. Generous by default because long tenant-wide operations are the
-    /// normal case here; clients that support the Tasks extension avoid the wait entirely by running
-    /// the call as a task.
-    /// </summary>
+    /// <summary>Per-command wall-clock limit; generous because long tenant-wide operations are normal here.</summary>
     private static TimeSpan CommandTimeout =>
         int.TryParse(Environment.GetEnvironmentVariable("PNP_MCP_COMMAND_TIMEOUT_SECONDS"), out var seconds) && seconds > 0
             ? TimeSpan.FromSeconds(seconds)
@@ -76,11 +64,11 @@ internal partial class PnPPowerShellTools
                   if ($__pnpCmd.Noun -like "*$__pnpTerm*") { $__pnpScore += 6 }
                 }
                 if ($__pnpScore -gt 0) {
-                  [PSCustomObject]@{ Name = $__pnpCmd.Name; Verb = $__pnpCmd.Verb; Noun = $__pnpCmd.Noun; Score = $__pnpScore }
+                  [PSCustomObject]@{ Name = $__pnpCmd.Name; Verb = $__pnpCmd.Verb; Noun = $__pnpCmd.Noun; HelpUri = $__pnpCmd.HelpUri; Score = $__pnpScore }
                 }
               } |
               Sort-Object -Property Score -Descending |
-              Select-Object -First {{limit}} Name, Verb, Noun |
+              Select-Object -First {{limit}} Name, Verb, Noun, HelpUri |
               ConvertTo-Json -Depth 5 -Compress
             Remove-Variable -Name __pnpTerms, __pnpCmd, __pnpScore, __pnpTerm -ErrorAction SilentlyContinue
             """;
@@ -91,6 +79,7 @@ internal partial class PnPPowerShellTools
             {result}
 
             TIP: Before executing any of the commands, run the 'pnp_get_command_docs' tool to retrieve the full syntax, parameters, and examples.
+            TIP: Each result carries a HelpUri, the published documentation page for that cmdlet. Fetch it when you need more detail than the local help gives, or cite it to the user.
             TIP: For complex tasks, break them into smaller steps and run commands incrementally using 'pnp_run_command'.
             """;
     }
@@ -115,8 +104,20 @@ internal partial class PnPPowerShellTools
               Write-Output "No documentation found for '{{safeCommandName}}'. Verify the command name using 'pnp_search_commands'."
             } else {
               Write-Output $__pnpHelpText
+              # HelpUri points at the published docs, which carry examples the shipped help often omits.
+              $__pnpHelpUri = $null
+              try { $__pnpHelpUri = ($ExecutionContext.InvokeCommand.GetCommand('{{safeCommandName}}', [System.Management.Automation.CommandTypes]::All)).HelpUri } catch { $__pnpHelpUri = $null }
+              if (-not [string]::IsNullOrWhiteSpace($__pnpHelpUri)) {
+                Write-Output ''
+                Write-Output "ONLINE DOCUMENTATION: $__pnpHelpUri"
+                Write-Output "TIP: If the syntax or examples above look incomplete, fetch that page with your web-fetch tool -- it is generated from the current source and usually carries more parameter detail and examples than the shipped help. If you cannot fetch pages, give the user the link instead."
+              } else {
+                Write-Output ''
+                Write-Output "NOTE: This cmdlet reports no documentation URL, which usually means an older PnP.PowerShell build (HelpUri is populated in current versions)."
+                Write-Output "FALLBACK: Search https://pnp.github.io/powershell/ for '{{safeCommandName}}' to find its page, or search the web for 'PnP PowerShell {{safeCommandName}}'. Do not hand-assemble a docs URL -- the path pattern is not guaranteed. Updating the module with 'Update-Module PnP.PowerShell' also restores the link."
+              }
             }
-            Remove-Variable -Name __pnpHelpText -ErrorAction SilentlyContinue
+            Remove-Variable -Name __pnpHelpText, __pnpHelpUri -ErrorAction SilentlyContinue
             """;
 
         return await sessions.Get(null).ExecuteAsync(script, MetadataTimeout, cancellationToken);
@@ -147,10 +148,56 @@ internal partial class PnPPowerShellTools
                 """;
         }
 
-        var destructiveMatch = DestructiveCommandRegex().Match(command);
-        if (destructiveMatch.Success && !confirmDestructive && !ConfirmationDisabled)
+        var session = sessions.Get(sessionId);
+
+        // Analysis and execution share one budget, so queuing behind a long command still waits out
+        // CommandTimeout rather than failing early, and a call cannot take twice the configured limit.
+        var budget = CommandTimeout;
+        var elapsed = System.Diagnostics.Stopwatch.StartNew();
+
+        // Parsed rather than pattern-matched, so aliases and indirect invocation are seen for what they are.
+        var (analysis, sessionError) = await ScriptAnalyzer.AnalyzeAsync(session, command, budget, cancellationToken);
+
+        if (sessionError is not null)
         {
-            var refusal = await ConfirmDestructiveAsync(server, context, command, destructiveMatch.Value);
+            return PnPErrorHints.Enrich(sessionError);
+        }
+
+        if (analysis is not null)
+        {
+            var blocked = CommandPolicy.Enforce(analysis);
+            if (blocked is not null)
+            {
+                return blocked;
+            }
+        }
+        else if (CommandPolicy.ReadOnlyMode)
+        {
+            // Fail closed: with no analysis there is no evidence the script only reads.
+            return
+                "Blocked: read-only mode is on (PNP_MCP_READONLY=true) but this command could not be analysed, " +
+                "so it was not run. Simplify the command and try again.";
+        }
+
+        // Read-only mode is skipped entirely: anything that survived Enforce has been parsed and proven
+        // not to change Microsoft 365, so a prompt would be noise -- and the textual check's false
+        // positives (a destructive name inside a string) must not leak into a mode that already verified
+        // the script. Reaching here in read-only mode implies a non-null analysis; a null one failed closed.
+        string? flagged = null;
+        if (!CommandPolicy.ReadOnlyMode)
+        {
+            // Both checks run: a needless prompt costs a click, a missed one costs tenant data.
+            flagged = analysis is null ? null : CommandPolicy.FindNeedingConfirmation(analysis);
+
+            // Textual fallback catches a destructive name used only as an argument, e.g. Set-Alias nuke Remove-PnPTenantSite.
+            if (flagged is null && DestructiveCommandRegex().Match(command) is { Success: true } textual)
+            {
+                flagged = textual.Value;
+            }
+        }
+        if (flagged is not null && !confirmDestructive && !ConfirmationDisabled)
+        {
+            var refusal = await ConfirmDestructiveAsync(server, context, command, flagged);
             if (refusal is not null)
             {
                 return refusal;
@@ -160,10 +207,8 @@ internal partial class PnPPowerShellTools
         // Base64-encode the command so quoting inside it cannot break the wrapper.
         var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(command));
 
-        // Wrapper variables are __pnp-prefixed and removed afterwards. The session is shared and
-        // long-lived now, so a plain name like $result would silently overwrite the caller's own
-        // variable between calls — which is exactly the assign-then-shape pattern best-practices.md
-        // tells them to use.
+        // Wrapper variables are __pnp-prefixed and removed afterwards: the session is shared, so a plain
+        // name like $result would overwrite the caller's own variable between calls.
         var script = $$"""
             $__pnpCommandText = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('{{encoded}}'))
             $__pnpCommandResult = Invoke-Expression $__pnpCommandText
@@ -180,13 +225,17 @@ internal partial class PnPPowerShellTools
             Remove-Variable -Name __pnpCommandText, __pnpCommandResult -ErrorAction SilentlyContinue
             """;
 
-        return await sessions.Get(sessionId).ExecuteAsync(script, CommandTimeout, cancellationToken);
+        // Whatever the analysis consumed is deducted, with a floor so the command still gets a chance.
+        var remaining = budget - elapsed.Elapsed;
+        if (remaining < TimeSpan.FromSeconds(10))
+        {
+            remaining = TimeSpan.FromSeconds(10);
+        }
+
+        return PnPErrorHints.Enrich(await session.ExecuteAsync(script, remaining, cancellationToken));
     }
 
-    /// <summary>
-    /// Returns <see langword="null"/> when the command is approved, or the message to return to the
-    /// caller when it is not.
-    /// </summary>
+    /// <summary>Null when the command is approved, otherwise the message to return to the caller.</summary>
     private static async Task<string?> ConfirmDestructiveAsync(
         McpServer server,
         RequestContext<CallToolRequestParams> context,
@@ -196,9 +245,8 @@ internal partial class PnPPowerShellTools
         // A retry carries the answer to the prompt raised by the previous attempt.
         if (context.Params?.InputResponses?.TryGetValue("confirmDestructive", out var response) is true)
         {
-            // The approval is only valid for the command the user was actually shown. Without this
-            // check the retry could carry different arguments and still arrive pre-approved.
-            if (!string.Equals(context.Params.RequestState, Fingerprint(command), StringComparison.Ordinal))
+            // The approval is only valid for the command the user was actually shown.
+            if (!IsApprovalBoundTo(context.Params.RequestState, command))
             {
                 return
                     $"Cancelled: the command changed after it was approved, so nothing was run. " +
@@ -209,7 +257,7 @@ internal partial class PnPPowerShellTools
 
             if (elicited?.IsAccepted is not true)
             {
-                return $"Cancelled: '{matchedCmdlet}' was not confirmed, so nothing was run.";
+                return $"Cancelled: {matchedCmdlet} was not confirmed, so nothing was run.";
             }
 
             // Requires an explicit true. The field carries Default = false, so an accepted response
@@ -220,7 +268,7 @@ internal partial class PnPPowerShellTools
 
             return confirmed
                 ? null
-                : $"Cancelled: '{matchedCmdlet}' was not explicitly confirmed, so nothing was run. To proceed, call 'pnp_run_command' again with confirmDestructive set to true.";
+                : $"Cancelled: {matchedCmdlet} was not explicitly confirmed, so nothing was run. To proceed, call 'pnp_run_command' again with confirmDestructive set to true.";
         }
 
         // IsMrtrSupported only says the round-trip can be represented; on the legacy bridge the client
@@ -234,7 +282,7 @@ internal partial class PnPPowerShellTools
                     ["confirmDestructive"] = InputRequest.ForElicitation(new ElicitRequestParams
                     {
                         Message =
-                            $"This will run a destructive PnP PowerShell command ({matchedCmdlet}) against the connected tenant:\n\n{command}\n\nThis cannot be undone. Continue?",
+                            $"This command needs confirmation before it runs against the connected tenant.\n\nFlagged: {matchedCmdlet}\n\n{command}\n\nThis may not be reversible. Continue?",
                         RequestedSchema = new()
                         {
                             Required = ["confirm"],
@@ -255,7 +303,9 @@ internal partial class PnPPowerShellTools
 
         // Clients that cannot prompt still get a way through, just not a silent one.
         return $"""
-            Blocked: '{matchedCmdlet}' is a destructive command and has not been confirmed. Nothing was run.
+            Blocked: this command needs confirmation and has not been confirmed. Nothing was run.
+
+            Flagged: {matchedCmdlet}
 
             Command:
             {command}
@@ -353,14 +403,46 @@ internal partial class PnPPowerShellTools
             3. Read syntax and examples with `pnp_get_command_docs`.
             4. Execute with `pnp_run_command` in small, verifiable steps.
 
+            ## Finding More About a Cmdlet
+
+            - Every cmdlet carries a `HelpUri` pointing at its page on https://pnp.github.io/powershell/.
+              `pnp_search_commands` returns it per result; `pnp_get_command_docs` ends with it.
+            - The local help comes from the installed module, so it can lag the published page and
+              sometimes omits examples. When it is not enough, fetch the URL with the client's web-fetch
+              tool; if there is no such tool, give the user the link.
+            - Never guess a parameter name. If the local help does not list it, fetch the page or ask.
+            - Use the returned `HelpUri` as-is; do not hand-assemble a docs URL from the cmdlet name.
+            - If a cmdlet reports no HelpUri, it is almost certainly an older PnP.PowerShell build.
+              Search https://pnp.github.io/powershell/ for the cmdlet name, or search the web for
+              "PnP PowerShell <Cmdlet-Name>", instead of inventing a URL. Suggest
+              `Update-Module PnP.PowerShell` (then a server restart) if it keeps happening.
+
             ## Sessions
 
             - Commands run in a persistent PowerShell session, so a `Connect-PnPOnline` connection
               stays alive across calls. Connect once, then reuse it.
-            - Pass the same `sessionId` to keep working in one session. Use a second `sessionId` only
-              when you need connections to two tenants at the same time.
+            - **Omit `sessionId` for normal work**; everything then shares the session `default`.
+              Accepted by `pnp_run_command`, `pnp_get_connection_status` and `pnp_reset_session`.
+            - Use a second `sessionId` only to hold two tenant or account connections at once, since
+              one session holds one connection. Each session has its own variables too.
+            - One command runs at a time per session. A second call waits, then reports the session is
+              busy; use a different `sessionId` to run two things at once.
             - Use `pnp_reset_session` to sign out, switch accounts, or recover a stuck session.
             - A session is dropped after 30 minutes of inactivity; simply reconnect if that happens.
+              A session busy running a command is never dropped, however long it takes.
+
+            ## Server Configuration
+
+            Behaviour is controlled by environment variables the **user** sets in their MCP client
+            config, not something this server can change at runtime. If a limit is in the way, explain
+            which variable to set and let the user decide:
+
+            - `PNP_MCP_READONLY=true` — refuse anything that would change Microsoft 365.
+            - `PNP_MCP_COMMAND_TIMEOUT_SECONDS` — per-command limit, default 600.
+            - `PNP_MCP_CONFIRM_DESTRUCTIVE=false` — skip destructive confirmations.
+            - `PNP_SCRIPT_SAMPLES_PATH` — local clone of the script samples repo.
+
+            A change takes effect only after the server restarts.
 
             ## Authentication
 
@@ -369,11 +451,30 @@ internal partial class PnPPowerShellTools
             - Avoid storing credentials in scripts; use Azure Key Vault or environment variables.
             - Check connection status before running commands to avoid auth errors.
 
+            ## Read-Only Mode
+
+            When `PNP_MCP_READONLY=true`, anything that would change Microsoft 365 is refused.
+
+            - **Allowed**: `Get-`, `Export-`, `Test-`, `Convert-`, `ConvertTo-`, `ConvertFrom-`, `Read-`,
+              `Measure-`, `Connect-`, `Disconnect-`, `Find-`, `Format-`, `Resolve-`, `Write-`, `Search-`,
+              `Show-`, `Compare-`, and pipeline shaping (`Select-`, `Where-`, `Sort-`, `Group-`,
+              `ForEach-`, `Out-`, `Join-`, `Split-`).
+            - **Refused**: `Set-`, `Remove-`, `Add-`, `New-`, `Clear-`, `Invoke-`, `Update-`, `Move-`,
+              `Enable-`, `Disable-`, `Grant-`, `Revoke-`, `Copy-`, `Import-`, `Restore-`, `Reset-`,
+              `Rename-`, `Start-`, `Stop-`, `Register-`, `Unregister-`, and every other change verb.
+            - Also refused: commands invoked indirectly (`& $var`), native executables, and
+              state-changing method calls (`ExecuteQuery`, `DeleteObject`).
+            - Aliases are resolved by parsing, so `rm` is treated as `Remove-Item`.
+            - Local file output (`Out-File`, `Export-*`) is still allowed.
+
             ## Destructive Commands
 
             - Destructive verbs (`Remove-*`, `Clear-*`, `Reset-*`, `Revoke-*`, `Disable-*`, ...) require
               confirmation before they run. On clients that support prompting you will be asked directly;
               elsewhere the command is blocked until it is re-sent with `confirmDestructive: true`.
+            - A command invoked indirectly also requires confirmation, since it cannot be identified.
+            - The check prefers asking too often to missing something, so it also matches a destructive
+              name that only appears as text. You may be asked about a harmless command occasionally.
             - Always show the user the exact command before asking them to confirm it.
 
             ## Execution Tips
@@ -411,12 +512,14 @@ internal partial class PnPPowerShellTools
             """;
     }
 
-    /// <summary>
-    /// Identifies the exact command text an approval was granted for. A hash rather than the text
-    /// itself, so the round-trip stays small regardless of script size.
-    /// </summary>
-    private static string Fingerprint(string command) =>
+    /// <summary>Identifies the exact command text an approval was granted for, hashed to stay small.</summary>
+    internal static string Fingerprint(string command) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(command)));
+
+    /// <summary>True only when the echoed request state was minted for exactly this command text.</summary>
+    // Fails closed on a missing state: an approval that cannot be tied to what the user saw is not one.
+    internal static bool IsApprovalBoundTo(string? requestState, string command) =>
+        requestState is not null && string.Equals(requestState, Fingerprint(command), StringComparison.Ordinal);
 
     private static bool LooksLikePnpCommand(string command)
     {

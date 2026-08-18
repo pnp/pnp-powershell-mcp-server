@@ -8,9 +8,87 @@ Use this flow for reliable execution:
 
 1. **Check connection** with `pnp_get_connection_status` to see if you are already authenticated.
 2. **Search commands** with `pnp_search_commands` to find the right command for your task.
-3. **Read documentation** with `pnp_get_command_docs` to understand syntax, parameters, and examples.
+3. **Read documentation** with `pnp_get_command_docs` to understand syntax, parameters, and examples. Both this and `pnp_search_commands` return the cmdlet's published documentation URL, which is worth citing to the user and often carries examples the shipped help omits.
 4. **Search community samples** with `pnp_search_script_samples` or `pnp_suggest_script` before writing a script from scratch — there is a good chance someone has already solved a similar problem.
 5. **Execute commands** with `pnp_run_command` in small, verifiable steps.
+
+## Finding More About a Cmdlet
+
+Every cmdlet carries a `HelpUri` — its page on <https://pnp.github.io/powershell/>. Both
+`pnp_search_commands` (as a `HelpUri` field per result) and `pnp_get_command_docs` (as an
+`ONLINE DOCUMENTATION:` line) return it.
+
+The local help returned by `pnp_get_command_docs` is generated from the installed module, so it can
+lag the published page and sometimes omits examples entirely. Reach for the URL when the local help is
+not enough.
+
+### Worked example
+
+You need to filter list items server-side and `Get-PnPListItem`'s local help does not explain `-Query`:
+
+1. Find the cmdlet:
+
+   ```jsonc
+   // pnp_search_commands
+   { "query": "list item" }
+   ```
+
+   ```jsonc
+   { "Name": "Get-PnPListItem", "Verb": "Get", "Noun": "PnPListItem",
+     "HelpUri": "https://pnp.github.io/powershell/cmdlets/Get-PnPListItem.html" }
+   ```
+
+2. Read the local help:
+
+   ```jsonc
+   // pnp_get_command_docs
+   { "commandName": "Get-PnPListItem" }
+   ```
+
+   The output ends with:
+
+   ```text
+   ONLINE DOCUMENTATION: https://pnp.github.io/powershell/cmdlets/Get-PnPListItem.html
+   ```
+
+3. If the parameter is still unclear, **fetch that URL with whatever web-fetch tool the client
+   provides** and read the parameter and examples sections. If no fetch tool is available, give the
+   user the link rather than guessing at the syntax.
+
+4. Build the command from what the page shows, then run it in a small verifiable step.
+
+### When there is no link
+
+A cmdlet may report no `HelpUri` — `null` in search results, and no `ONLINE DOCUMENTATION:` line from
+`pnp_get_command_docs`. That almost always means an **older `PnP.PowerShell` build**; current versions
+populate it for effectively every cmdlet. `pnp_get_command_docs` says so and offers the fallback
+directly in its output.
+
+What to do instead, in order:
+
+1. **Search the docs site** rather than guessing a URL: <https://pnp.github.io/powershell/> has a
+   search box, and a web search for `PnP PowerShell <Cmdlet-Name>` normally lands on the right page.
+2. **Suggest updating the module** if the user keeps hitting it:
+
+   ```powershell
+   Update-Module PnP.PowerShell
+   ```
+
+   Then restart the MCP server, since the module is imported once when a session starts.
+3. **Fall back to the local help** (`pnp_get_command_docs`) and `Get-Command <Name> -Syntax` for the
+   parameter list, and tell the user the online page could not be linked.
+
+Never hand-assemble a documentation URL from the cmdlet name. The path pattern is not guaranteed, and a
+fabricated link that 404s is worse than no link.
+
+### Rules of thumb
+
+- **Do not guess parameter names.** If the local help does not list it, fetch the page or ask. A
+  guessed parameter fails with "A parameter cannot be found that matches parameter name".
+- **Cite the link when you explain a cmdlet** to the user, so they can verify it themselves.
+- **Use the returned `HelpUri` as-is** rather than constructing one; it is authoritative.
+- The pages are public documentation, so fetching one needs no tenant connection and leaks nothing
+  about the tenant.
 
 ## Prerequisites
 
@@ -29,9 +107,22 @@ once, then keep running commands against it.
 
 - **Reuse the connection.** Do not re-run `Connect-PnPOnline` before every command. Check with
   `pnp_get_connection_status` and connect only when it reports you are not connected.
-- **`sessionId`.** `pnp_run_command` and `pnp_get_connection_status` accept an optional `sessionId`.
-  Leave it unset for normal work. Use a second name (e.g. `tenant-b`) only when you genuinely need
-  two connections at once — each session has its own independent connection and variables.
+- **`sessionId`.** Accepted by `pnp_run_command`, `pnp_get_connection_status` and `pnp_reset_session`.
+  **Leave it unset for normal work** — everything then shares the session named `default`. Use a second
+  name only to hold two tenant or account connections at the same time, because one session holds one
+  connection:
+
+  ```jsonc
+  { "sessionId": "contoso",  "command": "Connect-PnPOnline -Url https://contoso.sharepoint.com -Interactive" }
+  { "sessionId": "fabrikam", "command": "Connect-PnPOnline -Url https://fabrikam.sharepoint.com -Interactive" }
+  { "sessionId": "contoso",  "command": "(Get-PnPTenantSite).Count" }
+  ```
+
+  Each session has its own connection **and** its own variables, so a `$sites` set in one is not
+  visible in the other. `pnp_search_commands` and `pnp_get_command_docs` always use `default`, since
+  cmdlet lookup does not depend on the connection.
+- **One command at a time per session.** A second call against a busy session waits, then reports that
+  the session is busy. Use a different `sessionId` to genuinely run two things at once.
 - **Ending a session.** Use `pnp_reset_session` to sign out, switch accounts, or recover a session
   that has stopped responding. Everything in that session is discarded.
 - **Idle sessions** are ended automatically after 30 minutes; just reconnect if that happens.
@@ -40,10 +131,87 @@ once, then keep running commands against it.
   Clients that support the MCP Tasks extension can run `pnp_run_command` as a task and poll it
   instead of holding the call open.
 
+## Server Configuration
+
+Four environment variables control behaviour. They are set by the user in their **MCP client config**
+(see the [README](./README.md#configuration) for per-client examples) and take effect only after the
+server restarts — this server cannot change them at runtime. If one is in the way, say which variable
+to set rather than working around it.
+
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `PNP_MCP_READONLY` | `false` | `true` refuses anything that would change Microsoft 365. |
+| `PNP_MCP_COMMAND_TIMEOUT_SECONDS` | `600` | Per-command wall-clock limit, in seconds. |
+| `PNP_MCP_CONFIRM_DESTRUCTIVE` | `true` | `false` skips destructive confirmations. |
+| `PNP_SCRIPT_SAMPLES_PATH` | _(unset)_ | Local clone of the script samples repo, used when GitHub is unreachable. |
+
+Both booleans are matched exactly: read-only turns on only for the literal `true`, and confirmation
+turns off only for the literal `false`. `1` and `yes` leave the default in place.
+
+## Read-Only Mode
+
+Set `PNP_MCP_READONLY=true` to refuse anything that would change Microsoft 365.
+
+Classification is by **verb**, resolved by parsing the script with PowerShell's own parser — so an
+alias is followed to its target (`rm` is treated as `Remove-Item`) rather than taken at face value.
+
+### Allowed verbs
+
+| Verb | Why |
+| --- | --- |
+| `Get-` | Reads |
+| `Export-` | Reads; writes a local file |
+| `Test-` | Checks without changing anything |
+| `Convert-` / `ConvertTo-` / `ConvertFrom-` | Transforms values and local files |
+| `Read-` | Reads a template from disk |
+| `Measure-` | Counts |
+| `Connect-` / `Disconnect-` | Authentication — without these the mode could not sign in |
+| `Find-` / `Search-` / `Resolve-` / `Show-` / `Compare-` | Look-ups and inspection |
+| `Format-` | Shapes output |
+| `Write-` | Local log output only (`Write-PnPTraceLog`) |
+
+Pipeline shaping is allowed too, since these appear in the parsed script as commands: `Select-`,
+`Where-`, `Sort-`, `Group-`, `ForEach-`, `Out-`, `Join-`, `Split-`. Without them, even
+`Get-PnPList | Select-Object Title` would be refused.
+
+### Refused verbs
+
+| Verb | Why |
+| --- | --- |
+| `Set-` / `Add-` / `New-` / `Update-` / `Rename-` | Creates or changes objects |
+| `Remove-` / `Clear-` / `Reset-` / `Restore-` / `Move-` / `Copy-` | Destroys, overwrites or relocates |
+| `Enable-` / `Disable-` / `Grant-` / `Revoke-` / `Deny-` / `Approve-` | Changes access or state |
+| `Invoke-` / `Start-` / `Stop-` / `Restart-` / `Submit-` / `Send-` / `Sync-` / `Request-` / `Receive-` | Triggers actions with side effects |
+| `Import-` / `Save-` / `Publish-` / `Unpublish-` / `Register-` / `Unregister-` | Applies content or registrations |
+| `Install-` / `Uninstall-` / `Merge-` / `Repair-` / `Unlock-` / `Undo-` / `Use-` | Changes tenant or app state |
+
+### Also refused
+
+- **Commands invoked indirectly** (`& $someVariable`), because what they would run cannot be
+  established before they run.
+- **Native executables** (`pwsh`, `git`, ...), which have no verb to classify.
+- **Method calls that can change state** — anything named `Delete*`, `Recycle*`
+  and `Execute*`. `ExecuteQuery` is the commit point for every CSOM change, so
+  `$list.DeleteObject(); $ctx.ExecuteQuery()` is refused even though neither is a cmdlet. Read-only
+  helpers such as `ToString()` and `Trim()` are unaffected.
+
+### Limits worth knowing
+
+- Read-only refers to **Microsoft 365**. Local file output (`Out-File`, `Export-*`) is still allowed.
+- Classification is by verb, so a cmdlet whose verb does not match its behaviour is classified by the
+  verb. `Invoke-*` is refused wholesale for this reason.
+- This is defence in depth, not a sandbox. A script that builds a command name at runtime is refused
+  rather than analysed, but static analysis cannot prove the absence of every escape.
+
 ## Destructive Commands
 
 Commands using a destructive verb — `Remove-*`, `Clear-*`, `Reset-*`, `Uninstall-*`, `Revoke-*`,
 `Deny-*`, `Restore-*`, `Move-*`, `Rename-*`, `Disable-*` — are **not run without confirmation**.
+Neither is a command invoked indirectly, since it cannot be identified in advance.
+
+This check favours asking too often over missing something: it also matches a destructive name that
+appears only as text (for example inside a string), so you may occasionally be asked to confirm a
+command that turns out to be harmless.
 
 - On clients that support prompting, you will be asked to confirm the exact command first.
 - On clients that do not, the command is blocked and must be re-sent with `confirmDestructive: true`.

@@ -2,15 +2,9 @@ using System.Collections.Concurrent;
 
 namespace PnPPowerShell.MCPServer.Services;
 
-/// <summary>
-/// Owns the named <see cref="PowerShellSession"/> instances the tools execute against.
-/// </summary>
-/// <remarks>
-/// The MCP protocol is stateless, but the application it fronts is not: a PnP connection is real
-/// state living in a real process. Rather than hiding that behind an implicit session, each session
-/// is addressed by an explicit <c>sessionId</c> handle that the caller passes back on later calls —
-/// which is also what makes it possible to hold connections to two tenants at once.
-/// </remarks>
+/// <summary>Owns the named <see cref="PowerShellSession"/> instances the tools execute against.</summary>
+// The protocol is stateless but a PnP connection is real state in a real process, so each session is
+// addressed by an explicit sessionId handle, which also allows two tenant connections at once.
 internal sealed class PowerShellSessionManager : IAsyncDisposable
 {
     public const string DefaultSessionId = "default";
@@ -45,10 +39,7 @@ internal sealed class PowerShellSessionManager : IAsyncDisposable
     private static string Normalize(string? sessionId) =>
         string.IsNullOrWhiteSpace(sessionId) ? DefaultSessionId : sessionId.Trim();
 
-    /// <summary>
-    /// Ends sessions that have gone unused, so an abandoned connection does not keep a pwsh process
-    /// (and its tenant connection) alive for the lifetime of the server.
-    /// </summary>
+    /// <summary>Ends unused sessions so an abandoned connection does not outlive its usefulness.</summary>
     private void EvictIdleSessions()
     {
         var cutoff = DateTimeOffset.UtcNow - IdleTimeout;
