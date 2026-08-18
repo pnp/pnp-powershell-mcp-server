@@ -90,16 +90,13 @@ public class BestPracticeSectionTests
     }
 
     [Fact]
-    public async Task Every_advertised_section_resolves_against_the_shipped_document()
+    public void Every_advertised_section_resolves_against_the_shipped_document()
     {
-        // Guards the real failure mode: renaming a heading in best-practices.md silently empties a section.
-        foreach (var key in new[]
-                 {
-                     "workflow", "docs", "sessions", "config", "readonly",
-                     "destructive", "auth", "execution", "patterns",
-                 })
+        // Guards the real failure mode: renaming a heading in best-practices.md silently empties a
+        // section. Iterates the dictionary itself so a newly added section is covered automatically.
+        foreach (var key in PnPPowerShellTools.BestPracticeSections.Keys)
         {
-            var result = await PnPPowerShellTools.GetPnpBestPractices(key);
+            var result = PnPPowerShellTools.GetPnpBestPractices(key);
 
             Assert.False(
                 result.StartsWith("Error:", StringComparison.Ordinal),
@@ -109,19 +106,19 @@ public class BestPracticeSectionTests
     }
 
     [Fact]
-    public async Task An_unknown_section_is_rejected_with_the_valid_list()
+    public void An_unknown_section_is_rejected_with_the_valid_list()
     {
-        var result = await PnPPowerShellTools.GetPnpBestPractices("nonsense");
+        var result = PnPPowerShellTools.GetPnpBestPractices("nonsense");
 
         Assert.StartsWith("Error:", result);
         Assert.Contains("sessions", result);
     }
 
     [Fact]
-    public async Task Omitting_the_section_returns_the_whole_document()
+    public void Omitting_the_section_returns_the_whole_document()
     {
-        var whole = await PnPPowerShellTools.GetPnpBestPractices();
-        var slice = await PnPPowerShellTools.GetPnpBestPractices("sessions");
+        var whole = PnPPowerShellTools.GetPnpBestPractices();
+        var slice = PnPPowerShellTools.GetPnpBestPractices("sessions");
 
         Assert.True(whole.Length > slice.Length * 2, "The full document should be substantially larger than one section.");
         Assert.Contains("Read-Only Mode", whole);
@@ -130,16 +127,61 @@ public class BestPracticeSectionTests
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
-    public async Task Blank_is_treated_as_no_section(string section)
+    public void Blank_is_treated_as_no_section(string section)
     {
-        Assert.Contains("Read-Only Mode", await PnPPowerShellTools.GetPnpBestPractices(section));
+        Assert.Contains("Read-Only Mode", PnPPowerShellTools.GetPnpBestPractices(section));
     }
 
     [Fact]
-    public async Task A_section_name_is_trimmed_before_lookup()
+    public void A_section_name_is_trimmed_before_lookup()
     {
-        var result = await PnPPowerShellTools.GetPnpBestPractices("  readonly  ");
+        var result = PnPPowerShellTools.GetPnpBestPractices("  readonly  ");
 
         Assert.DoesNotContain("Error:", result);
+    }
+}
+
+/// <summary>Guards the lists that must be updated by hand whenever a section is added or renamed.</summary>
+public class BestPracticeSectionDriftTests
+{
+    private static string SectionParameterDescription()
+    {
+        var method = typeof(PnPPowerShellTools).GetMethod(nameof(PnPPowerShellTools.GetPnpBestPractices))!;
+        var parameter = method.GetParameters().Single(p => p.Name == "section");
+
+        return parameter
+            .GetCustomAttributes(typeof(System.ComponentModel.DescriptionAttribute), false)
+            .Cast<System.ComponentModel.DescriptionAttribute>()
+            .Single()
+            .Description;
+    }
+
+    [Fact]
+    public void The_tool_description_advertises_every_section()
+    {
+        // The attribute needs a compile-time constant, so the list is hand-written and can drift from
+        // the dictionary. This is what the model reads, so a stale list means an unusable section.
+        var description = SectionParameterDescription();
+
+        foreach (var key in PnPPowerShellTools.BestPracticeSections.Keys)
+        {
+            Assert.True(
+                description.Contains(key, StringComparison.OrdinalIgnoreCase),
+                $"Section '{key}' is missing from the tool's parameter description.");
+        }
+    }
+
+    [Fact]
+    public void The_shipped_guidance_mentions_every_section()
+    {
+        // best-practices.md tells the reader which sections exist; it is embedded, so it can be checked.
+        var document = PnPPowerShellTools.GetPnpBestPractices();
+
+        foreach (var key in PnPPowerShellTools.BestPracticeSections.Keys)
+        {
+            Assert.True(
+                document.Contains($"`{key}`", StringComparison.OrdinalIgnoreCase),
+                $"Section '{key}' is not listed in best-practices.md.");
+        }
     }
 }

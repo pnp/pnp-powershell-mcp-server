@@ -179,22 +179,7 @@ internal partial class PnPPowerShellTools
                 "so it was not run. Simplify the command and try again.";
         }
 
-        // Read-only mode is skipped entirely: anything that survived Enforce has been parsed and proven
-        // not to change Microsoft 365, so a prompt would be noise -- and the textual check's false
-        // positives (a destructive name inside a string) must not leak into a mode that already verified
-        // the script. Reaching here in read-only mode implies a non-null analysis; a null one failed closed.
-        string? flagged = null;
-        if (!CommandPolicy.ReadOnlyMode)
-        {
-            // Both checks run: a needless prompt costs a click, a missed one costs tenant data.
-            flagged = analysis is null ? null : CommandPolicy.FindNeedingConfirmation(analysis);
-
-            // Textual fallback catches a destructive name used only as an argument, e.g. Set-Alias nuke Remove-PnPTenantSite.
-            if (flagged is null && DestructiveCommandRegex().Match(command) is { Success: true } textual)
-            {
-                flagged = textual.Value;
-            }
-        }
+        var flagged = DetermineConfirmationTarget(analysis, command);
         if (flagged is not null && !confirmDestructive && !ConfirmationDisabled)
         {
             var refusal = await ConfirmDestructiveAsync(server, context, command, flagged);
@@ -233,6 +218,37 @@ internal partial class PnPPowerShellTools
         }
 
         return PnPErrorHints.Enrich(await session.ExecuteAsync(script, remaining, cancellationToken));
+    }
+
+    /// <summary>Describes what must be confirmed before running, or null when nothing must be.</summary>
+    internal static string? DetermineConfirmationTarget(ScriptAnalysis? analysis, string command)
+    {
+        // Read-only mode needs no prompt: anything that survived Enforce was parsed and proven not to
+        // change Microsoft 365, and the textual check's false positives must not leak into a mode that
+        // already verified the script.
+        if (CommandPolicy.ReadOnlyMode)
+        {
+            return null;
+        }
+
+        // Fail closed when the parse is unavailable. The textual check alone cannot see an alias, an
+        // indirect invocation or a CSOM method call, so relying on it here would let exactly the cases
+        // the parser exists to catch run unconfirmed.
+        if (analysis is null)
+        {
+            return "a command that could not be analysed, so what it would run cannot be verified";
+        }
+
+        // Both checks run: a needless prompt costs a click, a missed one costs tenant data.
+        var parsed = CommandPolicy.FindNeedingConfirmation(analysis);
+        if (parsed is not null)
+        {
+            return parsed;
+        }
+
+        // Textual fallback catches a destructive name used only as an argument, e.g. Set-Alias nuke Remove-PnPTenantSite.
+        var textual = DestructiveCommandRegex().Match(command);
+        return textual.Success ? textual.Value : null;
     }
 
     /// <summary>Null when the command is approved, otherwise the message to return to the caller.</summary>
@@ -369,8 +385,10 @@ internal partial class PnPPowerShellTools
     }
 
     /// <summary>Named slices of the guidance, so a caller can pull one topic instead of the whole document.</summary>
-    // Keys are matched against the "## " headings in best-practices.md; the values are heading prefixes.
-    private static readonly Dictionary<string, string[]> BestPracticeSections = new(StringComparer.OrdinalIgnoreCase)
+    // Values are matched against the "## " headings in best-practices.md by exact title, case-insensitively.
+    // Internal so a test can assert the [Description] list and the shipped guidance stay in step; the
+    // attribute needs a compile-time constant, so the list cannot be generated from this dictionary.
+    internal static readonly Dictionary<string, string[]> BestPracticeSections = new(StringComparer.OrdinalIgnoreCase)
     {
         ["workflow"] = ["Recommended Workflow", "Prerequisites", "Summary"],
         ["docs"] = ["Finding More About a Cmdlet"],
@@ -385,10 +403,10 @@ internal partial class PnPPowerShellTools
 
     [McpServerTool(Name = "pnp_get_best_practices", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description("Returns best practices for using this MCP server with PnP PowerShell. The full document is long, so pass a section to retrieve only what you need.")]
-    public static async Task<string> GetPnpBestPractices(
+    public static string GetPnpBestPractices(
         [Description("Optional topic to return instead of the whole document. One of: workflow, docs, sessions, config, readonly, destructive, auth, execution, patterns. Omit for everything.")] string? section = null)
     {
-        var document = await LoadBestPracticesAsync();
+        var document = BestPracticesDocument.Value;
 
         if (string.IsNullOrWhiteSpace(section))
         {
@@ -414,25 +432,17 @@ internal partial class PnPPowerShellTools
             : extracted.TrimEnd();
     }
 
-    private static async Task<string> LoadBestPracticesAsync()
+    // best-practices.md is compiled into the assembly, so there is exactly one copy of the guidance.
+    // It previously fell back to a hand-maintained inline duplicate, which had already drifted: the
+    // duplicate used different headings, so the section lookup silently returned nothing for some keys.
+    private static readonly Lazy<string> BestPracticesDocument = new(() =>
     {
-        // Try to load best-practices.md from the application directory
-        var bestPracticesPath = Path.Combine(AppContext.BaseDirectory, "best-practices.md");
-        if (File.Exists(bestPracticesPath))
-        {
-            return await File.ReadAllTextAsync(bestPracticesPath);
-        }
+        using var stream = typeof(PnPPowerShellTools).Assembly.GetManifestResourceStream("best-practices.md")
+            ?? throw new InvalidOperationException("best-practices.md is missing from the assembly; it must be an EmbeddedResource.");
 
-        // Try from the working directory (dev scenario)
-        bestPracticesPath = Path.Combine(Directory.GetCurrentDirectory(), "best-practices.md");
-        if (File.Exists(bestPracticesPath))
-        {
-            return await File.ReadAllTextAsync(bestPracticesPath);
-        }
-
-        // Fallback to inline content
-        return GetInlineBestPractices();
-    }
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    });
 
     /// <summary>Returns the named "## " sections of a markdown document, in document order.</summary>
     // Matches on the heading text so the slices keep working as the document is edited, and takes only
@@ -463,128 +473,6 @@ internal partial class PnPPowerShellTools
         }
 
         return result.ToString();
-    }
-
-    private static string GetInlineBestPractices()
-    {
-        return """
-            # Best Practices for Using PnP PowerShell via MCP Server
-
-            ## Recommended Workflow
-
-            Use this flow for reliable execution:
-            1. Check connection with `pnp_get_connection_status`.
-            2. Search commands with `pnp_search_commands`.
-            3. Read syntax and examples with `pnp_get_command_docs`.
-            4. Execute with `pnp_run_command` in small, verifiable steps.
-
-            ## Finding More About a Cmdlet
-
-            - Every cmdlet carries a `HelpUri` pointing at its page on https://pnp.github.io/powershell/.
-              `pnp_search_commands` returns it per result; `pnp_get_command_docs` ends with it.
-            - The local help comes from the installed module, so it can lag the published page and
-              sometimes omits examples. When it is not enough, fetch the URL with the client's web-fetch
-              tool; if there is no such tool, give the user the link.
-            - Never guess a parameter name. If the local help does not list it, fetch the page or ask.
-            - Use the returned `HelpUri` as-is; do not hand-assemble a docs URL from the cmdlet name.
-            - If a cmdlet reports no HelpUri, it is almost certainly an older PnP.PowerShell build.
-              Search https://pnp.github.io/powershell/ for the cmdlet name, or search the web for
-              "PnP PowerShell <Cmdlet-Name>", instead of inventing a URL. Suggest
-              `Update-Module PnP.PowerShell` (then a server restart) if it keeps happening.
-
-            ## Sessions
-
-            - Commands run in a persistent PowerShell session, so a `Connect-PnPOnline` connection
-              stays alive across calls. Connect once, then reuse it.
-            - **Omit `sessionId` for normal work**; everything then shares the session `default`.
-              Accepted by `pnp_run_command`, `pnp_get_connection_status` and `pnp_reset_session`.
-            - Use a second `sessionId` only to hold two tenant or account connections at once, since
-              one session holds one connection. Each session has its own variables too.
-            - One command runs at a time per session. A second call waits, then reports the session is
-              busy; use a different `sessionId` to run two things at once.
-            - Use `pnp_reset_session` to sign out, switch accounts, or recover a stuck session.
-            - A session is dropped after 30 minutes of inactivity; simply reconnect if that happens.
-              A session busy running a command is never dropped, however long it takes.
-
-            ## Server Configuration
-
-            Behaviour is controlled by environment variables the **user** sets in their MCP client
-            config, not something this server can change at runtime. If a limit is in the way, explain
-            which variable to set and let the user decide:
-
-            - `PNP_MCP_READONLY=true` — refuse anything that would change Microsoft 365.
-            - `PNP_MCP_COMMAND_TIMEOUT_SECONDS` — per-command limit, default 600.
-            - `PNP_MCP_CONFIRM_DESTRUCTIVE=false` — skip destructive confirmations.
-            - `PNP_SCRIPT_SAMPLES_PATH` — local clone of the script samples repo.
-
-            A change takes effect only after the server restarts.
-
-            ## Authentication
-
-            - Always start sessions with `Connect-PnPOnline`.
-            - Prefer secure auth methods: `-Interactive`, certificate-based (`-ClientId`, `-Tenant`, `-Thumbprint`), or managed identity.
-            - Avoid storing credentials in scripts; use Azure Key Vault or environment variables.
-            - Check connection status before running commands to avoid auth errors.
-
-            ## Read-Only Mode
-
-            When `PNP_MCP_READONLY=true`, anything that would change Microsoft 365 is refused.
-
-            - **Allowed**: `Get-`, `Export-`, `Test-`, `Convert-`, `ConvertTo-`, `ConvertFrom-`, `Read-`,
-              `Measure-`, `Connect-`, `Disconnect-`, `Find-`, `Format-`, `Resolve-`, `Write-`, `Search-`,
-              `Show-`, `Compare-`, and pipeline shaping (`Select-`, `Where-`, `Sort-`, `Group-`,
-              `ForEach-`, `Out-`, `Join-`, `Split-`).
-            - **Refused**: `Set-`, `Remove-`, `Add-`, `New-`, `Clear-`, `Invoke-`, `Update-`, `Move-`,
-              `Enable-`, `Disable-`, `Grant-`, `Revoke-`, `Copy-`, `Import-`, `Restore-`, `Reset-`,
-              `Rename-`, `Start-`, `Stop-`, `Register-`, `Unregister-`, and every other change verb.
-            - Also refused: commands invoked indirectly (`& $var`), native executables, and
-              state-changing method calls (`ExecuteQuery`, `DeleteObject`).
-            - Aliases are resolved by parsing, so `rm` is treated as `Remove-Item`.
-            - Local file output (`Out-File`, `Export-*`) is still allowed.
-
-            ## Destructive Commands
-
-            - Destructive verbs (`Remove-*`, `Clear-*`, `Reset-*`, `Revoke-*`, `Disable-*`, ...) require
-              confirmation before they run. On clients that support prompting you will be asked directly;
-              elsewhere the command is blocked until it is re-sent with `confirmDestructive: true`.
-            - A command invoked indirectly also requires confirmation, since it cannot be identified.
-            - The check prefers asking too often to missing something, so it also matches a destructive
-              name that only appears as text. You may be asked about a harmless command occasionally.
-            - Always show the user the exact command before asking them to confirm it.
-
-            ## Execution Tips
-
-            - Prefer idempotent reads before writes (`Get-*` before `Set-*`, `Add-*`, `Remove-*`).
-            - For complex tasks, run commands incrementally and validate outputs between steps.
-            - Return only required properties using `Select-Object` to keep outputs concise.
-            - Use explicit site URLs, tenant identifiers, and object IDs to reduce ambiguity.
-            - Handle errors with `try/catch` in command chains.
-            - Use `-ErrorAction Stop` for predictable error behavior.
-
-            ## Output Tips
-
-            - Use `| Select-Object Property1, Property2` to limit output size.
-            - Use `| Where-Object { $_.Property -eq 'Value' }` for filtering.
-            - For large result sets, use `-PageSize` parameter where available.
-            - Pipe to `ConvertTo-Json` for structured output when needed.
-
-            ## Common Patterns
-
-            ### Connect to a site
-            ```powershell
-            Connect-PnPOnline -Url https://contoso.sharepoint.com/sites/MySite -Tenant contoso.onmicrosoft.com -ClientId xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx -Thumbprint xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-            ```
-
-            ### List all site collections
-            ```powershell
-            Get-PnPTenantSite | Select-Object Url, Title, Template
-            ```
-
-            ### Get items from a list
-            ```powershell
-            Get-PnPListItem -List "Documents" -PageSize 100 | Select-Object Id, FieldValues
-            ```
-            """;
     }
 
     /// <summary>Identifies the exact command text an approval was granted for, hashed to stay small.</summary>

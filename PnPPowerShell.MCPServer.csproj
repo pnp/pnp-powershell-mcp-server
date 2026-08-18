@@ -44,7 +44,8 @@
     <None Include=".mcp\server.json" Pack="true" PackagePath="/.mcp/" />
     <None Include="README.md" Pack="true" PackagePath="/" />
     <None Include="LICENSE" Pack="true" PackagePath="/" />
-    <None Include="best-practices.md" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Compiled in, so the guidance cannot drift from a second copy and is always present at runtime. -->
+    <EmbeddedResource Include="best-practices.md" LogicalName="best-practices.md" />
   </ItemGroup>
 
   <ItemGroup>
