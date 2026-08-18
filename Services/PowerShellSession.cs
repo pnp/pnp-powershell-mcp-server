@@ -12,7 +12,7 @@ namespace PnPPowerShell.MCPServer.Services;
 internal sealed class PowerShellSession : IAsyncDisposable
 {
     private const string PwshMissingMessage =
-        "Error: Could not launch 'pwsh'. Install PowerShell 7+ from https://aka.ms/powershell and ensure it is available on PATH.";
+        "Error: Could not launch 'pwsh'. Install PowerShell 7.4 or above from https://aka.ms/powershell and ensure it is available on PATH.";
 
     private const string ModuleMissingMessage =
         "Error: The PnP.PowerShell module is not installed. Install it by running: Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force";

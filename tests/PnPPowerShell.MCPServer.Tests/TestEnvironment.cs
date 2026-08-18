@@ -17,11 +17,11 @@ internal static class TestEnvironment
     {
         try
         {
+            // stderr is not redirected: an unread redirected pipe can fill and deadlock the child.
             var startInfo = new ProcessStartInfo
             {
                 FileName = "pwsh",
                 RedirectStandardOutput = true,
-                RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true,
             };
@@ -37,8 +37,26 @@ internal static class TestEnvironment
                 return false;
             }
 
-            var output = process.StandardOutput.ReadToEnd();
-            return process.WaitForExit(120_000) && output.Contains("YES", StringComparison.Ordinal);
+            // Read asynchronously and bound the wait: ReadToEnd blocks until stdout closes, which a
+            // hung pwsh never does, and that would stall the whole test run rather than skip a test.
+            var output = process.StandardOutput.ReadToEndAsync();
+
+            if (!process.WaitForExit(120_000))
+            {
+                try
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+                catch (Exception)
+                {
+                    // Already gone; nothing to clean up.
+                }
+
+                return false;
+            }
+
+            return output.Wait(TimeSpan.FromSeconds(10))
+                && output.Result.Contains("YES", StringComparison.Ordinal);
         }
         catch (Exception)
         {

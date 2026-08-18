@@ -12,6 +12,11 @@ Use this flow for reliable execution:
 4. **Search community samples** with `pnp_search_script_samples` or `pnp_suggest_script` before writing a script from scratch — there is a good chance someone has already solved a similar problem.
 5. **Execute commands** with `pnp_run_command` in small, verifiable steps.
 
+This guide is long, so `pnp_get_best_practices` accepts an optional `section` — `workflow`, `docs`,
+`sessions`, `config`, `readonly`, `destructive`, `auth`, `execution` or `patterns` — to return one
+topic instead of everything. Pull `readonly` when a command is refused, `destructive` before a
+confirmation prompt, or `patterns` when looking for a worked example.
+
 ## Finding More About a Cmdlet
 
 Every cmdlet carries a `HelpUri` — its page on <https://pnp.github.io/powershell/>. Both
@@ -92,7 +97,7 @@ fabricated link that 404s is worse than no link.
 
 ## Prerequisites
 
-- **PowerShell 7+** (`pwsh`) must be installed and available on `PATH`. This server runs PnP PowerShell in a `pwsh` session — if it's missing, tools will return an actionable error telling you to install it.
+- **PowerShell 7.4 or above** (`pwsh`) must be installed and available on `PATH`. This server runs PnP PowerShell in a `pwsh` session — if it's missing, tools will return an actionable error telling you to install it.
 - **The `PnP.PowerShell` module** must be installed:
   ```powershell
   Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force

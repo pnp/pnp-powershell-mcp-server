@@ -181,7 +181,7 @@ Can you check if I have a Power Automate flow called 'HoursReportingReminder' an
 | pnp_run_command | Executes one or more PnP PowerShell commands and returns the result. Runs in a persistent session, so a `Connect-PnPOnline` connection is reused across calls. Destructive commands require confirmation first. |
 | pnp_get_connection_status | Checks the current PnP PowerShell connection status before running commands. |
 | pnp_reset_session | Ends a session and its PnP connection. Use it to sign out, switch accounts, or recover a session that has stopped responding. |
-| pnp_get_best_practices | Returns recommended best practices for using PnP PowerShell via this MCP server, including authentication, sessions, error handling, and execution tips. |
+| pnp_get_best_practices | Returns best practices for using PnP PowerShell via this MCP server. Takes an optional `section` (`workflow`, `docs`, `sessions`, `config`, `readonly`, `destructive`, `auth`, `execution`, `patterns`) to retrieve one topic instead of the whole guide, which keeps the response small. |
 | pnp_search_script_samples | Searches the community [PnP Script Samples](https://pnp.github.io/script-samples/) index for scripts matching a keyword or use case. |
 | pnp_get_script_sample | Retrieves the full PnP PowerShell script code for a specific script sample by name, fetched live from GitHub. |
 | pnp_suggest_script | Finds the most relevant community script samples for a task and returns their full script code plus adaptation guidance, in one call. |
@@ -241,8 +241,6 @@ Connect to contoso, find all site collections with no owner, and export them to 
   session is busy. To genuinely run two things at once, use two different `sessionId` values.
 - **Reuse the connection.** Do not re-run `Connect-PnPOnline` before every command; check
   `pnp_get_connection_status` first. It reports which session it inspected.
-
-### Configuration
 
 ### Configuration
 

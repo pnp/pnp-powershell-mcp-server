@@ -368,9 +368,53 @@ internal partial class PnPPowerShellTools
             : $"No session named '{name}' was running, so there was nothing to end.\n\n{summary}";
     }
 
+    /// <summary>Named slices of the guidance, so a caller can pull one topic instead of the whole document.</summary>
+    // Keys are matched against the "## " headings in best-practices.md; the values are heading prefixes.
+    private static readonly Dictionary<string, string[]> BestPracticeSections = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["workflow"] = ["Recommended Workflow", "Prerequisites", "Summary"],
+        ["docs"] = ["Finding More About a Cmdlet"],
+        ["sessions"] = ["Sessions"],
+        ["config"] = ["Server Configuration"],
+        ["readonly"] = ["Read-Only Mode"],
+        ["destructive"] = ["Destructive Commands"],
+        ["auth"] = ["Authentication Best Practices"],
+        ["execution"] = ["Execution Best Practices", "Working with Complex Data", "Debugging and Verbose Output"],
+        ["patterns"] = ["Common Patterns", "Areas Covered by PnP PowerShell"],
+    };
+
     [McpServerTool(Name = "pnp_get_best_practices", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-    [Description("Returns recommended best practices and guidance for using this MCP server with PnP PowerShell commands, including authentication, session handling, error handling, and execution tips.")]
-    public static async Task<string> GetPnpBestPractices()
+    [Description("Returns best practices for using this MCP server with PnP PowerShell. The full document is long, so pass a section to retrieve only what you need.")]
+    public static async Task<string> GetPnpBestPractices(
+        [Description("Optional topic to return instead of the whole document. One of: workflow, docs, sessions, config, readonly, destructive, auth, execution, patterns. Omit for everything.")] string? section = null)
+    {
+        var document = await LoadBestPracticesAsync();
+
+        if (string.IsNullOrWhiteSpace(section))
+        {
+            return $"""
+                {document}
+
+                TIP: This is the full guide. To pull a single topic next time, call 'pnp_get_best_practices' with section set to one of: {string.Join(", ", BestPracticeSections.Keys)}.
+                """;
+        }
+
+        var key = section.Trim();
+        if (!BestPracticeSections.TryGetValue(key, out var headings))
+        {
+            return
+                $"Error: Unknown section '{key}'. Valid sections are: {string.Join(", ", BestPracticeSections.Keys)}. " +
+                "Omit the section to get the whole document.";
+        }
+
+        var extracted = ExtractSections(document, headings);
+
+        return string.IsNullOrWhiteSpace(extracted)
+            ? $"Error: Section '{key}' is not present in this build of the guidance. Omit the section to get the whole document."
+            : extracted.TrimEnd();
+    }
+
+    private static async Task<string> LoadBestPracticesAsync()
     {
         // Try to load best-practices.md from the application directory
         var bestPracticesPath = Path.Combine(AppContext.BaseDirectory, "best-practices.md");
@@ -388,6 +432,37 @@ internal partial class PnPPowerShellTools
 
         // Fallback to inline content
         return GetInlineBestPractices();
+    }
+
+    /// <summary>Returns the named "## " sections of a markdown document, in document order.</summary>
+    // Matches on the heading text so the slices keep working as the document is edited, and takes only
+    // level-2 headings so a "###" subheading cannot end a section early.
+    internal static string ExtractSections(string document, string[] headings)
+    {
+        var result = new StringBuilder();
+        var keeping = false;
+
+        foreach (var line in document.Split('\n'))
+        {
+            var trimmed = line.TrimEnd('\r');
+
+            if (trimmed.StartsWith("## ", StringComparison.Ordinal))
+            {
+                var title = trimmed[3..].Trim();
+                keeping = headings.Any(h => title.Equals(h, StringComparison.OrdinalIgnoreCase));
+            }
+            else if (trimmed.StartsWith("# ", StringComparison.Ordinal))
+            {
+                keeping = false;
+            }
+
+            if (keeping)
+            {
+                result.AppendLine(trimmed);
+            }
+        }
+
+        return result.ToString();
     }
 
     private static string GetInlineBestPractices()
