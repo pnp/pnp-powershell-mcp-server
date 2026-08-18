@@ -151,12 +151,13 @@ internal partial class PnPPowerShellTools
         var session = sessions.Get(sessionId);
 
         // Analysis and execution share one budget, so queuing behind a long command still waits out
-        // CommandTimeout rather than failing early, and a call cannot take twice the configured limit.
+        // CommandTimeout rather than failing early, and a call cannot exceed the configured limit.
         var budget = CommandTimeout;
+        var (analysisBudget, executionFloor) = SplitBudget(budget);
         var elapsed = System.Diagnostics.Stopwatch.StartNew();
 
         // Parsed rather than pattern-matched, so aliases and indirect invocation are seen for what they are.
-        var (analysis, sessionError) = await ScriptAnalyzer.AnalyzeAsync(session, command, budget, cancellationToken);
+        var (analysis, sessionError) = await ScriptAnalyzer.AnalyzeAsync(session, command, analysisBudget, cancellationToken);
 
         if (sessionError is not null)
         {
@@ -210,14 +211,26 @@ internal partial class PnPPowerShellTools
             Remove-Variable -Name __pnpCommandText, __pnpCommandResult -ErrorAction SilentlyContinue
             """;
 
-        // Whatever the analysis consumed is deducted, with a floor so the command still gets a chance.
+        // Whatever the analysis consumed is deducted, never dropping below the slice reserved for it.
         var remaining = budget - elapsed.Elapsed;
-        if (remaining < TimeSpan.FromSeconds(10))
+        if (remaining < executionFloor)
         {
-            remaining = TimeSpan.FromSeconds(10);
+            remaining = executionFloor;
         }
 
         return PnPErrorHints.Enrich(await session.ExecuteAsync(script, remaining, cancellationToken));
+    }
+
+    /// <summary>Splits a command budget into an analysis cap and a reserved execution slice.</summary>
+    // The execution floor is reserved up front rather than added afterwards. Granting analysis the whole
+    // budget and then flooring execution at a fixed 10s let a slow analysis push the total past the
+    // configured timeout; capping analysis at budget-minus-floor keeps the sum within it.
+    internal static (TimeSpan Analysis, TimeSpan ExecutionFloor) SplitBudget(TimeSpan budget)
+    {
+        // Halve a very short budget instead of reserving a fixed slice, which would leave nothing to analyse with.
+        var floor = budget < TimeSpan.FromSeconds(20) ? budget / 2 : TimeSpan.FromSeconds(10);
+
+        return (budget - floor, floor);
     }
 
     /// <summary>Describes what must be confirmed before running, or null when nothing must be.</summary>
@@ -481,6 +494,9 @@ internal partial class PnPPowerShellTools
 
     /// <summary>True only when the echoed request state was minted for exactly this command text.</summary>
     // Fails closed on a missing state: an approval that cannot be tied to what the user saw is not one.
+    // This binds the approval to the command; it is not a security boundary. The hash is unkeyed, so a
+    // client could compute a matching one -- but a client that wanted to skip the prompt would just pass
+    // confirmDestructive. The value is catching a retry that carries different arguments.
     internal static bool IsApprovalBoundTo(string? requestState, string command) =>
         requestState is not null && string.Equals(requestState, Fingerprint(command), StringComparison.Ordinal);
 

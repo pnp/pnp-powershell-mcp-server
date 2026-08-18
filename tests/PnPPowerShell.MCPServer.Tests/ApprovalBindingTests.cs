@@ -44,7 +44,7 @@ public class ApprovalBindingTests
     [InlineData("")]
     [InlineData("not-a-hash")]
     [InlineData("0000000000000000000000000000000000000000000000000000000000000000")]
-    public void A_forged_request_state_is_rejected(string state)
+    public void An_invalid_request_state_is_rejected(string state)
     {
         Assert.False(PnPPowerShellTools.IsApprovalBoundTo(state, Command));
     }
