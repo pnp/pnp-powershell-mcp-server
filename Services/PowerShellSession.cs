@@ -5,27 +5,14 @@ using System.Threading.Channels;
 
 namespace PnPPowerShell.MCPServer.Services;
 
-/// <summary>
-/// A long-lived <c>pwsh</c> child process that executes scripts one at a time.
-/// </summary>
-/// <remarks>
-/// <para>
-/// Keeping a single process alive across tool calls is what allows a connection established by
-/// <c>Connect-PnPOnline</c> to survive into later commands. PnP PowerShell holds its connection in
-/// process memory, so the previous process-per-call model silently dropped it: every call started a
-/// fresh runspace, which made <c>pnp_get_connection_status</c> report "not connected" no matter what
-/// had been run before it.
-/// </para>
-/// <para>
-/// An in-proc runspace via the PowerShell SDK is not an option here — this project publishes native
-/// AOT and <c>System.Management.Automation</c> is heavily reflection-based — so the session is a
-/// child process driven over stdin with sentinel-delimited output.
-/// </para>
-/// </remarks>
+/// <summary>A long-lived <c>pwsh</c> child process that executes scripts one at a time.</summary>
+// One process across calls is what lets a Connect-PnPOnline connection survive: PnP holds it in process
+// memory, so the old process-per-call model dropped it and status always read "not connected".
+// An in-proc runspace is not an option under native AOT, so this drives a child process over stdin.
 internal sealed class PowerShellSession : IAsyncDisposable
 {
     private const string PwshMissingMessage =
-        "Error: Could not launch 'pwsh'. Install PowerShell 7+ from https://aka.ms/powershell and ensure it is available on PATH.";
+        "Error: Could not launch 'pwsh'. Install PowerShell 7.4 or above from https://aka.ms/powershell and ensure it is available on PATH.";
 
     private const string ModuleMissingMessage =
         "Error: The PnP.PowerShell module is not installed. Install it by running: Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force";
@@ -54,20 +41,14 @@ internal sealed class PowerShellSession : IAsyncDisposable
 
     public bool IsAlive => _process is { HasExited: false };
 
-    /// <summary>
-    /// True while a command holds the session. Used to keep the idle evictor off a session that is
-    /// still working — a command may legitimately outrun the idle window.
-    /// </summary>
+    /// <summary>True while a command holds the session, keeping the idle evictor off work in progress.</summary>
     public bool IsBusy => _gate.CurrentCount == 0;
 
     private string EndMarker => $"__PNP_END_{_token}__";
 
     private string ErrorMarker => $"__PNP_ERR_{_token}__";
 
-    /// <summary>
-    /// Runs <paramref name="script"/> in this session, starting the underlying process on first use.
-    /// Calls are serialized: a session is a single runspace and cannot interleave commands.
-    /// </summary>
+    /// <summary>Runs a script in this session, starting the process on first use; calls are serialized.</summary>
     public async Task<string> ExecuteAsync(string script, TimeSpan timeout, CancellationToken cancellationToken = default)
     {
         // The wait for the session is bounded by the same timeout as the command. Without this, a
@@ -100,10 +81,7 @@ internal sealed class PowerShellSession : IAsyncDisposable
         }
     }
 
-    /// <summary>
-    /// Terminates the underlying process. The next <see cref="ExecuteAsync"/> starts a fresh one,
-    /// which also discards any PnP connection held by this session.
-    /// </summary>
+    /// <summary>Terminates the process; the next call starts a fresh one and discards the PnP connection.</summary>
     public async Task ResetAsync()
     {
         // Only a bounded wait for the gate. The usual reason to reset is a command that has wedged
@@ -420,10 +398,7 @@ internal sealed class PowerShellSession : IAsyncDisposable
             }
         }
 
-        // _gate is deliberately not disposed. A command may still be in flight (that is precisely the
-        // case the bounded wait above exists for) and would then hit ObjectDisposedException on its
-        // Release, or on a pending WaitAsync, taking the server down during shutdown. SemaphoreSlim
-        // only holds a disposable resource once AvailableWaitHandle is touched, which this never does,
-        // so skipping Dispose costs nothing.
+        // _gate is deliberately not disposed: an in-flight command would hit ObjectDisposedException on
+        // Release. SemaphoreSlim only owns a resource once AvailableWaitHandle is touched, which it never is.
     }
 }

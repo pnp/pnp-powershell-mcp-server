@@ -7,7 +7,7 @@ This MCP server allows the use of natural language to run [PnP PowerShell](https
 ## 📦 Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download) (only required to build/run from source — published tool releases are self-contained)
-- [PowerShell 7+](https://aka.ms/powershell) (`pwsh`) installed and available on `PATH`
+- [PowerShell 7.4 or above](https://aka.ms/powershell) (`pwsh`) installed and available on `PATH`
 - The [`PnP.PowerShell`](https://www.powershellgallery.com/packages/PnP.PowerShell) module installed:
 
   ```powershell
@@ -147,43 +147,100 @@ The below use cases are only a few examples of how you may use this MCP server. 
 ### Manage SharePoint Online
 
 prompt:
-"Add a new list to this site with title 'awesome ducks'. Then add new columns to that list including them in the default view. The first should be a text description column and the second one should be a user column. Then add 3 items to this list with some funny jokes about ducks added in the description column and my user in the user column."
+```text
+Add a new list to this site with title 'awesome ducks'. Then add new columns to that list including them in the default view. The first should be a text description column and the second one should be a user column. Then add 3 items to this list with some funny jokes about ducks added in the description column and my user in the user column.
+```
 
 ### Manage Microsoft Teams
 
 prompt:
-"Create a new Team on Teams with name 'Awesome Ducks' and in the General channel add a welcome post."
+```text
+Create a new Team on Teams with name 'Awesome Ducks' and in the General channel add a welcome post.
+```
 
 ### Bootstrap a script from a community sample
 
 prompt:
-"I need a PnP PowerShell script that exports all SharePoint list items to a CSV file — find a community sample and adapt it for the 'Documents' list on my site."
+```text
+I need a PnP PowerShell script that exports all SharePoint list items to a CSV file — find a community sample and adapt it for the 'Documents' list on my site.
+```
 
 ### Report on tenant state
 
 prompt:
-"Can you check if I have a Power Automate flow called 'HoursReportingReminder' and if so disable it?"
+```text
+Can you check if I have a Power Automate flow called 'HoursReportingReminder' and if so disable it?
+```
 
 ## 🛠️ Tools
 
 | Tool | Description |
 | --- | --- |
-| pnp_search_commands | Searches PnP PowerShell commands using keyword matching against command names, verbs, and nouns. Use this tool first to find relevant commands. |
-| pnp_get_command_docs | Gets detailed documentation for a specific PnP PowerShell command including syntax, parameters, and examples. |
+| pnp_search_commands | Searches PnP PowerShell commands using keyword matching against command names, verbs, and nouns. Use this tool first to find relevant commands. Each result carries the cmdlet's `HelpUri`, a link to its published documentation. |
+| pnp_get_command_docs | Gets detailed documentation for a specific PnP PowerShell command including syntax, parameters, and examples, plus a link to the online documentation. |
 | pnp_run_command | Executes one or more PnP PowerShell commands and returns the result. Runs in a persistent session, so a `Connect-PnPOnline` connection is reused across calls. Destructive commands require confirmation first. |
 | pnp_get_connection_status | Checks the current PnP PowerShell connection status before running commands. |
 | pnp_reset_session | Ends a session and its PnP connection. Use it to sign out, switch accounts, or recover a session that has stopped responding. |
-| pnp_get_best_practices | Returns recommended best practices for using PnP PowerShell via this MCP server, including authentication, sessions, error handling, and execution tips. |
+| pnp_get_best_practices | Returns best practices for using PnP PowerShell via this MCP server. Takes an optional `section` (`workflow`, `docs`, `sessions`, `config`, `readonly`, `destructive`, `auth`, `execution`, `patterns`) to retrieve one topic instead of the whole guide, which keeps the response small. |
 | pnp_search_script_samples | Searches the community [PnP Script Samples](https://pnp.github.io/script-samples/) index for scripts matching a keyword or use case. |
 | pnp_get_script_sample | Retrieves the full PnP PowerShell script code for a specific script sample by name, fetched live from GitHub. |
 | pnp_suggest_script | Finds the most relevant community script samples for a task and returns their full script code plus adaptation guidance, in one call. |
 
-### Sessions
+### Sessions and `sessionId`
 
 Commands run in a persistent `pwsh` session, so a connection made with `Connect-PnPOnline` stays
-alive across tool calls — you connect once rather than on every command. Pass an optional `sessionId`
-to `pnp_run_command` / `pnp_get_connection_status` when you need two tenant connections side by side;
-otherwise leave it unset. Idle sessions end after 30 minutes.
+alive across tool calls — you connect once rather than on every command.
+
+**You normally never set `sessionId`.** Leave it out and everything shares the session named
+`default`. It exists for one situation: working against **two tenants (or two accounts) at the same
+time**, because a single PnP session can only hold one connection.
+
+| | Without `sessionId` | With `sessionId` |
+| --- | --- | --- |
+| Session used | `default` | the name you pass |
+| Connection | one, shared | one per session name |
+| Variables (`$sites`, ...) | shared | isolated per session |
+
+Three tools accept it: `pnp_run_command`, `pnp_get_connection_status` and `pnp_reset_session`. The
+metadata tools (`pnp_search_commands`, `pnp_get_command_docs`) always use `default`, since looking up
+a cmdlet does not depend on which tenant you are connected to.
+
+#### When to use it
+
+You are asking the agent for something in natural language, so you set this by *saying* it rather
+than by editing config. Two tenants in one conversation:
+
+```text
+Connect to contoso in a session called "contoso" and to fabrikam in a session called "fabrikam",
+then list the site count in each and tell me which is larger.
+```
+
+The agent then makes calls equivalent to:
+
+```jsonc
+// tool: pnp_run_command
+{ "sessionId": "contoso",  "command": "Connect-PnPOnline -Url https://contoso.sharepoint.com  -Interactive" }
+{ "sessionId": "fabrikam", "command": "Connect-PnPOnline -Url https://fabrikam.sharepoint.com -Interactive" }
+{ "sessionId": "contoso",  "command": "(Get-PnPTenantSite).Count" }
+{ "sessionId": "fabrikam", "command": "(Get-PnPTenantSite).Count" }
+```
+
+For everything else — including multi-step work against a single tenant — omit it:
+
+```text
+Connect to contoso, find all site collections with no owner, and export them to a CSV.
+```
+
+#### Things worth knowing
+
+- **Sign out or switch account** with `pnp_reset_session`. It ends that session and discards its
+  connection and variables; the next call starts fresh.
+- **Idle sessions end after 30 minutes.** A session busy running a command is never reclaimed, however
+  long it takes — just reconnect if one does expire.
+- **One command at a time per session.** A second call against a busy session waits, then reports the
+  session is busy. To genuinely run two things at once, use two different `sessionId` values.
+- **Reuse the connection.** Do not re-run `Connect-PnPOnline` before every command; check
+  `pnp_get_connection_status` first. It reports which session it inspected.
 
 ### Configuration
 
@@ -191,7 +248,122 @@ otherwise leave it unset. Idle sessions end after 30 minutes.
 | --- | --- | --- |
 | `PNP_MCP_COMMAND_TIMEOUT_SECONDS` | `600` | Wall-clock limit for a single `pnp_run_command` call. On timeout the session is terminated and the connection is lost. |
 | `PNP_MCP_CONFIRM_DESTRUCTIVE` | `true` | Set to `false` to run destructive commands (`Remove-*`, `Clear-*`, ...) without asking for confirmation. |
+| `PNP_MCP_READONLY` | `false` | Set to `true` to refuse any command that would change Microsoft 365. Allowed verbs: `Get-`, `Export-`, `Test-`, `Convert-`/`ConvertTo-`/`ConvertFrom-`, `Read-`, `Measure-`, `Connect-`/`Disconnect-`, `Find-`, `Format-`, `Resolve-`, `Write-`, `Search-`, `Show-`, `Compare-`, plus pipeline shaping (`Select-`, `Where-`, `Sort-`, `Group-`, `ForEach-`, `Out-`, `Join-`, `Split-`). Refused: `Set-`, `Remove-`, `Add-`, `New-`, `Clear-`, `Invoke-`, `Update-`, `Move-`, `Enable-`/`Disable-`, `Grant-`/`Revoke-`, `Copy-`, `Import-`, `Restore-`, `Reset-`, `Rename-`, `Start-`/`Stop-`, `Register-`/`Unregister-`, and every other change verb — along with indirectly invoked commands, native executables, and state-changing method calls such as `ExecuteQuery`. See [Best Practices](./best-practices.md#read-only-mode) for the full table. Local file output (`Out-File`, `Export-*`) is still permitted. |
+| `PNP_MCP_MAX_OUTPUT_CHARS` | `50000` | Largest tool response returned, in characters. Longer output is truncated to its first whole lines with a note saying how much was dropped. Values below 2000 are ignored, since the note itself would leave no room for output. |
 | `PNP_SCRIPT_SAMPLES_PATH` | _(unset)_ | Path to a local clone of the PnP script samples repository, used as a fallback when GitHub is unreachable. |
+
+The client passes the environment in when it launches the server process, so where you set them decides
+both who they apply to and that a **server restart** is needed for a change to take effect.
+
+#### Where to set them
+
+**In your MCP client config** — the usual choice. This is the only place that applies to the server no
+matter how the client was launched, and it survives a reboot.
+
+<details>
+<summary>VS Code — <code>.vscode/mcp.json</code> (or the user-level <code>mcp.json</code>)</summary>
+
+```json
+{
+    "servers": {
+        "PnP PowerShell MCP Server": {
+            "type": "stdio",
+            "command": "pnp-powershell-mcp-server",
+            "env": {
+                "PNP_MCP_READONLY": "true",
+                "PNP_MCP_COMMAND_TIMEOUT_SECONDS": "1800"
+            }
+        }
+    }
+}
+```
+</details>
+
+<details>
+<summary>Claude Desktop — <code>claude_desktop_config.json</code></summary>
+
+```json
+{
+  "mcpServers": {
+    "PnP-PowerShell": {
+      "command": "pnp-powershell-mcp-server",
+      "env": {
+        "PNP_MCP_READONLY": "true"
+      }
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary>Cursor — <code>mcp.json</code></summary>
+
+```json
+{
+  "mcpServers": {
+    "PnP PowerShell MCP Server": {
+      "type": "stdio",
+      "command": "pnp-powershell-mcp-server",
+      "env": {
+        "PNP_MCP_READONLY": "true"
+      }
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary>Claude Code — <code>claude mcp add</code></summary>
+
+```bash
+claude mcp add pnp-powershell --scope user \
+  --env PNP_MCP_READONLY=true \
+  --env PNP_MCP_COMMAND_TIMEOUT_SECONDS=1800 \
+  -- pnp-powershell-mcp-server
+```
+</details>
+
+**In your shell**, when you want a one-off run — for example to try read-only mode without editing
+config. The client must be started *from that shell* for it to inherit the value:
+
+```bash
+# macOS / Linux
+PNP_MCP_READONLY=true code .
+```
+
+```powershell
+# Windows PowerShell
+$env:PNP_MCP_READONLY = 'true'; code .
+```
+
+**Machine-wide**, if every tool on the box should behave the same way. Note this affects other
+processes too, so prefer the client config unless that is what you want:
+
+```powershell
+# Windows, persists across reboots
+[Environment]::SetEnvironmentVariable('PNP_MCP_READONLY', 'true', 'User')
+```
+
+#### Worked examples
+
+| Goal | Setting |
+| --- | --- |
+| Let an agent explore a production tenant without being able to change it | `PNP_MCP_READONLY=true` |
+| Tenant-wide reports that take longer than 10 minutes | `PNP_MCP_COMMAND_TIMEOUT_SECONDS=3600` |
+| Unattended automation where the commands are already reviewed | `PNP_MCP_CONFIRM_DESTRUCTIVE=false` |
+| Work offline against a local clone of the script samples | `PNP_SCRIPT_SAMPLES_PATH=C:\src\script-samples` |
+
+After changing any of these, **restart the MCP server** (in most clients, reload the window or toggle
+the server off and on) — the client passes the environment in when it launches the process, so an
+already-running server keeps the old values.
+
+Two cautions: `PNP_MCP_CONFIRM_DESTRUCTIVE=false` removes the only prompt standing between an agent
+and `Remove-PnPTenantSite`, so set it only where the commands are reviewed some other way. And both
+booleans are matched exactly — `PNP_MCP_READONLY` enables only on the literal string `true`
+(case-insensitive), and `PNP_MCP_CONFIRM_DESTRUCTIVE` disables only on `false`; anything else, `1` and
+`yes` included, leaves the default in place.
 
 Clients that support the MCP **Tasks** extension can run `pnp_run_command` as a task and poll for the
 result, rather than holding the request open for the duration of a long tenant operation.
@@ -239,6 +411,14 @@ Native AOT needs a platform toolchain: the "Desktop development with C++" worklo
 ### Releasing to NuGet
 
 A release is **eight** packages — a small wrapper plus one per platform — and a plain `dotnet pack` builds only the wrapper. Do not publish by hand; see [RELEASING.md](./RELEASING.md) and use the [Release workflow](./.github/workflows/release.yml).
+
+## Contributing to PnP PowerShell MCP Server
+
+Follow the [getting started contributing](/CONTRIBUTING.md) guidelines to help out. Sharing is caring!
+
+## Supportability and SLA
+
+This library is open-source and community provided library with active community providing support for it. This is not Microsoft provided module so there's no SLA or direct support for this open-source component from Microsoft. For more information about the PnP initiative, check out the official website: [Microsoft 365 & Power Platform Community](https://pnp.github.io).
 
 ## 🔗 Resources
 
