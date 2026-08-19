@@ -240,6 +240,14 @@ Native AOT needs a platform toolchain: the "Desktop development with C++" worklo
 
 A release is **eight** packages — a small wrapper plus one per platform — and a plain `dotnet pack` builds only the wrapper. Do not publish by hand; see [RELEASING.md](./RELEASING.md) and use the [Release workflow](./.github/workflows/release.yml).
 
+## Contributing to PnP PowerShell MCP Server
+
+Follow the [getting started contributing](/CONTRIBUTING.md) guidelines to help out. Sharing is caring!
+
+## Supportability and SLA
+
+This library is open-source and community provided library with active community providing support for it. This is not Microsoft provided module so there's no SLA or direct support for this open-source component from Microsoft. For more information about the PnP initiative, check out the official website: [Microsoft 365 & Power Platform Community](https://pnp.github.io).
+
 ## 🔗 Resources
 
 - [PnP PowerShell documentation](https://pnp.github.io/powershell/)
