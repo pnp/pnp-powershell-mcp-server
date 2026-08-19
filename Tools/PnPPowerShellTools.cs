@@ -75,13 +75,19 @@ internal partial class PnPPowerShellTools
 
         var result = await sessions.Get(null).ExecuteAsync(script, MetadataTimeout, cancellationToken);
 
-        return $"""
-            {OutputLimit.Apply(result, "Search with fewer keywords, or lower the limit.")}
+        const string searchTips = """
+
 
             TIP: Before executing any of the commands, run the 'pnp_get_command_docs' tool to retrieve the full syntax, parameters, and examples.
             TIP: Each result carries a HelpUri, the published documentation page for that cmdlet. Fetch it when you need more detail than the local help gives, or cite it to the user.
             TIP: For complex tasks, break them into smaller steps and run commands incrementally using 'pnp_run_command'.
             """;
+
+        // The TIPs are passed as a suffix so they count against the cap instead of being appended past it.
+        return OutputLimit.Apply(
+            result,
+            "Search with fewer keywords, or pass a smaller 'limit' to return fewer results.",
+            searchTips);
     }
 
     [McpServerTool(Name = "pnp_get_command_docs", ReadOnly = true, OpenWorld = false)]
@@ -223,8 +229,9 @@ internal partial class PnPPowerShellTools
 
         var result = await session.ExecuteAsync(script, remaining, cancellationToken);
 
-        // Capped before enrichment so a truncation does not cut off the "Likely cause" hint.
-        return PnPErrorHints.Enrich(OutputLimit.Apply(result));
+        // The hint is reserved as a suffix rather than appended after capping, so the response stays
+        // inside PNP_MCP_MAX_OUTPUT_CHARS and the "Likely cause" line still survives a truncation.
+        return OutputLimit.Apply(result, suffix: PnPErrorHints.HintFor(result));
     }
 
     /// <summary>Splits a command budget into an analysis cap and a reserved execution slice.</summary>

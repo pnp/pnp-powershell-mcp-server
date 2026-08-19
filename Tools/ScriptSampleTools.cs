@@ -259,7 +259,7 @@ internal sealed partial class ScriptSampleTools
         sb.AppendLine("TIP: Use `pnp_get_script_sample` with a sample **Name** (e.g., `spo-create-documentset`) to retrieve the full script code.");
         sb.AppendLine("TIP: Use `pnp_suggest_script` to search and return full script code in a single call.");
 
-        return Task.FromResult(OutputLimit.Apply(sb.ToString(), "Lower the limit, or search with more specific keywords."));
+        return Task.FromResult(OutputLimit.Apply(sb.ToString(), "Pass a smaller 'limit' to return fewer samples, or search with more specific keywords."));
     }
 
     //Tool 2: Get full script for a named sample (fetches live from GitHub)

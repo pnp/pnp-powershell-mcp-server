@@ -65,22 +65,27 @@ internal static class PnPErrorHints
     ];
 
     /// <summary>Appends a likely cause when the output is a failure; returns it unchanged otherwise.</summary>
-    public static string Enrich(string output)
+    public static string Enrich(string output) => output + HintFor(output);
+
+    /// <summary>The trailing hint block for a failure, or null when there is nothing to add.</summary>
+    // Returned separately so a caller can reserve room for it inside the output cap instead of
+    // appending it afterwards and overshooting.
+    public static string? HintFor(string? output)
     {
         if (string.IsNullOrWhiteSpace(output) || !IsFailure(output))
         {
-            return output;
+            return null;
         }
 
         foreach (var (match, hint) in Hints)
         {
             if (output.Contains(match, StringComparison.OrdinalIgnoreCase))
             {
-                return $"{output}\n\nLikely cause: {hint}";
+                return $"\n\nLikely cause: {hint}";
             }
         }
 
-        return output;
+        return null;
     }
 
     // Only the session's own failure prefix counts. Matching "Exception" or "Warnings:" would annotate

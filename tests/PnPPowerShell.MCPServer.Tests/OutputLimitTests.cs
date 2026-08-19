@@ -155,3 +155,70 @@ public class OutputLimitBoundTests
         Assert.Contains("must not be", result);
     }
 }
+
+/// <summary>Covers the suffix reservation that keeps trailing material inside the cap.</summary>
+public class OutputLimitSuffixTests
+{
+    private const string Suffix = "\n\nTIP: this trailing guidance must survive and still be counted.";
+
+    [Fact]
+    public void A_suffix_is_kept_when_the_body_is_truncated()
+    {
+        using var _ = new EnvVar("PNP_MCP_MAX_OUTPUT_CHARS", "3000");
+
+        var result = OutputLimit.Apply(new string('x', 100_000), null, Suffix);
+
+        Assert.Contains("truncated", result);
+        Assert.EndsWith(Suffix, result);
+    }
+
+    [Fact]
+    public void A_suffix_is_kept_when_the_body_is_not_truncated()
+    {
+        using var _ = new EnvVar("PNP_MCP_MAX_OUTPUT_CHARS", "3000");
+
+        Assert.Equal("body" + Suffix, OutputLimit.Apply("body", null, Suffix));
+    }
+
+    [Theory]
+    [InlineData(2000)]
+    [InlineData(5000)]
+    [InlineData(50_000)]
+    public void The_suffix_counts_against_the_cap(int limit)
+    {
+        // Appending the suffix after capping was how the response used to exceed its own limit.
+        using var _ = new EnvVar("PNP_MCP_MAX_OUTPUT_CHARS", limit.ToString());
+
+        var result = OutputLimit.Apply(new string('x', 500_000), null, Suffix);
+
+        Assert.True(result.Length <= limit, $"Result was {result.Length} chars against a {limit} cap.");
+    }
+
+    [Fact]
+    public void An_error_hint_is_preserved_and_counted()
+    {
+        using var _ = new EnvVar("PNP_MCP_MAX_OUTPUT_CHARS", "2000");
+        var failure = "Error: " + new string('x', 100_000) + " (403) Forbidden";
+
+        var hint = PnPErrorHints.HintFor(failure);
+        var result = OutputLimit.Apply(failure, null, hint);
+
+        Assert.NotNull(hint);
+        Assert.Contains("Likely cause:", result);
+        Assert.True(result.Length <= 2000, $"Result was {result.Length} chars.");
+    }
+
+    [Fact]
+    public void HintFor_returns_null_for_successful_output()
+    {
+        Assert.Null(PnPErrorHints.HintFor("[{\"Url\":\"https://contoso.sharepoint.com\"}]"));
+    }
+
+    [Fact]
+    public void Enrich_still_matches_HintFor()
+    {
+        const string failure = "Error: Get-PnPWeb: You are not signed in.";
+
+        Assert.Equal(failure + PnPErrorHints.HintFor(failure), PnPErrorHints.Enrich(failure));
+    }
+}
