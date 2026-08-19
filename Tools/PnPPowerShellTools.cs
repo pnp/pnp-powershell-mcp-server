@@ -76,7 +76,7 @@ internal partial class PnPPowerShellTools
         var result = await sessions.Get(null).ExecuteAsync(script, MetadataTimeout, cancellationToken);
 
         return $"""
-            {result}
+            {OutputLimit.Apply(result, "Search with fewer keywords, or lower the limit.")}
 
             TIP: Before executing any of the commands, run the 'pnp_get_command_docs' tool to retrieve the full syntax, parameters, and examples.
             TIP: Each result carries a HelpUri, the published documentation page for that cmdlet. Fetch it when you need more detail than the local help gives, or cite it to the user.
@@ -103,24 +103,27 @@ internal partial class PnPPowerShellTools
             if ([string]::IsNullOrWhiteSpace($__pnpHelpText)) {
               Write-Output "No documentation found for '{{safeCommandName}}'. Verify the command name using 'pnp_search_commands'."
             } else {
-              Write-Output $__pnpHelpText
-              # HelpUri points at the published docs, which carry examples the shipped help often omits.
+              # The link goes first, not last: help for some cmdlets runs to six figures of characters
+              # (Set-PnPTenant is ~135k), so a trailing link is exactly what the output cap would drop --
+              # and a cmdlet with help that long is the one most likely to need the online page.
               $__pnpHelpUri = $null
               try { $__pnpHelpUri = ($ExecutionContext.InvokeCommand.GetCommand('{{safeCommandName}}', [System.Management.Automation.CommandTypes]::All)).HelpUri } catch { $__pnpHelpUri = $null }
               if (-not [string]::IsNullOrWhiteSpace($__pnpHelpUri)) {
-                Write-Output ''
                 Write-Output "ONLINE DOCUMENTATION: $__pnpHelpUri"
-                Write-Output "TIP: If the syntax or examples above look incomplete, fetch that page with your web-fetch tool -- it is generated from the current source and usually carries more parameter detail and examples than the shipped help. If you cannot fetch pages, give the user the link instead."
+                Write-Output "TIP: If the syntax or examples below look incomplete, fetch that page with your web-fetch tool -- it is generated from the current source and usually carries more parameter detail and examples than the shipped help. If you cannot fetch pages, give the user the link instead."
               } else {
-                Write-Output ''
                 Write-Output "NOTE: This cmdlet reports no documentation URL, which usually means an older PnP.PowerShell build (HelpUri is populated in current versions)."
                 Write-Output "FALLBACK: Search https://pnp.github.io/powershell/ for '{{safeCommandName}}' to find its page, or search the web for 'PnP PowerShell {{safeCommandName}}'. Do not hand-assemble a docs URL -- the path pattern is not guaranteed. Updating the module with 'Update-Module PnP.PowerShell' also restores the link."
               }
+              Write-Output ''
+              Write-Output $__pnpHelpText
             }
             Remove-Variable -Name __pnpHelpText, __pnpHelpUri -ErrorAction SilentlyContinue
             """;
 
-        return await sessions.Get(null).ExecuteAsync(script, MetadataTimeout, cancellationToken);
+        var help = await sessions.Get(null).ExecuteAsync(script, MetadataTimeout, cancellationToken);
+
+        return OutputLimit.Apply(help, "Read the online documentation page linked above for the full reference.");
     }
 
     [McpServerTool(Name = "pnp_run_command", Destructive = true, OpenWorld = true)]
@@ -218,7 +221,10 @@ internal partial class PnPPowerShellTools
             remaining = executionFloor;
         }
 
-        return PnPErrorHints.Enrich(await session.ExecuteAsync(script, remaining, cancellationToken));
+        var result = await session.ExecuteAsync(script, remaining, cancellationToken);
+
+        // Capped before enrichment so a truncation does not cut off the "Likely cause" hint.
+        return PnPErrorHints.Enrich(OutputLimit.Apply(result));
     }
 
     /// <summary>Splits a command budget into an analysis cap and a reserved execution slice.</summary>
@@ -411,13 +417,14 @@ internal partial class PnPPowerShellTools
         ["destructive"] = ["Destructive Commands"],
         ["auth"] = ["Authentication Best Practices"],
         ["execution"] = ["Execution Best Practices", "Working with Complex Data", "Debugging and Verbose Output"],
+        ["output"] = ["Output Size"],
         ["patterns"] = ["Common Patterns", "Areas Covered by PnP PowerShell"],
     };
 
     [McpServerTool(Name = "pnp_get_best_practices", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description("Returns best practices for using this MCP server with PnP PowerShell. The full document is long, so pass a section to retrieve only what you need.")]
     public static string GetPnpBestPractices(
-        [Description("Optional topic to return instead of the whole document. One of: workflow, docs, sessions, config, readonly, destructive, auth, execution, patterns. Omit for everything.")] string? section = null)
+        [Description("Optional topic to return instead of the whole document. One of: workflow, docs, sessions, config, readonly, output, destructive, auth, execution, patterns. Omit for everything.")] string? section = null)
     {
         var document = BestPracticesDocument.Value;
 

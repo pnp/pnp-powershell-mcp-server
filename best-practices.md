@@ -13,7 +13,7 @@ Use this flow for reliable execution:
 5. **Execute commands** with `pnp_run_command` in small, verifiable steps.
 
 This guide is long, so `pnp_get_best_practices` accepts an optional `section` — `workflow`, `docs`,
-`sessions`, `config`, `readonly`, `destructive`, `auth`, `execution` or `patterns` — to return one
+`sessions`, `config`, `readonly`, `output`, `destructive`, `auth`, `execution` or `patterns` — to return one
 topic instead of everything. Pull `readonly` when a command is refused, `destructive` before a
 confirmation prompt, or `patterns` when looking for a worked example.
 
@@ -138,7 +138,7 @@ once, then keep running commands against it.
 
 ## Server Configuration
 
-Four environment variables control behaviour. They are set by the user in their **MCP client config**
+Five environment variables control behaviour. They are set by the user in their **MCP client config**
 (see the [README](./README.md#configuration) for per-client examples) and take effect only after the
 server restarts — this server cannot change them at runtime. If one is in the way, say which variable
 to set rather than working around it.
@@ -148,10 +148,32 @@ to set rather than working around it.
 | `PNP_MCP_READONLY` | `false` | `true` refuses anything that would change Microsoft 365. |
 | `PNP_MCP_COMMAND_TIMEOUT_SECONDS` | `600` | Per-command wall-clock limit, in seconds. |
 | `PNP_MCP_CONFIRM_DESTRUCTIVE` | `true` | `false` skips destructive confirmations. |
+| `PNP_MCP_MAX_OUTPUT_CHARS` | `50000` | Largest tool response, in characters; longer output is truncated. |
 | `PNP_SCRIPT_SAMPLES_PATH` | _(unset)_ | Local clone of the script samples repo, used when GitHub is unreachable. |
 
 Both booleans are matched exactly: read-only turns on only for the literal `true`, and confirmation
 turns off only for the literal `false`. `1` and `yes` leave the default in place.
+
+## Output Size
+
+Tool responses are capped (50,000 characters by default). When output is truncated you will see
+`[output truncated: N of M characters omitted]`.
+
+**Treat truncated output as incomplete.** It is not necessarily valid JSON, so do not parse it or
+summarise it as though it were the whole result — a truncated list of sites is not "all the sites".
+Instead, narrow the query and run it again:
+
+```powershell
+# Instead of everything
+Get-PnPListItem -List "Documents"
+
+# Page it, and return only the fields you need
+Get-PnPListItem -List "Documents" -PageSize 500 | Select-Object Id, Title
+```
+
+Counting rather than listing often answers the question outright: `(Get-PnPTenantSite).Count`. If the
+user genuinely needs the full set, tell them to raise `PNP_MCP_MAX_OUTPUT_CHARS`, or write the results
+to a file with `Export-Csv` and report the path instead of the contents.
 
 ## Read-Only Mode
 

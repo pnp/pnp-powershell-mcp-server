@@ -1,5 +1,6 @@
 using ModelContextProtocol.Server;
 using PnPPowerShell.MCPServer.Models;
+using PnPPowerShell.MCPServer.Services;
 using System.ComponentModel;
 using System.Text;
 using System.Text.Json;
@@ -258,7 +259,7 @@ internal sealed partial class ScriptSampleTools
         sb.AppendLine("TIP: Use `pnp_get_script_sample` with a sample **Name** (e.g., `spo-create-documentset`) to retrieve the full script code.");
         sb.AppendLine("TIP: Use `pnp_suggest_script` to search and return full script code in a single call.");
 
-        return Task.FromResult(sb.ToString());
+        return Task.FromResult(OutputLimit.Apply(sb.ToString(), "Lower the limit, or search with more specific keywords."));
     }
 
     //Tool 2: Get full script for a named sample (fetches live from GitHub)
@@ -338,7 +339,7 @@ internal sealed partial class ScriptSampleTools
         sb.AppendLine("TIP: Use `pnp_run_command` to test individual commands incrementally before running the full script.");
         sb.AppendLine("TIP: Use `pnp_get_command_docs` to understand any unfamiliar cmdlets in the script.");
 
-        return sb.ToString();
+        return OutputLimit.Apply(sb.ToString(), "Open the reference URL above to read the whole sample.");
     }
 
     //Tool 3: Suggest scripts for a task (search + fetch code in one call)
@@ -432,6 +433,6 @@ internal sealed partial class ScriptSampleTools
         sb.AppendLine("4. **Understand cmdlets**: use `pnp_get_command_docs` for any cmdlet you are unfamiliar with.");
         sb.AppendLine("5. **Combine**: if no single sample covers your scenario, merge relevant sections from multiple scripts.");
 
-        return sb.ToString();
+        return OutputLimit.Apply(sb.ToString(), "Lower maxSamples, or fetch one sample at a time with 'pnp_get_script_sample'.");
     }
 }
