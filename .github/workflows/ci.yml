@@ -19,6 +19,28 @@ env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
 
 jobs:
+  test:
+    # Runs on one OS only: the tests exercise portable logic, and installing PnP.PowerShell is slow.
+    # Integration tests skip themselves if the module is missing, so a failure here is a real failure.
+    name: Test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install PnP.PowerShell
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force -AllowClobber
+
+      - name: Test
+        shell: bash
+        run: dotnet test tests/PnPPowerShell.MCPServer.Tests --configuration Release --logger "console;verbosity=normal"
+
   build:
     # Packs the host RID on each OS family. This is the cheap smoke test that the native
     # AOT build still works — a full 7-RID matrix only runs at release time.

@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="PnPPowerShell.MCPServer.csproj" />
+  <Project Path="tests/PnPPowerShell.MCPServer.Tests/PnPPowerShell.MCPServer.Tests.csproj" />
 </Solution>
