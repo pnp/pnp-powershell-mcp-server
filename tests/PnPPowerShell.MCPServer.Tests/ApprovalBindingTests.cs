@@ -1,4 +1,6 @@
 using PnPPowerShell.MCPServer.Tools;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace PnPPowerShell.MCPServer.Tests;
 
@@ -47,6 +49,26 @@ public class ApprovalBindingTests
     public void An_invalid_request_state_is_rejected(string state)
     {
         Assert.False(PnPPowerShellTools.IsApprovalBoundTo(state, Command));
+    }
+
+    [Fact]
+    public void The_tool_exposes_no_parameter_that_approves_a_destructive_command()
+    {
+        var parameters = typeof(PnPPowerShellTools)
+            .GetMethod(nameof(PnPPowerShellTools.RunPnpCommand))!
+            .GetParameters()
+            .Select(p => p.Name);
+
+        Assert.DoesNotContain("confirmDestructive", parameters);
+    }
+
+    [Fact]
+    public void An_approval_the_caller_computed_for_itself_is_rejected()
+    {
+        var unkeyed = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Command)));
+
+        Assert.NotEqual(unkeyed, PnPPowerShellTools.Fingerprint(Command));
+        Assert.False(PnPPowerShellTools.IsApprovalBoundTo(unkeyed, Command));
     }
 
     [Fact]

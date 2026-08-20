@@ -1,0 +1,441 @@
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
+
+namespace PnPPowerShell.MCPServer.Services;
+
+/// <summary>What the environment probe found; null means "could not be determined".</summary>
+internal sealed class EnvironmentFacts
+{
+    public string? PwshVersion { get; set; }
+
+    public string? PwshPath { get; set; }
+
+    public string? ModuleVersion { get; set; }
+
+    public int ModuleVersionCount { get; set; }
+
+    public string? ProbeError { get; set; }
+
+    /// <summary>True once the pwsh process actually started, whatever it went on to say.</summary>
+    public bool PwshLaunched { get; set; }
+}
+
+/// <summary>What the session probe found about the connection this session holds.</summary>
+internal sealed class SessionFacts
+{
+    public bool Connected { get; set; }
+
+    public string? Url { get; set; }
+
+    public string? TenantAdminUrl { get; set; }
+
+    public string? ConnectionType { get; set; }
+
+    public string? ConnectionMethod { get; set; }
+
+    public string? Account { get; set; }
+
+    public string? App { get; set; }
+
+    public string? ClientId { get; set; }
+
+    public string? Scopes { get; set; }
+
+    public string? HelpUri { get; set; }
+}
+
+/// <summary>Everything <see cref="ConnectionPreflight.Render"/> needs, so the report can be tested without a tenant.</summary>
+internal sealed record PreflightFacts(string SessionId, EnvironmentFacts Environment, SessionFacts? Session, string? SessionError);
+
+/// <summary>Answers the three questions that decide whether a command can run at all.</summary>
+internal static class ConnectionPreflight
+{
+    private const string PwshMissingCause = "'pwsh' is not on PATH, so no PnP PowerShell command can run.";
+
+    private const string ModuleMissingCause = "The PnP.PowerShell module is not installed for this user.";
+
+    private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(90);
+
+    private const string EnvironmentProbeScript = """
+        $ErrorActionPreference = 'SilentlyContinue'
+        $mods = @(Get-Module -ListAvailable -Name PnP.PowerShell | Sort-Object Version -Descending)
+        [PSCustomObject]@{
+          pwshVersion = $PSVersionTable.PSVersion.ToString()
+          pwshPath = (Get-Process -Id $PID).Path
+          moduleVersion = if ($mods.Count -gt 0) { $mods[0].Version.ToString() } else { $null }
+          moduleVersionCount = $mods.Count
+        } | ConvertTo-Json -Compress
+        """;
+
+    private const string SessionProbeScript = """
+        $__pnpDiag = [ordered]@{ connected = $false; url = $null; tenantAdminUrl = $null; connectionType = $null; connectionMethod = $null; account = $null; app = $null; clientId = $null; scopes = $null; helpUri = $null }
+        try {
+          $__pnpC = Get-PnPConnection
+          $__pnpDiag.connected = $true
+          $__pnpDiag.url = $__pnpC.Url
+          $__pnpDiag.tenantAdminUrl = $__pnpC.TenantAdminUrl
+          $__pnpDiag.connectionType = [string]$__pnpC.ConnectionType
+          $__pnpDiag.connectionMethod = [string]$__pnpC.ConnectionMethod
+          if ([string]$__pnpC.ConnectionMethod -notin @('ManagedIdentity','AzureADWorkloadIdentity')) { $__pnpDiag.clientId = $__pnpC.ClientId }
+          if ($__pnpC.PSCredential) { $__pnpDiag.account = $__pnpC.PSCredential.UserName }
+        } catch { }
+        if ($__pnpDiag.connected) {
+          try {
+            $__pnpTok = Get-PnPAccessToken -Decoded -ErrorAction Stop
+            if ($__pnpTok) {
+              foreach ($__pnpClaim in @('upn','preferred_username','name')) {
+                if (-not $__pnpDiag.account) { $__pnpDiag.account = $__pnpTok.Claims | Where-Object { $_.Type -eq $__pnpClaim } | Select-Object -First 1 -ExpandProperty Value }
+              }
+              $__pnpDiag.app = $__pnpTok.Claims | Where-Object { $_.Type -eq 'app_displayname' } | Select-Object -First 1 -ExpandProperty Value
+              $__pnpDiag.scopes = ($__pnpTok.Claims | Where-Object { $_.Type -in @('scp','roles') } | Select-Object -ExpandProperty Value) -join ' '
+            }
+          } catch { }
+        }
+        try { $__pnpDiag.helpUri = ($ExecutionContext.InvokeCommand.GetCommand('Get-PnPWeb', [System.Management.Automation.CommandTypes]::All)).HelpUri } catch { }
+        [PSCustomObject]$__pnpDiag | ConvertTo-Json -Depth 4 -Compress
+        Remove-Variable -Name __pnpDiag, __pnpC, __pnpTok, __pnpClaim -ErrorAction SilentlyContinue
+        """;
+
+    public static async Task<PreflightFacts> GatherAsync(
+        PowerShellSessionManager sessions,
+        string? sessionId,
+        CancellationToken cancellationToken)
+    {
+        var name = string.IsNullOrWhiteSpace(sessionId) ? PowerShellSessionManager.DefaultSessionId : sessionId.Trim();
+        var environment = await ProbeEnvironmentAsync(cancellationToken);
+
+        if (environment.PwshVersion is null || environment.ModuleVersion is null)
+        {
+            return new PreflightFacts(name, environment, null, null);
+        }
+
+        var raw = await sessions.Get(sessionId).ExecuteAsync(SessionProbeScript, ProbeTimeout, cancellationToken);
+
+        if (raw.StartsWith("Error:", StringComparison.Ordinal))
+        {
+            return new PreflightFacts(name, environment, null, raw);
+        }
+
+        return new PreflightFacts(name, environment, Deserialize(raw, PreflightJsonContext.Default.SessionFacts), null);
+    }
+
+    public static string Render(PreflightFacts facts)
+    {
+        var report = new StringBuilder();
+        report.AppendLine($"PnP PowerShell preflight for session '{facts.SessionId}'.");
+        report.AppendLine();
+
+        var pwshNext = RenderPowerShell(report, facts.Environment);
+        var moduleNext = RenderModule(report, facts.Environment, skipped: pwshNext is not null);
+        var blocked = pwshNext ?? moduleNext;
+        report.AppendLine();
+
+        string next;
+
+        if (blocked is not null)
+        {
+            report.AppendLine("3. Connection");
+            report.AppendLine("   SKIPPED - the two checks above have to pass first.");
+            next = blocked;
+        }
+        else
+        {
+            report.AppendLine($"3. Connection (session '{facts.SessionId}')");
+
+            var connection = new StringBuilder();
+            next = RenderConnection(connection, facts);
+            report.Append(connection);
+        }
+
+        report.AppendLine();
+        report.AppendLine($"NEXT STEP: {next}");
+
+        return report.ToString().TrimEnd();
+    }
+
+    private static string? RenderPowerShell(StringBuilder report, EnvironmentFacts environment)
+    {
+        report.AppendLine("1. PowerShell 7 (pwsh)");
+
+        if (environment.PwshVersion is not null)
+        {
+            report.AppendLine($"   OK - pwsh {environment.PwshVersion}{(environment.PwshPath is null ? string.Empty : $" at {environment.PwshPath}")}.");
+            return null;
+        }
+
+        if (!environment.PwshLaunched)
+        {
+            report.AppendLine($"   FAIL - {PwshMissingCause}");
+            return "Install PowerShell 7.4 or later from https://aka.ms/powershell, then restart your MCP client so it picks up the new PATH.";
+        }
+
+        report.AppendLine(
+            "   FAIL - pwsh started but did not report a usable version, so it is installed and broken rather than missing." +
+            (environment.ProbeError is null ? string.Empty : $" It said: {environment.ProbeError}"));
+
+        return "Run 'pwsh -NoProfile -Command $PSVersionTable.PSVersion' in a terminal and fix whatever it reports before using this server; a working install prints a version immediately.";
+    }
+
+    private static string? RenderModule(StringBuilder report, EnvironmentFacts environment, bool skipped)
+    {
+        report.AppendLine();
+        report.AppendLine("2. PnP.PowerShell module");
+
+        if (skipped)
+        {
+            report.AppendLine("   SKIPPED - pwsh has to be available before the module can be looked for.");
+            return null;
+        }
+
+        if (environment.ModuleVersion is null)
+        {
+            const string next = "Run: Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force";
+
+            report.AppendLine($"   FAIL - {ModuleMissingCause}");
+            return next;
+        }
+
+        report.AppendLine($"   OK - PnP.PowerShell {environment.ModuleVersion} is installed.");
+
+        if (environment.ModuleVersionCount > 1)
+        {
+            report.AppendLine(
+                $"   NOTE - {environment.ModuleVersionCount} versions are installed side by side; the session imports {environment.ModuleVersion}. " +
+                "Remove the older ones with Uninstall-Module -Name PnP.PowerShell -AllVersions -Force, then reinstall, if behaviour differs from the docs.");
+        }
+
+        report.AppendLine(
+            "   NOTE - This server never reaches the PowerShell Gallery, so it cannot tell you whether that is the newest release. " +
+            "Check with: Find-Module -Name PnP.PowerShell | Select-Object Version");
+
+        return null;
+    }
+
+    private static string RenderConnection(StringBuilder report, PreflightFacts facts)
+    {
+        if (facts.SessionError is not null)
+        {
+            var error = facts.SessionError.Trim();
+            report.AppendLine($"   FAIL - The session did not answer: {error}");
+
+            return error.Contains("busy running another command", StringComparison.OrdinalIgnoreCase)
+                ? "Nothing is wrong: another command is still running in this session. Wait for it to finish, or use a different sessionId to work alongside it. Do not reset the session, which would terminate that command and drop its connection."
+                : "Run 'pnp_reset_session' to discard the session, then try again.";
+        }
+
+        if (facts.Session is null)
+        {
+            report.AppendLine("   UNKNOWN - The session answered, but its reply could not be read.");
+            return "Run 'pnp_reset_session' to start a clean session, then run 'pnp_diagnose_connection' again.";
+        }
+
+        var session = facts.Session;
+        var next = DescribeConnection(report, session);
+
+        if (string.IsNullOrWhiteSpace(session.HelpUri))
+        {
+            report.AppendLine(
+                "   NOTE - This build of PnP.PowerShell reports no HelpUri for Get-PnPWeb, which means it predates the versions " +
+                "that carry documentation links. 'pnp_get_command_docs' will fall back to a search instead of a direct link. " +
+                "Run: Update-Module -Name PnP.PowerShell -Scope CurrentUser");
+        }
+
+        return next;
+    }
+
+    private static string DescribeConnection(StringBuilder report, SessionFacts session)
+    {
+        if (!session.Connected)
+        {
+            report.AppendLine("   FAIL - This session holds no connection, so every PnP cmdlet will fail until one is made.");
+            const string next =
+                "Connect first, e.g. Connect-PnPOnline -Url https://<tenant>.sharepoint.com/sites/<site> -Interactive -ClientId <your-app-id>. " +
+                "If you have no app registration yet, run Register-PnPEntraIDAppForInteractiveLogin -ApplicationName \"PnP PowerShell\" -Tenant <tenant>.onmicrosoft.com first.";
+
+            return next;
+        }
+
+        report.AppendLine($"   OK - Connected as {session.Account ?? "an identity the connection does not expose"}.");
+        report.AppendLine($"   URL: {session.Url ?? "(none)"}");
+        report.AppendLine($"   Connection type: {session.ConnectionType ?? "(unknown)"}");
+        report.AppendLine($"   Authenticated by: {session.ConnectionMethod ?? "(unknown)"}");
+
+        if (!string.IsNullOrWhiteSpace(session.TenantAdminUrl))
+        {
+            report.AppendLine($"   Tenant admin URL: {session.TenantAdminUrl}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(session.ClientId) || !string.IsNullOrWhiteSpace(session.App))
+        {
+            report.AppendLine($"   Signing in through app: {session.App ?? "(unnamed)"} ({session.ClientId ?? "client id not exposed"})");
+        }
+
+        if (!string.IsNullOrWhiteSpace(session.Scopes))
+        {
+            report.AppendLine($"   Graph token scopes: {session.Scopes}");
+            report.AppendLine(
+                "   NOTE - Those are the scopes on the Microsoft Graph token. PnP acquires a separate token per resource " +
+                "on demand -- Graph, SharePoint, ARM -- so a cmdlet targeting a different resource is governed by that " +
+                "resource's token, not this list.");
+        }
+
+        if (string.IsNullOrWhiteSpace(session.Url))
+        {
+            const string next =
+                "This connection carries no site URL, so Get-PnPWeb, Get-PnPList and every other site-scoped cmdlet has " +
+                "nothing to target. Reconnect with Connect-PnPOnline -Url https://<tenant>.sharepoint.com/sites/<site>.";
+            report.AppendLine($"   WARN - {next}");
+            return next;
+        }
+
+        if (!session.Url.Contains("-admin.sharepoint.com", StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.Equals(session.ConnectionMethod, "DeviceLogin", StringComparison.OrdinalIgnoreCase))
+            {
+                const string next =
+                    "Ready for site-scoped work only. Tenant-wide cmdlets such as Get-PnPTenantSite will refuse to run, " +
+                    "because a device login is the one auth method PnP will not elevate to the admin site automatically. " +
+                    "For those, reconnect with Connect-PnPOnline -Url https://<tenant>-admin.sharepoint.com -DeviceLogin.";
+
+                report.AppendLine($"   WARN - {next}");
+                return next;
+            }
+
+            report.AppendLine(
+                "   NOTE - This is a site connection, not an admin one. Tenant-wide cmdlets such as Get-PnPTenantSite " +
+                "still work from here, because PnP clones the context to https://<tenant>-admin.sharepoint.com on " +
+                "demand, but they need the signed-in account to hold the SharePoint Administrator role. A 403 from " +
+                "one of those is that role missing, not this URL being wrong.");
+        }
+
+        return "Ready. Run your command with 'pnp_run_command'.";
+    }
+
+    private static async Task<EnvironmentFacts> ProbeEnvironmentAsync(CancellationToken cancellationToken)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "pwsh",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8,
+        };
+
+        startInfo.ArgumentList.Add("-NoLogo");
+        startInfo.ArgumentList.Add("-NoProfile");
+        startInfo.ArgumentList.Add("-NonInteractive");
+        startInfo.ArgumentList.Add("-Command");
+        startInfo.ArgumentList.Add(EnvironmentProbeScript);
+
+        Process? process;
+        try
+        {
+            process = Process.Start(startInfo);
+        }
+        catch (Exception ex) when (ex is Win32Exception or PlatformNotSupportedException)
+        {
+            return new EnvironmentFacts { ProbeError = ex.Message };
+        }
+
+        if (process is null)
+        {
+            return new EnvironmentFacts { ProbeError = "pwsh could not be started." };
+        }
+
+        using (process)
+        {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(ProbeTimeout);
+
+            var stdout = process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
+            var stderr = process.StandardError.ReadToEndAsync(timeoutCts.Token);
+
+            try
+            {
+                await process.WaitForExitAsync(timeoutCts.Token);
+
+                var text = await stdout;
+                var error = await stderr;
+
+                var facts = Deserialize(text, PreflightJsonContext.Default.EnvironmentFacts)
+                    ?? new EnvironmentFacts { ProbeError = Summarise(error) };
+
+                facts.PwshLaunched = true;
+                return facts;
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                Kill(process);
+
+                return new EnvironmentFacts
+                {
+                    PwshLaunched = true,
+                    ProbeError = $"it did not answer within {ProbeTimeout.TotalSeconds:0} seconds.",
+                };
+            }
+            catch (OperationCanceledException)
+            {
+                Kill(process);
+                throw;
+            }
+        }
+    }
+
+    private static string Summarise(string stderr)
+    {
+        var text = stderr.Trim();
+
+        return text.Length switch
+        {
+            0 => "it exited without printing anything readable.",
+            > 400 => text[..400] + "...",
+            _ => text,
+        };
+    }
+
+    private static void Kill(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException or SystemException)
+        {
+        }
+    }
+
+    private static T? Deserialize<T>(string raw, JsonTypeInfo<T> typeInfo) where T : class
+    {
+        var start = raw.IndexOf('{');
+        var end = raw.LastIndexOf('}');
+
+        if (start < 0 || end <= start)
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize(raw[start..(end + 1)], typeInfo);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+}
+
+[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+[JsonSerializable(typeof(EnvironmentFacts))]
+[JsonSerializable(typeof(SessionFacts))]
+internal sealed partial class PreflightJsonContext : JsonSerializerContext;

@@ -30,7 +30,7 @@ internal partial class PnPPowerShellTools
     private static bool ConfirmationDisabled =>
         string.Equals(Environment.GetEnvironmentVariable("PNP_MCP_CONFIRM_DESTRUCTIVE"), "false", StringComparison.OrdinalIgnoreCase);
 
-    [McpServerTool(Name = "pnp_search_commands", ReadOnly = true, OpenWorld = false)]
+    [McpServerTool(Name = "pnp_search_commands", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description("Searches PnP PowerShell commands using keyword matching against command names, verbs, and nouns. Use this tool first to find relevant commands before getting full command documentation.")]
     public static async Task<string> SearchPnpCommands(
         PowerShellSessionManager sessions,
@@ -87,10 +87,10 @@ internal partial class PnPPowerShellTools
         return OutputLimit.Apply(
             result,
             "Search with fewer keywords, or pass a smaller 'limit' to return fewer results.",
-            searchTips);
+            PnPErrorHints.HintFor(result) ?? searchTips);
     }
 
-    [McpServerTool(Name = "pnp_get_command_docs", ReadOnly = true, OpenWorld = false)]
+    [McpServerTool(Name = "pnp_get_command_docs", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description("Gets detailed documentation for a specific PnP PowerShell command including syntax, parameters, and examples. Use this after searching for commands to understand how to use them correctly.")]
     public static async Task<string> GetPnpCommandDocs(
         PowerShellSessionManager sessions,
@@ -105,34 +105,35 @@ internal partial class PnPPowerShellTools
         var safeCommandName = EscapeSingleQuotedPowerShell(commandName.Trim());
 
         var script = $$"""
-            $__pnpHelpText = Get-Help '{{safeCommandName}}' -Full | Out-String
+            $__pnpName = '{{safeCommandName}}'
+            $__pnpHelpText = Get-Help $__pnpName -Full | Out-String
             if ([string]::IsNullOrWhiteSpace($__pnpHelpText)) {
-              Write-Output "No documentation found for '{{safeCommandName}}'. Verify the command name using 'pnp_search_commands'."
+              Write-Output "No documentation found for '$__pnpName'. Verify the command name using 'pnp_search_commands'."
             } else {
               # The link goes first, not last: help for some cmdlets runs to six figures of characters
               # (Set-PnPTenant is ~135k), so a trailing link is exactly what the output cap would drop --
               # and a cmdlet with help that long is the one most likely to need the online page.
               $__pnpHelpUri = $null
-              try { $__pnpHelpUri = ($ExecutionContext.InvokeCommand.GetCommand('{{safeCommandName}}', [System.Management.Automation.CommandTypes]::All)).HelpUri } catch { $__pnpHelpUri = $null }
+              try { $__pnpHelpUri = ($ExecutionContext.InvokeCommand.GetCommand($__pnpName, [System.Management.Automation.CommandTypes]::All)).HelpUri } catch { $__pnpHelpUri = $null }
               if (-not [string]::IsNullOrWhiteSpace($__pnpHelpUri)) {
                 Write-Output "ONLINE DOCUMENTATION: $__pnpHelpUri"
                 Write-Output "TIP: If the syntax or examples below look incomplete, fetch that page with your web-fetch tool -- it is generated from the current source and usually carries more parameter detail and examples than the shipped help. If you cannot fetch pages, give the user the link instead."
               } else {
                 Write-Output "NOTE: This cmdlet reports no documentation URL, which usually means an older PnP.PowerShell build (HelpUri is populated in current versions)."
-                Write-Output "FALLBACK: Search https://pnp.github.io/powershell/ for '{{safeCommandName}}' to find its page, or search the web for 'PnP PowerShell {{safeCommandName}}'. Do not hand-assemble a docs URL -- the path pattern is not guaranteed. Updating the module with 'Update-Module PnP.PowerShell' also restores the link."
+                Write-Output "FALLBACK: Search https://pnp.github.io/powershell/ for '$__pnpName' to find its page, or search the web for 'PnP PowerShell $__pnpName'. Do not hand-assemble a docs URL -- the path pattern is not guaranteed. Updating the module with 'Update-Module PnP.PowerShell' also restores the link."
               }
               Write-Output ''
               Write-Output $__pnpHelpText
             }
-            Remove-Variable -Name __pnpHelpText, __pnpHelpUri -ErrorAction SilentlyContinue
+            Remove-Variable -Name __pnpName, __pnpHelpText, __pnpHelpUri -ErrorAction SilentlyContinue
             """;
 
         var help = await sessions.Get(null).ExecuteAsync(script, MetadataTimeout, cancellationToken);
 
-        return OutputLimit.Apply(help, "Read the online documentation page linked above for the full reference.");
+        return OutputLimit.Apply(help, "Read the online documentation page linked above for the full reference.", PnPErrorHints.HintFor(help));
     }
 
-    [McpServerTool(Name = "pnp_run_command", Destructive = true, OpenWorld = true)]
+    [McpServerTool(Name = "pnp_run_command", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = true)]
     [Description("Executes one or more PnP PowerShell commands and returns the result. Commands can be chained with semicolons or newlines. The connection established by Connect-PnPOnline persists across calls that use the same sessionId, so you only need to connect once. This tool can be used repeatedly to accomplish complex multi-step tasks.")]
     public static async Task<string> RunPnpCommand(
         PowerShellSessionManager sessions,
@@ -140,7 +141,6 @@ internal partial class PnPPowerShellTools
         RequestContext<CallToolRequestParams> context,
         [Description("PnP PowerShell command(s) to execute (e.g., \"Get-PnPSite\", \"Get-PnPList | Select-Object Title, ItemCount\")")] string command,
         [Description("Session to run in. Sessions keep their own PnP connection, so use a second name only when working against two tenants at once (default: \"default\")")] string? sessionId = null,
-        [Description("Set to true to approve a destructive command (Remove-*, Clear-*, Reset-*, ...) without an interactive confirmation prompt")] bool confirmDestructive = false,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(command))
@@ -190,7 +190,7 @@ internal partial class PnPPowerShellTools
         }
 
         var flagged = DetermineConfirmationTarget(analysis, command);
-        if (flagged is not null && !confirmDestructive && !ConfirmationDisabled)
+        if (flagged is not null && !ConfirmationDisabled)
         {
             var refusal = await ConfirmDestructiveAsync(server, context, command, flagged);
             if (refusal is not null)
@@ -287,12 +287,11 @@ internal partial class PnPPowerShellTools
         // A retry carries the answer to the prompt raised by the previous attempt.
         if (context.Params?.InputResponses?.TryGetValue("confirmDestructive", out var response) is true)
         {
-            // The approval is only valid for the command the user was actually shown.
             if (!IsApprovalBoundTo(context.Params.RequestState, command))
             {
                 return
-                    $"Cancelled: the command changed after it was approved, so nothing was run. " +
-                    $"Re-run 'pnp_run_command' and confirm the new command.";
+                    "Cancelled: this approval was not issued for this exact command, so nothing was run. " +
+                    "Re-run 'pnp_run_command' and confirm the command you are shown.";
             }
 
             var elicited = response.Deserialize(InputResponse.ElicitResultJsonTypeInfo);
@@ -310,7 +309,7 @@ internal partial class PnPPowerShellTools
 
             return confirmed
                 ? null
-                : $"Cancelled: {matchedCmdlet} was not explicitly confirmed, so nothing was run. To proceed, call 'pnp_run_command' again with confirmDestructive set to true.";
+                : $"Cancelled: {matchedCmdlet} was not explicitly confirmed, so nothing was run. Ask again and have the user tick the confirmation box.";
         }
 
         // IsMrtrSupported only says the round-trip can be represented; on the legacy bridge the client
@@ -343,21 +342,32 @@ internal partial class PnPPowerShellTools
                 requestState: Fingerprint(command));
         }
 
-        // Clients that cannot prompt still get a way through, just not a silent one.
         return $"""
-            Blocked: this command needs confirmation and has not been confirmed. Nothing was run.
+            Blocked: this command needs confirmation and this client cannot prompt for it. Nothing was run.
 
             Flagged: {matchedCmdlet}
 
             Command:
             {command}
 
-            Show this command to the user and, once they confirm, call 'pnp_run_command' again with confirmDestructive set to true.
-            Set the environment variable PNP_MCP_CONFIRM_DESTRUCTIVE=false to turn this check off entirely.
+            This cannot be approved from inside the conversation. Show the command to the user and tell them to either run it themselves in a PowerShell session, or switch to a client that supports MCP elicitation so the confirmation prompt can be shown.
+            An operator who has already reviewed what this server will be asked to run can set PNP_MCP_CONFIRM_DESTRUCTIVE=false to turn the gate off for the whole process.
             """;
     }
 
-    [McpServerTool(Name = "pnp_get_connection_status", ReadOnly = true, OpenWorld = false)]
+    [McpServerTool(Name = "pnp_diagnose_connection", ReadOnly = true, Idempotent = true, OpenWorld = true)]
+    [Description("Checks everything that has to be true before a PnP PowerShell command can run: that pwsh is installed and on PATH, that the PnP.PowerShell module is present, and what connection this session holds. Every failing check names its cause and the exact next command to run. Call this first when a command fails for a reason you cannot explain, or when starting from an unknown machine.")]
+    public static async Task<string> DiagnosePnpConnection(
+        PowerShellSessionManager sessions,
+        [Description("Session to inspect (default: \"default\")")] string? sessionId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var facts = await ConnectionPreflight.GatherAsync(sessions, sessionId, cancellationToken);
+
+        return OutputLimit.Apply(ConnectionPreflight.Render(facts));
+    }
+
+    [McpServerTool(Name = "pnp_get_connection_status", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description("Checks the current PnP PowerShell connection status for a session. Use this to verify if you are already connected to a SharePoint site or Microsoft 365 tenant before running commands.")]
     public static async Task<string> GetPnpConnectionStatus(
         PowerShellSessionManager sessions,
@@ -388,10 +398,10 @@ internal partial class PnPPowerShellTools
             Session: {(string.IsNullOrWhiteSpace(sessionId) ? PowerShellSessionManager.DefaultSessionId : sessionId.Trim())}
 
             {result}
-            """;
+            """ + PnPErrorHints.HintFor(result);
     }
 
-    [McpServerTool(Name = "pnp_reset_session", Destructive = true, Idempotent = true, OpenWorld = false)]
+    [McpServerTool(Name = "pnp_reset_session", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Description("Ends a PowerShell session and its PnP connection, discarding all in-session state. Use this to sign out, to recover a session that has stopped responding, or to switch the connected account.")]
     public static async Task<string> ResetPnpSession(
         PowerShellSessionManager sessions,
@@ -502,17 +512,19 @@ internal partial class PnPPowerShellTools
         return result.ToString();
     }
 
-    /// <summary>Identifies the exact command text an approval was granted for, hashed to stay small.</summary>
-    internal static string Fingerprint(string command) =>
-        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(command)));
+    /// <summary>Per-process key, so an approval cannot be minted anywhere but here.</summary>
+    private static readonly byte[] ApprovalKey = RandomNumberGenerator.GetBytes(32);
 
-    /// <summary>True only when the echoed request state was minted for exactly this command text.</summary>
-    // Fails closed on a missing state: an approval that cannot be tied to what the user saw is not one.
-    // This binds the approval to the command; it is not a security boundary. The hash is unkeyed, so a
-    // client could compute a matching one -- but a client that wanted to skip the prompt would just pass
-    // confirmDestructive. The value is catching a retry that carries different arguments.
+    /// <summary>Identifies the exact command an approval covers, keyed so a caller cannot forge one.</summary>
+    internal static string Fingerprint(string command) =>
+        Convert.ToHexStringLower(HMACSHA256.HashData(ApprovalKey, Encoding.UTF8.GetBytes(command)));
+
+    /// <summary>True only when the echoed request state was minted by this process for this command.</summary>
     internal static bool IsApprovalBoundTo(string? requestState, string command) =>
-        requestState is not null && string.Equals(requestState, Fingerprint(command), StringComparison.Ordinal);
+        requestState is not null &&
+        CryptographicOperations.FixedTimeEquals(
+            Encoding.UTF8.GetBytes(requestState),
+            Encoding.UTF8.GetBytes(Fingerprint(command)));
 
     private static bool LooksLikePnpCommand(string command)
     {
