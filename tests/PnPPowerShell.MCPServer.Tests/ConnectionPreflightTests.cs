@@ -114,6 +114,29 @@ public class ConnectionPreflightTests
         }
     }
 
+    [BarePnPFact]
+    public async Task A_machine_without_the_prerequisites_is_told_exactly_what_to_install()
+    {
+        await using var sessions = new PowerShellSessionManager();
+
+        var facts = await ConnectionPreflight.GatherAsync(sessions, null, CancellationToken.None);
+        var report = ConnectionPreflight.Render(facts);
+
+        Assert.Null(facts.Session);
+
+        if (facts.Environment.PwshLaunched)
+        {
+            Assert.Null(facts.Environment.ModuleVersion);
+            Assert.Contains("PnP.PowerShell module is not installed", report);
+            Assert.Contains("NEXT STEP: Run: Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force", report);
+        }
+        else
+        {
+            Assert.Contains("'pwsh' is not on PATH", report);
+            Assert.Contains("NEXT STEP: Install PowerShell 7.4", report);
+        }
+    }
+
     [RequiresPnPFact]
     public async Task The_probe_reads_the_real_environment_and_session()
     {

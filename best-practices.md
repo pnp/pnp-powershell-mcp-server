@@ -6,10 +6,11 @@ This guide provides best practices for using PnP PowerShell commands through the
 
 Use this flow for reliable execution:
 
-1. **Check connection** with `pnp_get_connection_status` to see if you are already authenticated. If
-   anything fails for a reason you cannot explain — or you are starting on an unfamiliar machine —
-   use `pnp_diagnose_connection` instead: it also checks that `pwsh` and the `PnP.PowerShell` module
-   are present, and every failing check names its cause and the exact next command to run.
+1. **Check you can run anything at all** with `pnp_diagnose_connection`. Make this your first call in
+   a new session: it answers, in one round trip, whether `pwsh` is on `PATH`, whether the
+   `PnP.PowerShell` module is installed, and what connection the session holds — and every failing
+   check names its cause and the exact next command to run. Use `pnp_get_connection_status` instead
+   when you only need to re-check the connection on a session you have already diagnosed.
 2. **Search commands** with `pnp_search_commands` to find the right command for your task.
 3. **Read documentation** with `pnp_get_command_docs` to understand syntax, parameters, and examples. Both this and `pnp_search_commands` return the cmdlet's published documentation URL, which is worth citing to the user and often carries examples the shipped help omits.
 4. **Search community samples** with `pnp_search_script_samples` or `pnp_suggest_script` before writing a script from scratch — there is a good chance someone has already solved a similar problem.

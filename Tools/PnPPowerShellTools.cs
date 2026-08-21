@@ -287,29 +287,11 @@ internal partial class PnPPowerShellTools
         // A retry carries the answer to the prompt raised by the previous attempt.
         if (context.Params?.InputResponses?.TryGetValue("confirmDestructive", out var response) is true)
         {
-            if (!IsApprovalBoundTo(context.Params.RequestState, command))
-            {
-                return
-                    "Cancelled: this approval was not issued for this exact command, so nothing was run. " +
-                    "Re-run 'pnp_run_command' and confirm the command you are shown.";
-            }
-
-            var elicited = response.Deserialize(InputResponse.ElicitResultJsonTypeInfo);
-
-            if (elicited?.IsAccepted is not true)
-            {
-                return $"Cancelled: {matchedCmdlet} was not confirmed, so nothing was run.";
-            }
-
-            // Requires an explicit true. The field carries Default = false, so an accepted response
-            // that omits it means the user left the box unticked — treating that as approval would
-            // run a destructive command nobody agreed to.
-            var confirmed = elicited.Content?.TryGetValue("confirm", out var confirmValue) is true &&
-                            confirmValue.ValueKind is JsonValueKind.True;
-
-            return confirmed
-                ? null
-                : $"Cancelled: {matchedCmdlet} was not explicitly confirmed, so nothing was run. Ask again and have the user tick the confirmation box.";
+            return EvaluateApproval(
+                context.Params.RequestState,
+                command,
+                response.Deserialize(InputResponse.ElicitResultJsonTypeInfo),
+                matchedCmdlet);
         }
 
         // IsMrtrSupported only says the round-trip can be represented; on the legacy bridge the client
@@ -364,7 +346,9 @@ internal partial class PnPPowerShellTools
     {
         var facts = await ConnectionPreflight.GatherAsync(sessions, sessionId, cancellationToken);
 
-        return OutputLimit.Apply(ConnectionPreflight.Render(facts));
+        return OutputLimit.Apply(
+            ConnectionPreflight.Render(facts),
+            "Raise PNP_MCP_MAX_OUTPUT_CHARS to see the whole report; this one is a fixed set of checks, so there is nothing to narrow.");
     }
 
     [McpServerTool(Name = "pnp_get_connection_status", ReadOnly = true, Idempotent = true, OpenWorld = false)]
@@ -510,6 +494,29 @@ internal partial class PnPPowerShellTools
         }
 
         return result.ToString();
+    }
+
+    /// <summary>Null when the retry is genuinely approved, otherwise the refusal to return.</summary>
+    internal static string? EvaluateApproval(string? requestState, string command, ElicitResult? elicited, string matchedCmdlet)
+    {
+        if (!IsApprovalBoundTo(requestState, command))
+        {
+            return
+                "Cancelled: this approval was not issued for this exact command, so nothing was run. " +
+                "Re-run 'pnp_run_command' and confirm the command you are shown.";
+        }
+
+        if (elicited?.IsAccepted is not true)
+        {
+            return $"Cancelled: {matchedCmdlet} was not confirmed, so nothing was run.";
+        }
+
+        var confirmed = elicited.Content?.TryGetValue("confirm", out var confirmValue) is true &&
+                        confirmValue.ValueKind is JsonValueKind.True;
+
+        return confirmed
+            ? null
+            : $"Cancelled: {matchedCmdlet} was not explicitly confirmed, so nothing was run. Ask again and have the user tick the confirmation box.";
     }
 
     /// <summary>Per-process key, so an approval cannot be minted anywhere but here.</summary>
