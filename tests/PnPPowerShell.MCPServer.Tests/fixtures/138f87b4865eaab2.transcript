@@ -1,0 +1,24 @@
+# key: 138f87b4865eaab2
+# operation: run | Get-PnPTenantSite -Identity 'https://contoso.sharepoint.com/sites/contoso/no-such-site-9f2c'
+# Scrubbed by TranscriptScrubber. Read it before committing: display names in free text are not detectable.
+
+--- command ---
+Get-PnPTenantSite -Identity 'https://contoso.sharepoint.com/sites/contoso/no-such-site-9f2c'
+
+--- script ---
+$__pnpCommandText = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('R2V0LVBuUFRlbmFudFNpdGUgLUlkZW50aXR5ICdodHRwczovL2NvbnRvc28uc2hhcmVwb2ludC5jb20vc2l0ZXMvY29udG9zby9uby1zdWNoLXNpdGUtOWYyYyc='))
+$__pnpCommandResult = Invoke-Expression $__pnpCommandText
+if ($null -ne $__pnpCommandResult) {
+  try {
+    $__pnpCommandResult | ConvertTo-Json -Depth 20 -Compress
+  }
+  catch {
+    $__pnpCommandResult | Out-String
+  }
+} else {
+  Write-Output 'Command completed successfully (no output).'
+}
+Remove-Variable -Name __pnpCommandText, __pnpCommandResult -ErrorAction SilentlyContinue
+
+--- output ---
+Error: Get-PnPTenantSite: The managed path sites/contoso is not a managed path in this tenant.

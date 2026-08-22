@@ -23,13 +23,21 @@ confirmation prompt, or `patterns` when looking for a worked example.
 
 ## Finding More About a Cmdlet
 
-Every cmdlet carries a `HelpUri` — its page on <https://pnp.github.io/powershell/>. Both
-`pnp_search_commands` (as a `HelpUri` field per result) and `pnp_get_command_docs` (as an
-`ONLINE DOCUMENTATION:` line) return it.
+Every cmdlet is documented on <https://pnp.github.io/powershell/>, and `pnp_get_command_docs` returns
+two links to that page before the help text:
+
+```text
+MARKDOWN DOCUMENTATION (prefer this — the same page in source form, at a fraction of the tokens): https://raw.githubusercontent.com/pnp/powershell/dev/documentation/Get-PnPWeb.md
+HTML DOCUMENTATION: https://pnp.github.io/powershell/cmdlets/Get-PnPWeb.html
+```
+
+**Fetch the markdown one.** It is the source the HTML page is generated from, so it says the same
+thing without the site chrome, navigation and styling that make the rendered page several times more
+expensive to read. Give the *user* the HTML link, since that is the page they can browse.
 
 The local help returned by `pnp_get_command_docs` is generated from the installed module, so it can
-lag the published page and sometimes omits examples entirely. Reach for the URL when the local help is
-not enough.
+lag the published page and sometimes omits examples entirely. Reach for the links when the local help
+is not enough.
 
 ### Worked example
 
@@ -54,24 +62,27 @@ You need to filter list items server-side and `Get-PnPListItem`'s local help doe
    { "commandName": "Get-PnPListItem" }
    ```
 
-   The output ends with:
+   The output begins with:
 
    ```text
-   ONLINE DOCUMENTATION: https://pnp.github.io/powershell/cmdlets/Get-PnPListItem.html
+   MARKDOWN DOCUMENTATION (prefer this ...): https://raw.githubusercontent.com/pnp/powershell/dev/documentation/Get-PnPListItem.md
+   HTML DOCUMENTATION: https://pnp.github.io/powershell/cmdlets/Get-PnPListItem.html
    ```
 
-3. If the parameter is still unclear, **fetch that URL with whatever web-fetch tool the client
+3. If the parameter is still unclear, **fetch the markdown URL with whatever web-fetch tool the client
    provides** and read the parameter and examples sections. If no fetch tool is available, give the
-   user the link rather than guessing at the syntax.
+   user the HTML link rather than guessing at the syntax.
 
 4. Build the command from what the page shows, then run it in a small verifiable step.
 
 ### When there is no link
 
-A cmdlet may report no `HelpUri` — `null` in search results, and no `ONLINE DOCUMENTATION:` line from
-`pnp_get_command_docs`. That almost always means an **older `PnP.PowerShell` build**; current versions
-populate it for effectively every cmdlet. `pnp_get_command_docs` says so and offers the fallback
-directly in its output.
+The two links above come from an index vendored into this server, so they are there even when `pwsh`
+or the module is not. A cmdlet newer than this build is not in that index; for those,
+`pnp_get_command_docs` falls back to the `HelpUri` your installed module reports, and search results
+carry a `HelpUri` field. When neither is available it almost always means an **older `PnP.PowerShell`
+build** — current versions populate `HelpUri` for effectively every cmdlet — and the tool says so and
+offers the fallback directly in its output.
 
 What to do instead, in order:
 
@@ -158,15 +169,41 @@ to set rather than working around it.
 | `PNP_MCP_COMMAND_TIMEOUT_SECONDS` | `600` | Per-command wall-clock limit, in seconds. |
 | `PNP_MCP_CONFIRM_DESTRUCTIVE` | `true` | `false` skips destructive confirmations. |
 | `PNP_MCP_MAX_OUTPUT_CHARS` | `50000` | Largest tool response, in characters; longer output is truncated. |
-| `PNP_SCRIPT_SAMPLES_PATH` | _(unset)_ | Local clone of the script samples repo, used when GitHub is unreachable. |
+| `PNP_SCRIPT_SAMPLES_PATH` | _(unset)_ | Local clone of the script samples repo, overriding the vendored index. |
 
 Both booleans are matched exactly: read-only turns on only for the literal `true`, and confirmation
 turns off only for the literal `false`. `1` and `yes` leave the default in place.
 
 ## Output Size
 
-Tool responses are capped (50,000 characters by default). When output is truncated you will see
-`[output truncated: N of M characters omitted]`.
+Tool responses are capped (50,000 characters by default). What happens past the cap depends on the
+shape of the result.
+
+### A large result set is summarised and paged, not cut
+
+When `pnp_run_command` produces a JSON array too big for the cap, you get the true row count, the
+field names, and as many whole rows as fit — followed by a cursor:
+
+```text
+Result set: 223 rows, summarised because the full output is 732,239 characters and the cap is 50,000.
+Fields: Url, Title, Template, StorageQuota, LastContentModifiedDate, and 77 more
+Rows 1-14 of 223:
+[ ... ]
+MORE: 209 rows remain. Call 'pnp_get_result_page' with cursor 'a1b2c3d4e5' and offset 14.
+```
+
+Every page is complete, valid JSON, and the count is the real one — 223 rows exist whether or not you
+read them all. Call `pnp_get_result_page` with the cursor to continue; it pages over rows already
+fetched, so it costs nothing against the tenant and returns exactly what the original command saw.
+
+The result set is held in the session that produced it, and **the next command in that session
+replaces it**. Page through what you need before running anything else. Re-running the command is the
+only way to get fresher rows.
+
+### Everything else is still truncated
+
+Non-array output — one large object, a `Format-Table` dump, a long help topic — is cut at a line
+boundary with `[output truncated: N of M characters omitted]`.
 
 **Treat truncated output as incomplete.** It is not necessarily valid JSON, so do not parse it or
 summarise it as though it were the whole result — a truncated list of sites is not "all the sites".

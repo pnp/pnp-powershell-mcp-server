@@ -176,20 +176,26 @@ Can you check if I have a Power Automate flow called 'HoursReportingReminder' an
 
 | Tool | Description |
 | --- | --- |
-| pnp_search_commands | Searches PnP PowerShell commands using keyword matching against command names, verbs, and nouns. Use this tool first to find relevant commands. Each result carries the cmdlet's `HelpUri`, a link to its published documentation. |
-| pnp_get_command_docs | Gets detailed documentation for a specific PnP PowerShell command including syntax, parameters, and examples, plus a link to the online documentation. |
-| pnp_run_command | Executes one or more PnP PowerShell commands and returns the result. Runs in a persistent session, so a `Connect-PnPOnline` connection is reused across calls. Destructive commands require confirmation first. |
-| pnp_get_connection_status | Checks the current PnP PowerShell connection status before running commands. |
+| pnp_search_commands | Finds which cmdlet does a job, by keyword against cmdlet names, verbs and nouns. Each result carries the cmdlet's `HelpUri`. Falls back to a vendored cmdlet index when `pwsh` or the module is unavailable, so it still answers on a machine that is not set up yet. |
+| pnp_get_command_docs | Gets the reference documentation for one named cmdlet — syntax, parameters, parameter sets and examples — preceded by links to both the raw markdown source of its documentation page and the rendered HTML page. The markdown is the same content for a fraction of the tokens. |
+| pnp_run_command | Runs PnP PowerShell against the connected tenant and returns the result. Runs in a persistent session, so a `Connect-PnPOnline` connection is reused across calls. Destructive commands require confirmation first. A result set too large for the output cap is summarised and paged rather than truncated. |
+| pnp_get_result_page | Returns the next page of a result set `pnp_run_command` summarised. Pages over rows already fetched, so it costs nothing against the tenant and returns exactly the rows the original command saw. |
+| pnp_get_connection_status | Checks whether the session is signed in, to which site, and as which account. |
 | pnp_diagnose_connection | Checks everything that has to be true before a command can run: `pwsh` on `PATH`, the `PnP.PowerShell` module, and what connection the session holds. Every failing check names its cause and the exact next command. The `pwsh` and module checks need no tenant and no network, so it still works on a machine that is not set up yet; once a connection exists it also inspects that connection, which asks PnP for a Graph token and so reaches Entra ID. |
 | pnp_reset_session | Ends a session and its PnP connection. Use it to sign out, switch accounts, or recover a session that has stopped responding. |
 | pnp_get_best_practices | Returns best practices for using PnP PowerShell via this MCP server. Takes an optional `section` (`workflow`, `docs`, `sessions`, `config`, `readonly`, `output`, `destructive`, `auth`, `execution`, `patterns`) to retrieve one topic instead of the whole guide, which keeps the response small. |
-| pnp_search_script_samples | Searches the community [PnP Script Samples](https://pnp.github.io/script-samples/) index for scripts matching a keyword or use case. |
-| pnp_get_script_sample | Retrieves the full PnP PowerShell script code for a specific script sample by name, fetched live from GitHub. |
+| pnp_search_script_samples | Lists community [PnP Script Samples](https://pnp.github.io/script-samples/) matching a keyword — titles, descriptions and links, no code. Answers from an index compiled into the server, so it needs no network. |
+| pnp_get_script_sample | Retrieves the full PnP PowerShell script code for one named script sample. The index entry is local; the script body is fetched from GitHub. |
 | pnp_suggest_script | Finds the most relevant community script samples for a task and returns their full script code plus adaptation guidance, in one call. |
 
 Every tool declares its `readOnlyHint`, `idempotentHint` and `openWorldHint` annotations, and the two
 that can change state also declare `destructiveHint`, so a client can decide what to auto-approve
 without guessing.
+
+Tool descriptions are gated on whether they actually select: `ToolSelectionEvaluatorTests` scores every
+prompt in [e2eTestPrompts.md](./tests/PnPPowerShell.MCPServer.Tests/e2eTestPrompts.md) against the
+published descriptions and fails the build if the right tool is not ranked in the top three. See
+[Tool selection](#tool-selection).
 
 ### 📚 Resources
 
@@ -265,8 +271,8 @@ Connect to contoso, find all site collections with no owner, and export them to 
 | `PNP_MCP_COMMAND_TIMEOUT_SECONDS` | `600` | Wall-clock limit for a single `pnp_run_command` call. On timeout the session is terminated and the connection is lost. |
 | `PNP_MCP_CONFIRM_DESTRUCTIVE` | `true` | Set to `false` to run destructive commands (`Remove-*`, `Clear-*`, ...) without asking for confirmation. This is the only way to bypass the gate: there is no tool parameter that lets the model approve its own destructive command, so on a client that cannot show a confirmation prompt, destructive commands are simply blocked. |
 | `PNP_MCP_READONLY` | `false` | Set to `true` to refuse any command that would change Microsoft 365. Allowed verbs: `Get-`, `Export-`, `Test-`, `Convert-`/`ConvertTo-`/`ConvertFrom-`, `Read-`, `Measure-`, `Connect-`/`Disconnect-`, `Find-`, `Format-`, `Resolve-`, `Write-`, `Search-`, `Show-`, `Compare-`, plus pipeline shaping (`Select-`, `Where-`, `Sort-`, `Group-`, `ForEach-`, `Out-`, `Join-`, `Split-`). Refused: `Set-`, `Remove-`, `Add-`, `New-`, `Clear-`, `Invoke-`, `Update-`, `Move-`, `Enable-`/`Disable-`, `Grant-`/`Revoke-`, `Copy-`, `Import-`, `Restore-`, `Reset-`, `Rename-`, `Start-`/`Stop-`, `Register-`/`Unregister-`, and every other change verb — along with indirectly invoked commands, native executables, and state-changing method calls such as `ExecuteQuery`. See [Best Practices](./best-practices.md#read-only-mode) for the full table. Local file output (`Out-File`, `Export-*`) is still permitted. |
-| `PNP_MCP_MAX_OUTPUT_CHARS` | `50000` | Largest tool response returned, in characters. Longer output is truncated to its first whole lines with a note saying how much was dropped. Values below 2000 are ignored, since the note itself would leave no room for output. |
-| `PNP_SCRIPT_SAMPLES_PATH` | _(unset)_ | Path to a local clone of the PnP script samples repository, used as a fallback when GitHub is unreachable. |
+| `PNP_MCP_MAX_OUTPUT_CHARS` | `50000` | Largest tool response returned, in characters. A JSON result set over the cap is summarised — true row count, field names, and as many whole rows as fit, plus a cursor for `pnp_get_result_page` — so the response stays complete and parseable. Anything else is truncated to its first whole lines with a note saying how much was dropped. Values below 2000 are ignored, since the note itself would leave no room for output. |
+| `PNP_SCRIPT_SAMPLES_PATH` | _(unset)_ | Path to a local clone of [pnp/script-samples](https://github.com/pnp/script-samples), overriding the index compiled into the server. For contributors working against a newer catalogue than the one this build shipped with. |
 
 The client passes the environment in when it launches the server process, so where you set them decides
 both who they apply to and that a **server restart** is needed for a change to take effect.
@@ -369,7 +375,7 @@ processes too, so prefer the client config unless that is what you want:
 | Let an agent explore a production tenant without being able to change it | `PNP_MCP_READONLY=true` |
 | Tenant-wide reports that take longer than 10 minutes | `PNP_MCP_COMMAND_TIMEOUT_SECONDS=3600` |
 | Unattended automation where the commands are already reviewed | `PNP_MCP_CONFIRM_DESTRUCTIVE=false` |
-| Work offline against a local clone of the script samples | `PNP_SCRIPT_SAMPLES_PATH=C:\src\script-samples` |
+| Work against a script-samples clone newer than the vendored index | `PNP_SCRIPT_SAMPLES_PATH=C:\src\script-samples` |
 
 After changing any of these, **restart the MCP server** (in most clients, reload the window or toggle
 the server off and on) — the client passes the environment in when it launches the process, so an
@@ -402,7 +408,79 @@ dotnet run --project FULL_PATH_TO_YOUR_PROJECT/PnPPowerShell.MCPServer.csproj
 
 Name it however you like. It's recommended to add it to `workspace` scope for testing. This repo's [.mcp.json](./.mcp.json) already contains an equivalent configuration you can adapt.
 
-If you need to point the script-sample tools at a local clone of [pnp/script-samples](https://github.com/pnp/script-samples) instead of the auto-discovered VS Code extension index, set the `PNP_SCRIPT_SAMPLES_PATH` environment variable to the clone's root folder.
+### Vendored data
+
+Two indexes are compiled into the assembly as embedded resources, so the tools that use them work with
+no network, no VS Code extension and no tenant:
+
+| File | Contents | Used by |
+| --- | --- | --- |
+| [data/script-samples.json](./data/script-samples.json) | The PnP Script Samples catalogue — name, title, description, tags, authors | `pnp_search_script_samples`, `pnp_get_script_sample`, `pnp_suggest_script` |
+| [data/pnp-commands.json](./data/pnp-commands.json) | Every `PnP.PowerShell` cmdlet name, with the URL templates for its markdown and HTML documentation | `pnp_get_command_docs`, and `pnp_search_commands` when `pwsh` is unavailable |
+
+Both are generated from [pnp/vscode-pnp-powershell](https://github.com/pnp/vscode-pnp-powershell) and
+record the source commit, which every tool that reads them prints — a stale index is visible rather
+than silent. Refresh them before a release:
+
+```powershell
+pwsh ./build/Update-VendoredData.ps1
+```
+
+The script fails rather than guessing if either upstream file stops matching the URL templates.
+
+Two overrides come first, for contributors working against a newer catalogue: the PnP PowerShell VS
+Code extension's own `samples.json` if that extension is installed, then `PNP_SCRIPT_SAMPLES_PATH`
+pointing at a [pnp/script-samples](https://github.com/pnp/script-samples) clone.
+
+### Tool selection
+
+[e2eTestPrompts.md](./tests/PnPPowerShell.MCPServer.Tests/e2eTestPrompts.md) holds natural-language
+prompts per tool. `ToolSelectionEvaluatorTests` ranks every tool against each prompt using BM25 over
+the published descriptions — no model, no network, no tenant — and fails if the expected tool is not
+in the top three. Confidence is a tool's share of the top-3 shortlist, so a three-way tie scores 0.33
+and the 0.4 bar means it leads them. `Baseline` prints the per-tool table and names every prompt below
+the bar. **Adding a tool means adding prompts for it**; the test fails on any tool with none, and when
+a prompt regresses the fix is usually the tool's `[Description]`, not the prompt.
+
+`Bm25_agrees_with_the_model_that_read_the_same_descriptions` is the check on the checker: it compares
+BM25s top pick against [modelSelections.md](./tests/PnPPowerShell.MCPServer.Tests/modelSelections.md),
+where a language model labelled the same prompts from the published descriptions alone. They agree on
+93 %. If that falls, the lexical scorer has stopped predicting selection and it is the scorer that needs
+replacing, not the prose.
+
+One counter-intuitive rule, learned the hard way: selection is zero-sum between tools, so broadening a
+description to win a prompt costs every other tool. Only more *distinctive* wording helps.
+
+### Protocol tests
+
+`StdioProtocolTests` spawns the built server as a real process and speaks newline-delimited JSON-RPC
+to it — `initialize`, `tools/list`, `tools/call` — with a hand-rolled client rather than the SDKs,
+so the wire format is exercised rather than the SDK talking to itself. It asserts the tool surface, the
+annotations as published, and that the destructive-command gate blocks a client which cannot be
+prompted. Everything but that last check is hermetic; run `dotnet build` first, since the tests launch
+the servers own build output.
+
+### Recorded-playback tests
+
+Tenant-dependent behaviour is recorded once against a dev tenant and replayed offline forever after, so
+CI needs neither `pwsh` nor a tenant. Each fixture is filed under the *operation* it records — `run`
+plus the command, `command-docs` plus the cmdlet — rather than a hash of the generated script, so
+rewording that script does not silently orphan every fixture. Fixtures live in
+[tests/PnPPowerShell.MCPServer.Tests/fixtures](./tests/PnPPowerShell.MCPServer.Tests/fixtures) and are
+scrubbed on the way in by `TranscriptScrubber` — tenant hostnames, UPNs, GUIDs, tokens, secrets,
+thumbprints and certificate blocks, including inside the base64 payload a command is wrapped in.
+
+To re-record, from a machine with a connected dev tenant:
+
+```powershell
+$env:PNP_MCP_RECORD_FIXTURES = '1'
+$env:PNP_MCP_RECORD_TENANT_URL = 'https://<tenant>.sharepoint.com/sites/<site>'
+$env:PNP_MCP_RECORD_CLIENT_ID  = '<app id>'
+dotnet test --filter RecordedPlaybackTests
+```
+
+**Read every fixture before committing it.** The scrubber cannot detect a display name in free text,
+and a recorded fixture is a tenant data leak waiting to be committed.
 
 ### Running MCP from local build using the inspector (Debugging)
 

@@ -3,20 +3,24 @@ using System.Text.Json.Serialization;
 namespace PnPPowerShell.MCPServer.Models;
 
 
-[JsonSerializable(typeof(ExtensionSamplesRoot))]
+[JsonSerializable(typeof(SamplesRoot))]
+[JsonSerializable(typeof(CommandsRoot))]
 [JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true)]
 internal partial class ScriptSampleJsonContext : JsonSerializerContext { }
 
-// Data model matching the PnP PowerShell VS Code extension's samples.json
+// One shape for both sources: the extension carries url/rawUrl per sample, the vendored file templates them.
 
-internal sealed class ExtensionSamplesRoot
+internal sealed class SamplesRoot
 {
+    public string? Commit { get; set; }
+    public string? Generated { get; set; }
+    public string? UrlTemplate { get; set; }
+    public string? RawUrlTemplate { get; set; }
     public List<ScriptSample> Samples { get; set; } = [];
 }
 
 internal sealed class ScriptSample
 {
-    // Folder-name slug derived from rawUrl at load time (e.g. "spo-create-documentset")
     public string Name { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string Url { get; set; } = string.Empty;
@@ -30,4 +34,13 @@ internal sealed class ScriptSample
 internal sealed class ScriptSampleAuthor
 {
     public string Name { get; set; } = string.Empty;
+}
+
+internal sealed class CommandsRoot
+{
+    public string? Commit { get; set; }
+    public string? Generated { get; set; }
+    public string MarkdownUrlTemplate { get; set; } = string.Empty;
+    public string DocsUrlTemplate { get; set; } = string.Empty;
+    public List<string> Commands { get; set; } = [];
 }

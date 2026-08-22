@@ -12,7 +12,21 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Added `data/script-samples.json` and `data/pnp-commands.json` as embedded resources, generated from [pnp/vscode-pnp-powershell](https://github.com/pnp/vscode-pnp-powershell) by `build/Update-VendoredData.ps1`. `pnp_search_script_samples`, `pnp_get_script_sample` and `pnp_suggest_script` previously returned an error string unless an unrelated VS Code extension happened to be installed; they now answer offline. Both indexes record the source commit, which is printed with every answer, so a stale index is visible rather than silent.
+- Added the `pnp_get_result_page` tool. When `pnp_run_command` produces a JSON result set larger than the output cap, it is now summarised — true row count, field names, and as many whole rows as fit — and the full set is held in the session that produced it, so "show me more" pages over rows already fetched instead of re-running the command against a live tenant.
+- Added record-and-playback testing. `PNP_MCP_RECORD_DIR` records what a real session returned; `PNP_MCP_REPLAY_DIR` replays it with no `pwsh` and no tenant. `TranscriptScrubber` removes tenant hostnames, identities, GUIDs, tokens, secrets, thumbprints, certificate blocks and the account name in a profile path on the way in — including inside the base64 payload a command is wrapped in, and covering both the spaced and colon-bound forms of a secret parameter. Fixtures are filed under the operation they record — `run` plus the command, `command-docs` plus the cmdlet — so rewording the generated script does not silently orphan them, and they stay portable across tenants.
+- Added `ToolSelectionEvaluator` and `e2eTestPrompts.md`, a BM25 scorer over the published tool descriptions that gates every prompt on ranking its tool in the top three. It needs no model, no network and no tenant. Confidence is a tools share of the top-3 shortlist rather than of all eleven tools, since dividing by the total made it zero-sum and measured how many tools the server has rather than how sure the choice is. The baseline is 56/56 top-3 and 89 % of prompts at or above the 0.4 confidence target.
+- Added a markdown documentation link to `pnp_get_command_docs`, from the vendored cmdlet index. It is the source the HTML page is generated from, so it carries the same content for a fraction of the tokens, and it is present even when `pwsh` or the module is not.
+- Added a vendored-index fallback to `pnp_search_commands`, so it still names cmdlets and their documentation on a machine where `pwsh` or `PnP.PowerShell` is missing.
+- Added `StdioProtocolTests`, which drives the built server as a real process over newline-delimited JSON-RPC — initialize, tools/list, tools/call — with a hand-rolled client, so the published wire format is tested rather than the SDK talking to itself. It covers the tool surface, the annotations as published, and the destructive-command gate refusing a client that cannot be prompted.
+- Added `modelSelections.md` and an agreement test, which compares the BM25 evaluators top pick against the tool a language model chose from the same published descriptions. They agree on 93 %; below 90 % the scorer, not the descriptions, is what needs replacing. The labels are not independent — the same model wrote the descriptions — so this checks that two mechanisms agree, not that the descriptions are good.
+- Added tests for the scrubber, summarising and paging, and the vendored indexes.
+
 ### Changed
+
+- Changed every tool description, driven by what the new tool-selection evaluator measured. `pnp_run_command` in particular described its mechanism rather than its job, and no task-shaped prompt selected it at all; it now names what it is for.
+- Changed `ScriptSampleTools` to read from `ScriptSampleIndex`, which resolves the VS Code extension and `PNP_SCRIPT_SAMPLES_PATH` as overrides ahead of the vendored index rather than as the only sources.
+- Changed the best practices guidance to cover summarise-and-paging and the markdown documentation link.
 
 ### Fixed
 
