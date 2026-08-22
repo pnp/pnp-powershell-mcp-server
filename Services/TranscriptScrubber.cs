@@ -54,7 +54,9 @@ internal sealed partial class TranscriptScrubber
         }
 
         // Secrets first: they can contain anything the later rules would rewrite past recognition.
-        var scrubbed = PemBlockRegex().Replace(text, "-----BEGIN REDACTED-----\n[redacted-certificate]\n-----END REDACTED-----");
+        // One line, and no quotes: a certificate is usually inside a JSON string, where a real newline
+        // would make the fixture unparseable — which is how the replacement is worse than the secret.
+        var scrubbed = PemBlockRegex().Replace(text, "-----BEGIN REDACTED----- [redacted-certificate] -----END REDACTED-----");
         scrubbed = JwtRegex().Replace(scrubbed, "[redacted-token]");
         scrubbed = BearerRegex().Replace(scrubbed, "Bearer [redacted-token]");
         scrubbed = SecretParameterRegex().Replace(scrubbed, m => $"-{m.Groups[1].Value} '[redacted-secret]'");

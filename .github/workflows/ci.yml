@@ -41,6 +41,40 @@ jobs:
         shell: bash
         run: dotnet test tests/PnPPowerShell.MCPServer.Tests --configuration Release --logger "console;verbosity=normal"
 
+  test-bare:
+    # The mirror of the job above: a runner with no pwsh and no PnP.PowerShell, which is the only place
+    # the cold-start states can be manufactured for real. It is also the only check on the offline
+    # claims — the vendored indexes, recorded playback and the stdio protocol tests all have to pass
+    # here, on a machine that could not reach a tenant even if it wanted to.
+    name: Test (bare runner, no pwsh or module)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Confirm the runner really is bare
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v pwsh >/dev/null 2>&1; then
+            echo "::error::pwsh is on PATH, so this job is no longer testing the bare case"
+            exit 1
+          fi
+          echo "ok: no pwsh on PATH"
+
+      # Built explicitly: StdioProtocolTests launches the server's own build output, which the test
+      # project's own build does not guarantee is present.
+      - name: Build the server
+        shell: bash
+        run: dotnet build "$PROJECT" --configuration Release
+
+      - name: Test
+        shell: bash
+        run: dotnet test tests/PnPPowerShell.MCPServer.Tests --configuration Release --logger "console;verbosity=normal"
+
   build:
     # Packs the host RID on each OS family. This is the cheap smoke test that the native
     # AOT build still works — a full 7-RID matrix only runs at release time.

@@ -20,6 +20,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 - Added a vendored-index fallback to `pnp_search_commands`, so it still names cmdlets and their documentation on a machine where `pwsh` or `PnP.PowerShell` is missing.
 - Added `StdioProtocolTests`, which drives the built server as a real process over newline-delimited JSON-RPC — initialize, tools/list, tools/call — with a hand-rolled client, so the published wire format is tested rather than the SDK talking to itself. It covers the tool surface, the annotations as published, and the destructive-command gate refusing a client that cannot be prompted.
 - Added `modelSelections.md` and an agreement test, which compares the BM25 evaluators top pick against the tool a language model chose from the same published descriptions. They agree on 93 %; below 90 % the scorer, not the descriptions, is what needs replacing. The labels are not independent — the same model wrote the descriptions — so this checks that two mechanisms agree, not that the descriptions are good.
+- Added `TranscriptScrubberFuzzTests`, which plants known identifiers in randomly assembled transcripts and asserts none survive. It found one: redacting a certificate injected real newlines, so any JSON output containing one became unparseable. The replacement is now a single line.
+- Added a bare-runner CI job on ubuntu with no `pwsh` and no module, which is the only place the cold-start states can be manufactured for real and the only check on the offline claims — vendored indexes, recorded playback and the stdio protocol tests all have to pass there.
 - Added tests for the scrubber, summarising and paging, and the vendored indexes.
 
 ### Changed
