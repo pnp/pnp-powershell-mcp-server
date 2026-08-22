@@ -136,6 +136,33 @@ public class VendoredIndexTests
         }
     }
 
+    /// <summary>The fallback must keep its cmdlets when a large session error is truncated away.</summary>
+    [Fact]
+    public async Task The_vendored_fallback_survives_a_session_error_too_large_to_show()
+    {
+        var directory = Directory.CreateTempSubdirectory("pnp-fallback");
+
+        try
+        {
+            var failure = "Error: the command failed\n\nOutput before the failure:\n" + new string('x', 200_000);
+            var key = SessionTranscript.Key(string.Empty, "search-commands\ntenant site\n5");
+            File.WriteAllText(Path.Combine(directory.FullName, key + ".transcript"), $"# key: {key}\n\n--- output ---\n{failure}");
+
+            using var replay = new EnvVar("PNP_MCP_REPLAY_DIR", directory.FullName);
+            await using var sessions = new PowerShellSessionManager();
+
+            var output = await PnPPowerShellTools.SearchPnpCommands(sessions, "tenant site", 5);
+
+            Assert.True(output.Length <= OutputLimit.MaxChars, $"{output.Length} characters against a {OutputLimit.MaxChars} cap.");
+            Assert.Contains("Get-PnPTenantSite", output, StringComparison.Ordinal);
+            Assert.Contains(CommandIndex.Provenance, output, StringComparison.Ordinal);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
     /// <summary>Provenance is a footer, so truncation takes it first — exactly when it is most wanted.</summary>
     [Theory]
     [InlineData("search")]

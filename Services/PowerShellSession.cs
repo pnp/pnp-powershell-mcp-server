@@ -58,7 +58,7 @@ internal sealed class PowerShellSession : IAsyncDisposable
         (await RunAsync(script, timeout, capture: false, transcriptKey, cancellationToken)).Output;
 
     /// <summary>Runs a script and holds an oversized JSON array for paging.</summary>
-    // Returned as well as held: a concurrent command can replace the hold.
+    // Also returned: a concurrent command can replace the hold.
     public Task<(string Output, HeldResultSet? Held)> ExecuteAndCaptureAsync(
         string script, TimeSpan timeout, CancellationToken cancellationToken = default, string? transcriptKey = null) =>
         RunAsync(script, timeout, capture: true, transcriptKey, cancellationToken);

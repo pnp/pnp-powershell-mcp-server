@@ -41,6 +41,8 @@ internal static class ResultSummary
     /// <summary>Row ceiling too: many tiny rows cost more than their characters.</summary>
     private const int MaxHeldRows = 100_000;
 
+    private const int MaxSessionIdChars = 40;
+
     /// <summary>Captures a JSON array of two or more elements; null for anything else.</summary>
     public static HeldResultSet? TryCapture(string? output)
     {
@@ -194,10 +196,18 @@ internal static class ResultSummary
         }
 
         sb.AppendLine(
-            $"The result set is held in session '{sessionId}' and is replaced by the next command that runs there, " +
+            $"The result set is held in session '{Name(sessionId)}' and is replaced by the next command that runs there, " +
             "so page through it before running anything else. Re-running the command is the only way to get fresher rows.");
 
         return sb.ToString();
+    }
+
+    /// <summary>Caps the caller-supplied session id, which could otherwise overrun the page.</summary>
+    private static string Name(string sessionId)
+    {
+        var clean = new string([.. sessionId.Where(c => !char.IsControl(c)).Take(MaxSessionIdChars + 1)]);
+
+        return clean.Length > MaxSessionIdChars ? clean[..MaxSessionIdChars] + "..." : clean;
     }
 
     private static string N(int value) => value.ToString("N0", CultureInfo.InvariantCulture);

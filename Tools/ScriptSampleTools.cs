@@ -33,13 +33,18 @@ internal sealed partial class ScriptSampleTools
         return score;
     }
 
-    private static List<ScriptSample> Rank(string query, int limit) =>
+    private static List<ScriptSample> Rank(string query, int limit)
+    {
+        var terms = Terms(query);
+
+        return
         [.. ScriptSampleIndex.Samples
-            .Select(s => (Sample: s, Score: ScoreMatch(s, Terms(query))))
+            .Select(s => (Sample: s, Score: ScoreMatch(s, terms)))
             .Where(x => x.Score > 0)
             .OrderByDescending(x => x.Score)
             .Take(limit)
             .Select(x => x.Sample)];
+    }
 
     private static string[] Terms(string query) =>
         (query ?? string.Empty).Split([' ', ',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);

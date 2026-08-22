@@ -105,10 +105,10 @@ internal partial class PnPPowerShellTools
         var terms = query.Split([' ', ',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var matches = CommandIndex.Search(terms, limit);
 
+        // Results first, error last: truncation should cost the error, not the cmdlets.
         var sb = new StringBuilder();
-        sb.AppendLine(sessionError);
-        sb.AppendLine();
-        sb.AppendLine($"Answered from the vendored cmdlet index instead. Nothing below was checked against your installed module, and no command can run until the error above is fixed.");
+        sb.AppendLine("Answered from the vendored cmdlet index: the live lookup failed, and its error is at the end.");
+        sb.AppendLine("Nothing below was checked against your installed module, and no command can run until that is fixed.");
         sb.AppendLine();
 
         if (matches.Count == 0)
@@ -125,6 +125,8 @@ internal partial class PnPPowerShellTools
 
         sb.AppendLine();
         sb.AppendLine(CommandIndex.Provenance);
+        sb.AppendLine();
+        sb.AppendLine(sessionError);
 
         return sb.ToString();
     }
