@@ -124,7 +124,7 @@ internal sealed partial class ScriptSampleTools
             return NoMatch(query);
 
         var sb = new StringBuilder();
-        sb.AppendLine($"Found **{results.Count}** script sample(s) matching '{query}':\n");
+        sb.AppendLine($"Found **{results.Count}** script sample(s) matching '{OutputLimit.Echo(query)}':\n");
 
         foreach (var sample in results)
         {
@@ -182,7 +182,9 @@ internal sealed partial class ScriptSampleTools
         }
         else
         {
-            sb.AppendLine($"The script body could not be fetched, so only the index entry is shown. Read the full sample at {sample.Url}");
+            sb.AppendLine(sample.Url.Length > 0
+                ? "The script body could not be fetched, so only the index entry is shown. Read it at the reference above."
+                : "The script body could not be fetched, and this index entry carries no reference URL.");
         }
 
         sb.AppendLine();

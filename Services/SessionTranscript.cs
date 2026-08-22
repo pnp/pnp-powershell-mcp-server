@@ -86,7 +86,8 @@ internal static partial class SessionTranscript
 
         var fixture = new StringBuilder();
         fixture.AppendLine($"# key: {Key(script, transcriptKey)}");
-        fixture.AppendLine($"# operation: {(transcriptKey is { Length: > 0 } label ? scrubber.Scrub(label).ReplaceLineEndings(" | ") : "(unlabelled — keyed on the script itself, so editing that script orphans this fixture)")}");
+        // Clamped: the label can be a whole command, and only Key needs it whole.
+        fixture.AppendLine($"# operation: {(transcriptKey is { Length: > 0 } label ? OutputLimit.Echo(scrubber.Scrub(label).ReplaceLineEndings(" | ")) : "(unlabelled — keyed on the script itself)")}");
         fixture.AppendLine("# Scrubbed by TranscriptScrubber. Read it before committing: display names in free text are not detectable.");
         fixture.AppendLine();
         fixture.AppendLine(CommandMarker);

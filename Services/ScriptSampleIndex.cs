@@ -181,7 +181,10 @@ internal static class ScriptSampleIndex
                         Name = name,
                         Title = Text(element, "title"),
                         Description = Text(element, "shortDescription"),
-                        Url = Text(element, "url"),
+                        // Templated when the manifest omits it, so every source yields a reference URL.
+                        Url = Text(element, "url") is { Length: > 0 } url
+                            ? url
+                            : $"https://pnp.github.io/script-samples/{name}/README.html",
                         RawUrl = $"https://raw.githubusercontent.com/pnp/script-samples/main/scripts/{name}/README.md",
                         Tags = element.TryGetProperty("tags", out var tags) && tags.ValueKind == JsonValueKind.Array
                             ? [.. tags.EnumerateArray().Select(t => t.GetString() ?? string.Empty)]
