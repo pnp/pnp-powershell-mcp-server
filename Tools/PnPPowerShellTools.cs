@@ -542,4 +542,57 @@ internal partial class PnPPowerShellTools
     {
         return value.Replace("'", "''");
     }
+
+    private static readonly DateTimeOffset ServerStartedUtc = DateTimeOffset.UtcNow;
+
+    [McpServerTool(Name = "pnp_ping", ReadOnly = true, Idempotent = true, OpenWorld = false)]
+    [Description("Returns the server version, uptime, read-only mode status, and active session count. Use this as a lightweight health check to confirm the server is responsive.")]
+    public static string Ping(PowerShellSessionManager sessions)
+    {
+        var version = typeof(PnPPowerShellTools).Assembly.GetName().Version;
+        var uptime = DateTimeOffset.UtcNow - ServerStartedUtc;
+        var active = sessions.Describe();
+        var readOnly = CommandPolicy.ReadOnlyMode;
+
+        return $$"""
+            {
+              "status": "ok",
+              "version": "{{version?.ToString(3) ?? "0.0.0"}}",
+              "packageVersion": "0.1.5-beta",
+              "uptime": "{{uptime:d\d\ hh\:mm\:ss}}",
+              "startedUtc": "{{ServerStartedUtc:O}}",
+              "readOnlyMode": {{(readOnly ? "true" : "false")}},
+              "activeSessions": {{active.Count}}
+            }
+            """;
+    }
+
+    [McpServerTool(Name = "pnp_list_sessions", ReadOnly = true, Idempotent = true, OpenWorld = false)]
+    [Description("Lists all active PowerShell sessions with their status and last activity time. Use this to see what sessions exist before deciding which to connect, reset, or reuse.")]
+    public static string ListSessions(PowerShellSessionManager sessions)
+    {
+        var active = sessions.Describe();
+
+        if (active.Count == 0)
+        {
+            return "No sessions are currently running. A session is created automatically when you first call pnp_run_command or pnp_search_commands.";
+        }
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"**{active.Count}** active session(s):\n");
+        sb.AppendLine("| Session | Status | Last Activity (UTC) |");
+        sb.AppendLine("|---------|--------|---------------------|");
+
+        foreach (var (id, isAlive, lastUsed) in active)
+        {
+            var status = isAlive ? "running" : "stopped";
+            sb.AppendLine($"| {id} | {status} | {lastUsed:yyyy-MM-dd HH:mm:ss} |");
+        }
+
+        sb.AppendLine();
+        sb.AppendLine("TIP: Use `pnp_get_connection_status` with a sessionId to check what a session is connected to.");
+        sb.AppendLine("TIP: Use `pnp_reset_session` to end a session that is no longer needed.");
+
+        return sb.ToString();
+    }
 }
