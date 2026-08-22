@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 namespace PnPPowerShell.MCPServer.Tests;
 
 /// <summary>How one prompt ranked against every tool.</summary>
-internal sealed record Selection(string Prompt, string Expected, IReadOnlyList<string> Ranked, double Confidence)
+internal sealed record Selection(string Prompt, string Expected, IReadOnlyList<string> Ranked)
 {
     public int Rank => Ranked.ToList().IndexOf(Expected) + 1;
 
@@ -41,19 +41,11 @@ internal static class ToolSelectionEvaluator
             .ThenBy(x => x.Name, StringComparer.Ordinal)
             .ToList();
 
-        // Share of the shortlist, not of all eleven tools. Dividing by the total makes confidence a
-        // zero-sum quantity — every word added to one description takes mass from every other tool, and
-        // the mean sat at 0.47 across six materially different description sets. It measured how many
-        // tools this server has, not how sure the choice is. The eval's own claim is a top-3 one, so the
-        // denominator is the top 3: a three-way tie scores 0.33 and the 0.4 bar still means "leads them".
-        var shortlist = scored.Take(3).Sum(x => x.Score);
-        var expectedScore = scored.FirstOrDefault(x => x.Name == expected).Score;
-
-        return new Selection(
-            prompt,
-            expected,
-            [.. scored.Select(x => x.Name)],
-            shortlist > 0 ? expectedScore / shortlist : 0);
+        // Ranking only. A confidence score used to live here, normalised first over all eleven tools and
+        // then over the top three; neither ever caught a regression, and the first was zero-sum between
+        // tools rather than a measure of how sure the choice was. Rank is the part this scorer is
+        // reliable about, and it is what the agreement test is measured against.
+        return new Selection(prompt, expected, [.. scored.Select(x => x.Name)]);
     }
 
     private static double Score(Document document, IReadOnlyList<string> terms, Corpus corpus)

@@ -437,10 +437,10 @@ pointing at a [pnp/script-samples](https://github.com/pnp/script-samples) clone.
 [e2eTestPrompts.md](./tests/PnPPowerShell.MCPServer.Tests/e2eTestPrompts.md) holds natural-language
 prompts per tool. `ToolSelectionEvaluatorTests` ranks every tool against each prompt using BM25 over
 the published descriptions — no model, no network, no tenant — and fails if the expected tool is not
-in the top three. Confidence is a tool's share of the top-3 shortlist, so a three-way tie scores 0.33
-and the 0.4 bar means it leads them. `Baseline` prints the per-tool table and names every prompt below
-the bar. **Adding a tool means adding prompts for it**; the test fails on any tool with none, and when
-a prompt regresses the fix is usually the tool's `[Description]`, not the prompt.
+in the top three. Ranking is the only thing asserted: a confidence score lived here briefly and was
+removed, having never caught a regression. **Adding a tool means adding prompts for it**; the test fails
+on any tool with none, and when a prompt regresses the fix is usually the tool's `[Description]`, not
+the prompt.
 
 `Bm25_agrees_with_the_model_that_read_the_same_descriptions` is the check on the checker: it compares
 BM25s top pick against [modelSelections.md](./tests/PnPPowerShell.MCPServer.Tests/modelSelections.md),

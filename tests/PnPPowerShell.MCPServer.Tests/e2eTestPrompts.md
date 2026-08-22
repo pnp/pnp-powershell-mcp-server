@@ -2,8 +2,7 @@
 
 Every prompt here is a thing a SharePoint administrator might reasonably type, paired with the tool
 that should answer it. `ToolSelectionEvaluatorTests` scores each one against the published tool
-descriptions and fails the build when the right tool is not in the top three with at least 40 %
-confidence.
+descriptions and fails the build when the right tool is not ranked in the top three.
 
 **Adding a tool means adding prompts for it** — the test fails on any tool with none. When a prompt
 regresses, the fix is almost always the tool's `[Description]`, not the prompt: the evaluator sees

@@ -1,3 +1,4 @@
+using System.Reflection;
 using PnPPowerShell.MCPServer.Models;
 using PnPPowerShell.MCPServer.Services;
 using PnPPowerShell.MCPServer.Tools;
@@ -103,9 +104,9 @@ public class VendoredIndexTests
             Samples = [new ScriptSample { Name = name, Title = "tampered" }, new ScriptSample { Name = "spo-good-sample", Title = "fine" }],
         };
 
-        var kept = ScriptSampleIndex.NormalizeForTest(root);
+        ScriptSampleIndex.Normalize(root);
 
-        Assert.Equal(["spo-good-sample"], kept.Select(s => s.Name));
+        Assert.Equal(["spo-good-sample"], root.Samples.Select(s => s.Name));
     }
 
     /// <summary>The docs error path returned raw, and a session error carries unbounded prior output.</summary>
@@ -150,6 +151,42 @@ public class VendoredIndexTests
         Assert.Contains(OutputLimit.TruncationMarker, output, StringComparison.Ordinal);
         Assert.Contains(ScriptSampleIndex.Provenance, output, StringComparison.Ordinal);
         Assert.True(output.Length <= OutputLimit.MaxChars, $"{output.Length} characters against a {OutputLimit.MaxChars} cap.");
+    }
+
+    /// <summary>The PNP_SCRIPT_SAMPLES_PATH override, which is the only index source with no coverage.</summary>
+    // Reads the private loader by reflection rather than through ScriptSampleIndex.Samples, because that
+    // is a process-lifetime Lazy: by the time any test runs it has already resolved to the vendored copy.
+    [Fact]
+    public void A_local_clone_override_is_read_from_its_per_sample_manifests()
+    {
+        var clone = Directory.CreateTempSubdirectory("pnp-clone");
+
+        try
+        {
+            var assets = Directory.CreateDirectory(Path.Combine(clone.FullName, "scripts", "spo-demo-sample", "assets"));
+            File.WriteAllText(Path.Combine(assets.FullName, "sample.json"), """
+                [{"name":"ignored","title":"Demo sample","shortDescription":"A local one","url":"https://example.invalid/demo","tags":["Get-PnPWeb","modern"]}]
+                """);
+
+            // A manifest folder with no assets/sample.json must be skipped rather than fault the read.
+            Directory.CreateDirectory(Path.Combine(clone.FullName, "scripts", "spo-no-manifest"));
+
+            using var path = new EnvVar("PNP_SCRIPT_SAMPLES_PATH", clone.FullName);
+
+            var read = typeof(ScriptSampleIndex).GetMethod("ReadLocalClone", BindingFlags.NonPublic | BindingFlags.Static)!;
+            var samples = (List<ScriptSample>)read.Invoke(null, null)!;
+
+            var sample = Assert.Single(samples);
+            Assert.Equal("spo-demo-sample", sample.Name);
+            Assert.Equal("Demo sample", sample.Title);
+            Assert.Equal("A local one", sample.Description);
+            Assert.Contains("Get-PnPWeb", sample.Tags);
+            Assert.Equal("https://raw.githubusercontent.com/pnp/script-samples/main/scripts/spo-demo-sample/README.md", sample.RawUrl);
+        }
+        finally
+        {
+            clone.Delete(recursive: true);
+        }
     }
 
     [Fact]

@@ -83,16 +83,9 @@ internal static class ScriptSampleIndex
         name.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.') &&
         name.Trim('.').Length > 0;
 
-    /// <summary>Normalize, exposed so a test can prove a tampered index entry is dropped.</summary>
-    internal static IReadOnlyList<ScriptSample> NormalizeForTest(SamplesRoot root)
-    {
-        Normalize(root);
-        return root.Samples;
-    }
-
     /// <summary>Fills in whichever of name, url and rawUrl the source left out, and drops nulls from the rest.</summary>
     // An explicit JSON null replaces a property initializer, and one null tag faults every search.
-    private static void Normalize(SamplesRoot root)
+    internal static void Normalize(SamplesRoot root)
     {
         root.Samples.RemoveAll(s => s is null);
 

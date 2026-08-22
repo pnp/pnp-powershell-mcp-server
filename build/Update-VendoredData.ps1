@@ -63,7 +63,7 @@ $indexed = foreach ($sample in $samples) {
     urlTemplate    = $sampleUrlTemplate
     rawUrlTemplate = $sampleRawUrlTemplate
     samples        = @($indexed)
-} | ConvertTo-Json -Depth 6 | Set-Content (Join-Path $OutputDirectory 'script-samples.json') -Encoding utf8NoBOM
+} | ConvertTo-Json -Depth 6 -Compress | Set-Content (Join-Path $OutputDirectory 'script-samples.json') -Encoding utf8NoBOM
 
 Write-Host "script-samples.json: $($indexed.Count) samples at $($samplesCommit.Substring(0,7))"
 
@@ -86,6 +86,6 @@ foreach ($command in $commands) {
     markdownUrlTemplate = $markdownUrlTemplate
     docsUrlTemplate     = $docsUrlTemplate
     commands            = @($commands.name | Sort-Object)
-} | ConvertTo-Json -Depth 3 | Set-Content (Join-Path $OutputDirectory 'pnp-commands.json') -Encoding utf8NoBOM
+} | ConvertTo-Json -Depth 3 -Compress | Set-Content (Join-Path $OutputDirectory 'pnp-commands.json') -Encoding utf8NoBOM
 
 Write-Host "pnp-commands.json: $($commands.Count) cmdlets at $($commandsCommit.Substring(0,7))"
