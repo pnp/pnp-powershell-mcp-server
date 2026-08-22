@@ -2,14 +2,12 @@ using Xunit.Abstractions;
 
 namespace PnPPowerShell.MCPServer.Tests;
 
-/// <summary>Gates tool descriptions on whether a plausible prompt actually selects the right tool.</summary>
-// A failure is a description missing the words a user would actually use, which is the same reason a
-// real client picks the wrong tool. It scores tool choice, not whether the resulting command is correct.
+/// <summary>Gates tool descriptions on whether a plausible prompt selects the right tool.</summary>
+// Scores choice, not command correctness.
 public class ToolSelectionEvaluatorTests(ITestOutputHelper output)
 {
-    /// <summary>How often BM25 must match the model's pick for the scorer to be worth trusting.</summary>
-    // Measured at 93 %. Below this the lexical proxy is no longer standing in for semantic selection,
-    // and the honest response is to replace the scorer rather than to keep tuning descriptions against it.
+    /// <summary>How often BM25 must match the model's pick.</summary>
+    // Measured at 93 %. Below this, replace the scorer.
     private const double MinimumAgreement = 0.90;
 
     public static TheoryData<string, string> Prompts()
@@ -55,8 +53,7 @@ public class ToolSelectionEvaluatorTests(ITestOutputHelper output)
     }
 
     /// <summary>How often BM25's top pick matches a model reading the same descriptions.</summary>
-    // The evaluator's own accuracy. Everything else here assumes BM25 predicts tool selection; this is
-    // the only test that checks it. If it falls, the scorer is what needs replacing, not the prose.
+    // The only test that checks the scorer itself.
     [Fact]
     public void Bm25_agrees_with_the_model_that_read_the_same_descriptions()
     {

@@ -4,8 +4,7 @@ using System.Text.RegularExpressions;
 
 namespace PnPPowerShell.MCPServer.Services;
 
-/// <summary>Records what a real session returned, and replays it later with no pwsh and no tenant.</summary>
-// The seam is a session's script-in, text-out contract. Both directions are off unless their variable is set.
+/// <summary>Records what a session returned; replays it with no pwsh and no tenant.</summary>
 internal static partial class SessionTranscript
 {
     private const string ScriptMarker = "--- script ---";
@@ -21,8 +20,7 @@ internal static partial class SessionTranscript
 
     public static bool IsReplaying => ReplayDirectory is not null;
 
-    /// <summary>Identifies a fixture by the scrubbed script that produced it.</summary>
-    // Scrubbed, not raw: recording drives a real tenant URL and playback has only the placeholder.
+    /// <summary>Identifies a fixture by its scrubbed script, so record and replay agree.</summary>
     public static string Key(string script, string? transcriptKey = null) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Normalize(
             transcriptKey is { Length: > 0 } label
@@ -83,8 +81,7 @@ internal static partial class SessionTranscript
         File.WriteAllText(Path.Combine(directory, Key(script, transcriptKey) + ".transcript"), fixture.ToString());
     }
 
-    /// <summary>Scrubs a script, including inside the base64 payload the tools wrap a command in.</summary>
-    // The payload is opaque to every textual rule and is exactly where a -ClientSecret ends up.
+    /// <summary>Scrubs a script, including inside its base64 payload.</summary>
     private static string ScrubScript(string script, TranscriptScrubber scrubber, List<string>? commands) =>
         Base64PayloadRegex().Replace(scrubber.Scrub(script), match =>
         {

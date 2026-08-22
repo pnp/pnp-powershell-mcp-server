@@ -54,8 +54,8 @@ internal sealed partial class ScriptSampleTools
         return match.Success ? match.Groups[1].Value.Trim() : string.Empty;
     }
 
-    /// <summary>Fetches the README from GitHub and extracts the PnP PowerShell script block.</summary>
-    // Enrichment only: a failed fetch degrades to the reference URL, never to no result.
+    /// <summary>Fetches the README and extracts the script block.</summary>
+    // Enrichment only: a failed fetch degrades to the reference URL.
     private static async Task<string> FetchScript(ScriptSample sample, CancellationToken cancellationToken)
     {
         var local = Environment.GetEnvironmentVariable("PNP_SCRIPT_SAMPLES_PATH");
@@ -96,9 +96,7 @@ internal sealed partial class ScriptSampleTools
             sb.AppendLine($"{bullet}**Authors**: {string.Join(", ", sample.Authors.Select(a => a.Name))}");
     }
 
-    /// <summary>Where the index came from, as a suffix so the output cap cannot drop it.</summary>
-    // It is a footer, so truncation takes it first — and a truncated answer is exactly when knowing
-    // whether the index is the vendored one, an extension's or an override matters most.
+    /// <summary>Index provenance, as a suffix so the output cap cannot drop it.</summary>
     private static string Provenance => "\n\n" + ScriptSampleIndex.Provenance;
 
     private static string NoMatch(string query) =>

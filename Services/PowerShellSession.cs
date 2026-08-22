@@ -44,25 +44,21 @@ internal sealed class PowerShellSession : IAsyncDisposable
     /// <summary>True while a command holds the session, keeping the idle evictor off work in progress.</summary>
     public bool IsBusy => _gate.CurrentCount == 0;
 
-    /// <summary>The last oversized result set produced here, kept so the caller can page over it.</summary>
-    // Only the latest one: this is for re-reading rows already fetched, not a cache.
+    /// <summary>The last oversized result set, kept for paging. Latest only, not a cache.</summary>
     public HeldResultSet? Held { get; set; }
 
     private string EndMarker => $"__PNP_END_{_token}__";
 
     private string ErrorMarker => $"__PNP_ERR_{_token}__";
 
-    /// <summary>Runs a script in this session, starting the process on first use; calls are serialized.</summary>
-    // transcriptKey names what the call is doing, e.g. "docs\nGet-PnPWeb". Recorded fixtures are filed
-    // under it, so rewording the generated script does not silently invalidate every fixture; without
-    // one the script itself is the key, which is correct but brittle.
+    /// <summary>Runs a script here; calls are serialized.</summary>
+    // transcriptKey files the fixture, so rewording the script does not orphan it.
     public async Task<string> ExecuteAsync(
         string script, TimeSpan timeout, CancellationToken cancellationToken = default, string? transcriptKey = null) =>
         (await RunAsync(script, timeout, capture: false, transcriptKey, cancellationToken)).Output;
 
-    /// <summary>Runs a script and, if the result is a JSON array too big for the cap, holds it for paging.</summary>
-    // The captured set is returned as well as held, because the hold is the latest one and a concurrent
-    // command on this session can replace it: the caller must render the rows its own command produced.
+    /// <summary>Runs a script and holds an oversized JSON array for paging.</summary>
+    // Returned as well as held: a concurrent command can replace the hold.
     public Task<(string Output, HeldResultSet? Held)> ExecuteAndCaptureAsync(
         string script, TimeSpan timeout, CancellationToken cancellationToken = default, string? transcriptKey = null) =>
         RunAsync(script, timeout, capture: true, transcriptKey, cancellationToken);

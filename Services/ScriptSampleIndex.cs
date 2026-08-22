@@ -3,8 +3,7 @@ using System.Text.Json;
 
 namespace PnPPowerShell.MCPServer.Services;
 
-/// <summary>The PnP Script Samples catalogue, resolved once per process.</summary>
-// The two override sources come first; the vendored copy is compiled in so this never returns nothing.
+/// <summary>The catalogue, resolved once. Overrides first, then the compiled-in copy.</summary>
 internal static class ScriptSampleIndex
 {
     private static readonly Lazy<(List<ScriptSample> Samples, string Provenance)> Loaded = new(Load);
@@ -16,8 +15,7 @@ internal static class ScriptSampleIndex
 
     private static (List<ScriptSample>, string) Load()
     {
-        // Both overrides are optional, so neither may throw: Lazy caches the exception, and one unreadable
-        // file would disable all three sample tools for the life of the process rather than falling back.
+        // Overrides must not throw: Lazy caches the exception and would disable the tools.
         if (Safely(ReadExtension) is { Count: > 0 } fromExtension)
         {
             return (fromExtension, $"Index: {fromExtension.Count} samples, from the PnP PowerShell VS Code extension.");
@@ -71,11 +69,7 @@ internal static class ScriptSampleIndex
         return root.Samples;
     }
 
-    /// <summary>True when a name is a single, ordinary folder segment.</summary>
-    // A sample name is substituted into both a filesystem path and a URL, and two of the three index
-    // sources are files this server does not control. A name carrying separators or ".." would walk out
-    // of the scripts folder — reading an arbitrary file into the model's context — or point the fetch at
-    // a different path on GitHub, since the URL prefix check cannot see through a traversal.
+    /// <summary>True when a name is one plain folder segment. It reaches a path and a URL.</summary>
     private static bool IsSafeName(string name) =>
         name.Length is > 0 and <= 128 &&
         name == Path.GetFileName(name) &&
@@ -83,8 +77,7 @@ internal static class ScriptSampleIndex
         name.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.') &&
         name.Trim('.').Length > 0;
 
-    /// <summary>Fills in whichever of name, url and rawUrl the source left out, and drops nulls from the rest.</summary>
-    // An explicit JSON null replaces a property initializer, and one null tag faults every search.
+    /// <summary>Fills in name, url and rawUrl, and drops nulls the sources leave.</summary>
     internal static void Normalize(SamplesRoot root)
     {
         root.Samples.RemoveAll(s => s is null);
@@ -120,8 +113,7 @@ internal static class ScriptSampleIndex
             }
         }
 
-        // Last, once names have been derived: an unsafe entry is dropped rather than repaired, because
-        // there is no way to know what it was meant to be.
+        // Dropped rather than repaired: the intent is unknowable.
         root.Samples.RemoveAll(s => !IsSafeName(s.Name));
     }
 
@@ -203,8 +195,7 @@ internal static class ScriptSampleIndex
             }
         }
 
-        // Path.GetFileName already yields a single segment, but this path does not run through
-        // Normalize, so the guarantee is restated here rather than assumed.
+        // Restated because this path does not run through Normalize.
         samples.RemoveAll(s => !IsSafeName(s.Name));
 
         return samples;

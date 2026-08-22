@@ -10,8 +10,7 @@ internal sealed record Selection(string Prompt, string Expected, IReadOnlyList<s
     public bool InTopThree => Rank is > 0 and <= 3;
 }
 
-/// <summary>Scores which tool a natural-language prompt selects, from the published descriptions alone.</summary>
-// BM25, so it can gate a PR. A lower bound: a prompt it cannot route is one the descriptions do not cover.
+/// <summary>Scores which tool a prompt selects, from the published descriptions alone.</summary>
 internal static class ToolSelectionEvaluator
 {
     private const double K1 = 1.2;
@@ -41,10 +40,7 @@ internal static class ToolSelectionEvaluator
             .ThenBy(x => x.Name, StringComparer.Ordinal)
             .ToList();
 
-        // Ranking only. A confidence score used to live here, normalised first over all eleven tools and
-        // then over the top three; neither ever caught a regression, and the first was zero-sum between
-        // tools rather than a measure of how sure the choice was. Rank is the part this scorer is
-        // reliable about, and it is what the agreement test is measured against.
+        // Ranking only. A confidence score lived here and never caught a regression.
         return new Selection(prompt, expected, [.. scored.Select(x => x.Name)]);
     }
 
@@ -97,8 +93,7 @@ internal static class ToolSelectionEvaluator
             .Where(t => t.Length > 1 && !Stopwords.Contains(t))
             .Select(Stem)];
 
-    /// <summary>A crude suffix fold, enough that a description saying "creating" matches a prompt saying "create".</summary>
-    // Only internal consistency matters: both sides go through the same rules, so non-words are fine.
+    /// <summary>Crude suffix fold, so "creating" matches "create". Non-words are fine.</summary>
     private static string Stem(string token)
     {
         if (token.Length > 4 && token.EndsWith("ies", StringComparison.Ordinal))

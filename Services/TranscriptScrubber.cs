@@ -2,8 +2,8 @@ using System.Text.RegularExpressions;
 
 namespace PnPPowerShell.MCPServer.Services;
 
-/// <summary>Replaces tenant-identifying and secret material in a transcript before it is written to disk.</summary>
-// One instance per recording run. It over-scrubs by choice, and cannot see a display name in free text.
+/// <summary>Removes tenant and secret material before a transcript is written.</summary>
+// Over-scrubs by choice; cannot see display names.
 internal sealed partial class TranscriptScrubber
 {
     private static readonly string[] TenantNames = ["contoso", "fabrikam", "northwind", "adventureworks"];
@@ -24,8 +24,7 @@ internal sealed partial class TranscriptScrubber
     [GeneratedRegex(@"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{16,}")]
     private static partial Regex BearerRegex();
 
-    // PowerShell binds a parameter with either whitespace or a colon, and -ClientSecret:'x' is as valid
-    // as -ClientSecret 'x'. Matching only the spaced form let a real secret through untouched.
+    // PowerShell also binds -ClientSecret:'x', which a spaced-only match missed.
     [GeneratedRegex(@"(?i)-(ClientSecret|Password|CertificatePassword|CertificateBase64Encoded|AccessToken|SecureString|Token|ApiKey)(\s*:\s*|\s+)('[^']*'|""[^""]*""|\$?[^\s;|,)]+)")]
     private static partial Regex SecretParameterRegex();
 
@@ -53,9 +52,7 @@ internal sealed partial class TranscriptScrubber
             return text ?? string.Empty;
         }
 
-        // Secrets first: they can contain anything the later rules would rewrite past recognition.
-        // One line, and no quotes: a certificate is usually inside a JSON string, where a real newline
-        // would make the fixture unparseable — which is how the replacement is worse than the secret.
+        // Secrets first; one line, since a newline breaks the JSON around them.
         var scrubbed = PemBlockRegex().Replace(text, "-----BEGIN REDACTED----- [redacted-certificate] -----END REDACTED-----");
         scrubbed = JwtRegex().Replace(scrubbed, "[redacted-token]");
         scrubbed = BearerRegex().Replace(scrubbed, "Bearer [redacted-token]");
@@ -73,8 +70,7 @@ internal sealed partial class TranscriptScrubber
             ? m.Value
             : Map(_guids, m.Value, i => $"00000000-0000-4000-8000-{i:d12}"));
 
-        // Longest first: with "acme" before "acmecorp", the shorter one rewrites the longer one's prefix
-        // and the same tenant ends up with two different placeholders.
+        // Longest first, or "acme" rewrites the prefix of "acmecorp".
         foreach (var real in _tenants.Keys.OrderByDescending(k => k.Length).ToList())
         {
             scrubbed = Regex.Replace(scrubbed, Regex.Escape(real), _tenants[real], RegexOptions.IgnoreCase);

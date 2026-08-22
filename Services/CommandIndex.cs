@@ -3,8 +3,7 @@ using System.Text.Json;
 
 namespace PnPPowerShell.MCPServer.Services;
 
-/// <summary>The vendored list of PnP.PowerShell cmdlet names and where each one is documented.</summary>
-// Names the markdown behind each cmdlet page, and lets search and docs answer without pwsh.
+/// <summary>Vendored cmdlet names and where each is documented. Answers without pwsh.</summary>
 internal static class CommandIndex
 {
     private static readonly Lazy<CommandsRoot> Root = new(Load);

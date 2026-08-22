@@ -14,8 +14,8 @@ internal static class ToolCatalog
 
     public static IReadOnlyList<McpServerTool> All => Tools.Value;
 
-    /// <summary>Everything a client sees about a tool when deciding whether to call it.</summary>
-    // Weighted by repetition: name and description state purpose, a parameter description only qualifies one argument.
+    /// <summary>Everything a client sees when deciding whether to call a tool.</summary>
+    // Weighted: a parameter description qualifies one argument.
     private const int FieldWeight = 3;
 
     public static string SelectionText(McpServerTool tool)

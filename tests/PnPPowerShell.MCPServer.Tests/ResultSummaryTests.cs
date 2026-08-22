@@ -62,8 +62,7 @@ public class ResultSummaryTests
                 break;
             }
 
-            // Advance the way a caller does, from the printed offset: adding the row count would spin
-            // forever on a page that returned none.
+            // Advance from the printed offset; a page can return no rows.
             offset = int.Parse(System.Text.RegularExpressions.Regex.Match(page, @"offset (\d+)").Groups[1].Value);
         }
 
@@ -156,8 +155,7 @@ public class ResultSummaryTests
     [Fact]
     public void A_result_set_of_very_many_tiny_rows_is_bounded_by_row_count_not_just_characters()
     {
-        // Scalars, as `Select-Object -ExpandProperty Id` produces: a few characters each, so the
-        // character ceiling alone would let millions of string objects accumulate.
+        // Scalars: a few characters each, so the character ceiling is not enough.
         var raw = "[" + string.Join(",", Enumerable.Range(0, 400_000)) + "]";
         var held = ResultSummary.TryCapture(raw)!;
 

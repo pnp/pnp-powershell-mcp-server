@@ -153,9 +153,8 @@ public class VendoredIndexTests
         Assert.True(output.Length <= OutputLimit.MaxChars, $"{output.Length} characters against a {OutputLimit.MaxChars} cap.");
     }
 
-    /// <summary>The PNP_SCRIPT_SAMPLES_PATH override, which is the only index source with no coverage.</summary>
-    // Reads the private loader by reflection rather than through ScriptSampleIndex.Samples, because that
-    // is a process-lifetime Lazy: by the time any test runs it has already resolved to the vendored copy.
+    /// <summary>The PNP_SCRIPT_SAMPLES_PATH override, the only source with no coverage.</summary>
+    // By reflection: ScriptSampleIndex.Samples is a Lazy already resolved.
     [Fact]
     public void A_local_clone_override_is_read_from_its_per_sample_manifests()
     {

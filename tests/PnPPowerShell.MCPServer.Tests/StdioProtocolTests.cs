@@ -5,10 +5,7 @@ using System.Text.Json;
 
 namespace PnPPowerShell.MCPServer.Tests;
 
-/// <summary>Drives the published server the way a client does: a real process, JSON-RPC over stdio.</summary>
-// Everything else in this suite calls the tool methods directly, which never proves the server starts,
-// negotiates, publishes its tools or returns a well-formed result. Hermetic: replay answers the calls
-// that would otherwise need pwsh and a tenant.
+/// <summary>Drives the built server as a real process over JSON-RPC, the way a client does.</summary>
 public sealed class StdioProtocolTests : IDisposable
 {
     private readonly McpStdioClient _client = new();
@@ -80,9 +77,7 @@ public sealed class StdioProtocolTests : IDisposable
     }
 
     /// <summary>The confirmation gate, over the wire, against a client that cannot be prompted.</summary>
-    // Not replayed: the gate sits after analysis, and analysis is the one step that must really run for
-    // the refusal to mean anything. Nothing is executed — the command is parsed, recognised as
-    // destructive, and blocked before it reaches a session, so this needs no tenant and no connection.
+    // Analysis must run; nothing is executed.
     [RequiresPnPFact]
     public void A_destructive_command_is_refused_when_the_client_cannot_be_prompted()
     {
@@ -97,9 +92,8 @@ public sealed class StdioProtocolTests : IDisposable
     }
 }
 
-/// <summary>A minimal MCP client: newline-delimited JSON-RPC over the server's stdin and stdout.</summary>
-// Deliberately hand-rolled rather than using the SDK's client, so the test exercises the wire format
-// instead of the SDK talking to itself.
+/// <summary>Minimal MCP client: newline-delimited JSON-RPC over stdio.</summary>
+// Hand-rolled, so the wire format is tested rather than the SDK.
 internal sealed class McpStdioClient : IDisposable
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(60);
@@ -133,9 +127,8 @@ internal sealed class McpStdioClient : IDisposable
         _ = Task.Run(() => _server.StandardError.ReadToEnd());
     }
 
-    /// <summary>The server's own build output, which is where its self-contained runtime lives.</summary>
-    // The copy beside the tests is not runnable: the project publishes self-contained, so its
-    // runtimeconfig names no shared framework and the runtime is only in the server's own folder.
+    /// <summary>The server's own build output, where its self-contained runtime lives.</summary>
+    // The copy beside the tests will not start.
     private static string FindServerExecutable()
     {
         var name = OperatingSystem.IsWindows() ? "PnPPowerShell.MCPServer.exe" : "PnPPowerShell.MCPServer";
@@ -155,9 +148,7 @@ internal sealed class McpStdioClient : IDisposable
 
         Assert.True(candidates.Count > 0, $"No built server found under {directory.FullName}/bin. Run 'dotnet build' first.");
 
-        // Newest-first alone picks whatever was built last, which on a machine holding several builds
-        // can be another configuration or another architecture entirely — a stale or unrunnable binary
-        // that the test would then report on as though it were the code under test.
+        // Match configuration and RID, or this drives a stale or foreign binary.
         var configuration = AppContext.BaseDirectory.Contains($"{Path.DirectorySeparatorChar}Release{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
             ? "Release"
             : "Debug";

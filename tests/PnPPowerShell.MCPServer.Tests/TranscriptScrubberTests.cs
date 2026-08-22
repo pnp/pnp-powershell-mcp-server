@@ -36,8 +36,7 @@ public class TranscriptScrubberTests
     [Fact]
     public void Catches_the_bare_tenant_name_once_a_url_has_named_it()
     {
-        // A site title is free text, but the tenant token inside it is not: learning it from the URL is
-        // the only way that occurrence gets scrubbed at all.
+        // The tenant token in a title is scrubbed only once a URL has named it.
         var scrubbed = new TranscriptScrubber().Scrub(
             """{"Url":"https://acmecorp.sharepoint.com/sites/team","Title":"Acmecorp Team Site"}""");
 

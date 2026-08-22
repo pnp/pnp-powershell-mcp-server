@@ -143,7 +143,7 @@ internal partial class PnPPowerShellTools
 
         var safeCommandName = EscapeSingleQuotedPowerShell(commandName.Trim());
 
-        // Markdown first, and both before the help text: Set-PnPTenant's help is ~135k characters, so a trailing link is what the cap drops.
+        // Markdown first, and before the help: a trailing link is what the cap drops.
         var links = CommandIndex.MarkdownUrl(commandName) is { } markdown
             ? $"""
               MARKDOWN DOCUMENTATION (prefer this — the same page in source form, at a fraction of the tokens): {markdown}
@@ -179,8 +179,7 @@ internal partial class PnPPowerShellTools
 
         var help = await sessions.Get(null).ExecuteAsync(script, MetadataTimeout, cancellationToken, $"command-docs\n{commandName.Trim()}");
 
-        // Capped like every other path: a session error carries whatever the command printed before it
-        // failed, which is unbounded, so returning it raw would let this tool exceed the output limit.
+        // Capped: a session error carries unbounded prior output.
         if (help.StartsWith("Error:", StringComparison.OrdinalIgnoreCase) && links.Length > 0)
         {
             return OutputLimit.Apply(
@@ -308,8 +307,7 @@ internal partial class PnPPowerShellTools
     {
         var session = sessions.FindHolder(cursor);
 
-        // Read once: a command running concurrently in that session clears Held, so checking the
-        // property and then rendering it are two different values.
+        // Read once: a concurrent command in that session clears Held.
         if (session?.Held is not { } held)
         {
             return

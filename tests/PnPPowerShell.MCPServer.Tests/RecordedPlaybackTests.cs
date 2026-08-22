@@ -3,10 +3,8 @@ using PnPPowerShell.MCPServer.Tools;
 
 namespace PnPPowerShell.MCPServer.Tests;
 
-/// <summary>
-/// Tenant-dependent behaviour, recorded once against a dev tenant and replayed offline forever after.
-/// </summary>
-// pnp_diagnose_connection is absent: ConnectionPreflight starts its own pwsh, outside this seam.
+/// <summary>Tenant-dependent behaviour, recorded once and replayed offline.</summary>
+// pnp_diagnose_connection is absent: its pwsh probe is outside this seam.
 public class RecordedPlaybackTests
 {
     private static readonly string FixtureDirectory = Path.Combine(AppContext.BaseDirectory, "fixtures");

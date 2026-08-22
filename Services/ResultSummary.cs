@@ -23,8 +23,7 @@ internal sealed class HeldResultSet
     public bool Partial => TotalRows > Rows.Count;
 }
 
-/// <summary>Turns an oversized JSON array into a summary plus a page, instead of a truncated fragment.</summary>
-// Truncation spends the tokens and returns unparseable JSON; summarising keeps the bound and the answer.
+/// <summary>Summarises an oversized JSON array into pages instead of truncating it.</summary>
 internal static class ResultSummary
 {
     // Reserved for the header, the field list and the continuation footer before any row is measured.
@@ -36,15 +35,10 @@ internal static class ResultSummary
     // Bounds the field line in characters as well as in count, so Overhead cannot be overrun by long names.
     private const int MaxFieldChars = 600;
 
-    /// <summary>Ceiling on what a session may pin in memory for paging.</summary>
-    // A tenant-wide query can return hundreds of megabytes, and the hold lives until the next command
-    // in that session. Beyond this the rows stop being kept, but they are still counted: the caller is
-    // told the true total and how much of it is pageable, rather than being quietly given a short answer.
+    /// <summary>Ceiling on what a session pins in memory. Rows past it are counted, not kept.</summary>
     private const int MaxHeldChars = 8_000_000;
 
-    /// <summary>Companion ceiling on row count, since the character one does not bound object overhead.</summary>
-    // A million one-token rows — Select-Object -ExpandProperty Id over a large list — costs far more in
-    // string and list overhead than the characters suggest, so the cheap cap has to be counted too.
+    /// <summary>Row ceiling too: many tiny rows cost more than their characters.</summary>
     private const int MaxHeldRows = 100_000;
 
     /// <summary>Captures a JSON array of two or more elements; null for anything else.</summary>
@@ -117,8 +111,7 @@ internal static class ResultSummary
     /// <summary>Renders one page: what the whole result set is, then as many rows from <paramref name="offset"/> as fit.</summary>
     public static string Render(HeldResultSet held, int offset, string sessionId)
     {
-        // Two counts, deliberately: paging walks the rows actually kept, but every figure reported to
-        // the caller is the true one, so a partial hold cannot read as a complete result set.
+        // Paging walks held rows; every reported figure is the true total.
         var pageable = held.Rows.Count;
         var total = held.TotalRows;
         offset = Math.Clamp(offset, 0, Math.Max(pageable - 1, 0));
@@ -133,8 +126,7 @@ internal static class ResultSummary
             taken++;
         }
 
-        // A row wider than a whole page cannot be emitted without the output cap cutting it mid-token,
-        // which is the truncated, unparseable answer this class exists to avoid. Skip it and say so.
+        // A row wider than a page would be cut mid-token, so skip it.
         var oversized = taken == 0 && offset < pageable;
         var end = offset + (oversized ? 1 : taken);
 
@@ -187,8 +179,7 @@ internal static class ResultSummary
         }
         else if (held.Partial)
         {
-            // The end of what is held is not the end of the result set, and saying "last page" here
-            // would report a partial answer as a complete one.
+            // Held rows ended, but the result set did not.
             sb.AppendLine(
                 $"END OF HELD ROWS: rows {N(pageable + 1)}-{N(total)} were never held, so no cursor reaches them. " +
                 "Re-run with a narrower query — fewer fields, a filter, or -PageSize — to see the rest.");

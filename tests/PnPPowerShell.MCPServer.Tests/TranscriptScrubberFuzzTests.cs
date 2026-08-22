@@ -4,12 +4,8 @@ using System.Text.Json;
 
 namespace PnPPowerShell.MCPServer.Tests;
 
-/// <summary>Generated transcripts, checked for anything identifying that survived the scrubber.</summary>
-// The hand-written tests only cover the shapes someone thought of. These plant known markers in
-// randomly assembled output and assert none of them come out the other side, which is the property
-// that actually matters: a fixture is committed to a public repository.
-//
-// Deterministic by seed, so a failure names the seed that produced it and can be replayed.
+/// <summary>Generated transcripts, checked for identifiers that survived the scrubber.</summary>
+// Deterministic by seed, so a failure can be replayed.
 public class TranscriptScrubberFuzzTests
 {
     private const int Cases = 400;
