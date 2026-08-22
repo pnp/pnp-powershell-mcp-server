@@ -55,12 +55,22 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Confirm the runner really is bare
+      # ubuntu-latest ships PowerShell preinstalled, so the bare case has to be manufactured rather
+      # than assumed. Renamed rather than uninstalled: it is the PATH lookup the server does, and the
+      # runner is thrown away afterwards.
+      - name: Take pwsh off PATH
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          for _ in 1 2 3; do
+            found="$(command -v pwsh || true)"
+            [ -z "$found" ] && break
+            echo "disabling $found"
+            sudo mv "$found" "$found.disabled"
+          done
+
           if command -v pwsh >/dev/null 2>&1; then
-            echo "::error::pwsh is on PATH, so this job is no longer testing the bare case"
+            echo "::error::pwsh is still on PATH at $(command -v pwsh), so this job would not test the bare case"
             exit 1
           fi
           echo "ok: no pwsh on PATH"

@@ -71,6 +71,25 @@ internal static class ScriptSampleIndex
         return root.Samples;
     }
 
+    /// <summary>True when a name is a single, ordinary folder segment.</summary>
+    // A sample name is substituted into both a filesystem path and a URL, and two of the three index
+    // sources are files this server does not control. A name carrying separators or ".." would walk out
+    // of the scripts folder — reading an arbitrary file into the model's context — or point the fetch at
+    // a different path on GitHub, since the URL prefix check cannot see through a traversal.
+    private static bool IsSafeName(string name) =>
+        name.Length is > 0 and <= 128 &&
+        name == Path.GetFileName(name) &&
+        name.IndexOfAny(Path.GetInvalidFileNameChars()) < 0 &&
+        name.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.') &&
+        name.Trim('.').Length > 0;
+
+    /// <summary>Normalize, exposed so a test can prove a tampered index entry is dropped.</summary>
+    internal static IReadOnlyList<ScriptSample> NormalizeForTest(SamplesRoot root)
+    {
+        Normalize(root);
+        return root.Samples;
+    }
+
     /// <summary>Fills in whichever of name, url and rawUrl the source left out, and drops nulls from the rest.</summary>
     // An explicit JSON null replaces a property initializer, and one null tag faults every search.
     private static void Normalize(SamplesRoot root)
@@ -97,11 +116,6 @@ internal static class ScriptSampleIndex
                 }
             }
 
-            if (sample.Name.Length == 0)
-            {
-                continue;
-            }
-
             if (sample.Url.Length == 0 && root.UrlTemplate is { Length: > 0 } urlTemplate)
             {
                 sample.Url = urlTemplate.Replace("{name}", sample.Name);
@@ -112,6 +126,10 @@ internal static class ScriptSampleIndex
                 sample.RawUrl = rawTemplate.Replace("{name}", sample.Name);
             }
         }
+
+        // Last, once names have been derived: an unsafe entry is dropped rather than repaired, because
+        // there is no way to know what it was meant to be.
+        root.Samples.RemoveAll(s => !IsSafeName(s.Name));
     }
 
     /// <summary>The samples.json shipped inside the PnP PowerShell VS Code extension, if it is installed.</summary>
@@ -191,6 +209,10 @@ internal static class ScriptSampleIndex
                 // A malformed sample manifest skips that sample rather than the whole checkout.
             }
         }
+
+        // Path.GetFileName already yields a single segment, but this path does not run through
+        // Normalize, so the guarantee is restated here rather than assumed.
+        samples.RemoveAll(s => !IsSafeName(s.Name));
 
         return samples;
     }

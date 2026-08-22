@@ -1,3 +1,4 @@
+using PnPPowerShell.MCPServer.Models;
 using PnPPowerShell.MCPServer.Services;
 using PnPPowerShell.MCPServer.Tools;
 
@@ -83,5 +84,37 @@ public class VendoredIndexTests
 
         Assert.Contains("Get-PnPTenantSite", matches);
         Assert.True(matches.Count <= 10);
+    }
+
+    /// <summary>A sample name reaches both a file path and a URL, and two of the three sources are not ours.</summary>
+    [Theory]
+    [InlineData("../../../../etc/passwd")]
+    [InlineData("..\\..\\Windows\\System32\\config")]
+    [InlineData("spo/../../secrets")]
+    [InlineData("..")]
+    [InlineData("a:b")]
+    [InlineData("")]
+    public void A_sample_whose_name_is_not_a_plain_folder_segment_is_dropped(string name)
+    {
+        var root = new SamplesRoot
+        {
+            UrlTemplate = "https://pnp.github.io/script-samples/{name}/README.html",
+            RawUrlTemplate = "https://raw.githubusercontent.com/pnp/script-samples/main/scripts/{name}/README.md",
+            Samples = [new ScriptSample { Name = name, Title = "tampered" }, new ScriptSample { Name = "spo-good-sample", Title = "fine" }],
+        };
+
+        var kept = ScriptSampleIndex.NormalizeForTest(root);
+
+        Assert.Equal(["spo-good-sample"], kept.Select(s => s.Name));
+    }
+
+    [Fact]
+    public void Every_vendored_sample_name_is_a_plain_folder_segment()
+    {
+        Assert.All(ScriptSampleIndex.Samples, s =>
+        {
+            Assert.Equal(s.Name, Path.GetFileName(s.Name));
+            Assert.DoesNotContain("..", s.Name, StringComparison.Ordinal);
+        });
     }
 }

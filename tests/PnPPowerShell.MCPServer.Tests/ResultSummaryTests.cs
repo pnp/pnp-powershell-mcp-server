@@ -136,6 +136,43 @@ public class ResultSummaryTests
         }
     }
 
+    /// <summary>A tenant-wide query must not pin unbounded memory in the session until the next command.</summary>
+    [Fact]
+    public void A_result_set_too_large_to_hold_keeps_a_bounded_prefix_and_still_counts_the_rest()
+    {
+        // Rows of ~10 KB each, well past the 8 MB ceiling.
+        var wide = new string('x', 10_000);
+        var raw = "[" + string.Join(",", Enumerable.Range(0, 1_200).Select(i => $$"""{"I":{{i}},"Pad":"{{wide}}"}""")) + "]";
+
+        var held = ResultSummary.TryCapture(raw)!;
+
+        Assert.True(held.Partial, "A result set past the ceiling should be held only in part.");
+        Assert.Equal(1_200, held.TotalRows);
+        Assert.True(held.Rows.Count < 1_200, "Every row was held, so the ceiling did not apply.");
+        Assert.True(held.Rows.Sum(r => (long)r.Length) <= 8_010_000, "The hold exceeded its ceiling.");
+    }
+
+    [Fact]
+    public void A_partial_hold_reports_the_true_total_and_refuses_to_claim_it_is_complete()
+    {
+        using var cap = new EnvVar("PNP_MCP_MAX_OUTPUT_CHARS", "2000");
+
+        var wide = new string('x', 10_000);
+        var raw = "[" + string.Join(",", Enumerable.Range(0, 1_200).Select(i => $$"""{"I":{{i}},"Pad":"{{wide}}"}""")) + "]";
+        var held = ResultSummary.TryCapture(raw)!;
+
+        var first = ResultSummary.Render(held, 0, "default");
+        Assert.Contains("1,200 rows", first, StringComparison.Ordinal);
+        Assert.Contains("cannot", first, StringComparison.Ordinal);
+        Assert.DoesNotContain("No rows were dropped", first, StringComparison.Ordinal);
+
+        // The last held page must say the rest is unreachable rather than "this is the last page".
+        var last = ResultSummary.Render(held, held.Rows.Count - 1, "default");
+        Assert.Contains("END OF HELD ROWS", last, StringComparison.Ordinal);
+        Assert.DoesNotContain("COMPLETE", last, StringComparison.Ordinal);
+        Assert.DoesNotContain("MORE:", last, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Clamps_an_offset_past_the_end()
     {

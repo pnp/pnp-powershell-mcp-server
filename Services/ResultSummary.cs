@@ -9,9 +9,18 @@ namespace PnPPowerShell.MCPServer.Services;
 internal sealed class HeldResultSet
 {
     public required string Cursor { get; init; }
+
+    /// <summary>The rows kept for paging, which may be a prefix of the result set.</summary>
     public required IReadOnlyList<string> Rows { get; init; }
+
+    /// <summary>Rows the command actually returned, counted whether or not they were kept.</summary>
+    public required int TotalRows { get; init; }
+
     public required IReadOnlyList<string> Fields { get; init; }
     public required int RawLength { get; init; }
+
+    /// <summary>True when the result was too large to hold whole and only a prefix is pageable.</summary>
+    public bool Partial => TotalRows > Rows.Count;
 }
 
 /// <summary>Turns an oversized JSON array into a summary plus a page, instead of a truncated fragment.</summary>
@@ -26,6 +35,12 @@ internal static class ResultSummary
 
     // Bounds the field line in characters as well as in count, so Overhead cannot be overrun by long names.
     private const int MaxFieldChars = 600;
+
+    /// <summary>Ceiling on what a session may pin in memory for paging.</summary>
+    // A tenant-wide query can return hundreds of megabytes, and the hold lives until the next command
+    // in that session. Beyond this the rows stop being kept, but they are still counted: the caller is
+    // told the true total and how much of it is pageable, rather than being quietly given a short answer.
+    private const int MaxHeldChars = 8_000_000;
 
     /// <summary>Captures a JSON array of two or more elements; null for anything else.</summary>
     public static HeldResultSet? TryCapture(string? output)
@@ -47,10 +62,20 @@ internal static class ResultSummary
             var rows = new List<string>();
             var fields = new List<string>();
             var seen = new HashSet<string>(StringComparer.Ordinal);
+            var total = 0;
+            var held = 0;
 
             foreach (var element in document.RootElement.EnumerateArray())
             {
-                rows.Add(element.GetRawText());
+                total++;
+
+                // Counting continues past the ceiling so the reported total stays true.
+                if (held < MaxHeldChars)
+                {
+                    var row = element.GetRawText();
+                    rows.Add(row);
+                    held += row.Length;
+                }
 
                 if (element.ValueKind != JsonValueKind.Object)
                 {
@@ -73,6 +98,7 @@ internal static class ResultSummary
                 {
                     Cursor = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(5)),
                     Rows = rows,
+                    TotalRows = total,
                     Fields = fields,
                     RawLength = text.Length,
                 };
@@ -86,14 +112,17 @@ internal static class ResultSummary
     /// <summary>Renders one page: what the whole result set is, then as many rows from <paramref name="offset"/> as fit.</summary>
     public static string Render(HeldResultSet held, int offset, string sessionId)
     {
-        var total = held.Rows.Count;
-        offset = Math.Clamp(offset, 0, Math.Max(total - 1, 0));
+        // Two counts, deliberately: paging walks the rows actually kept, but every figure reported to
+        // the caller is the true one, so a partial hold cannot read as a complete result set.
+        var pageable = held.Rows.Count;
+        var total = held.TotalRows;
+        offset = Math.Clamp(offset, 0, Math.Max(pageable - 1, 0));
 
         var budget = Math.Max(OutputLimit.MaxChars - Overhead, 500);
         var taken = 0;
         var used = 0;
 
-        while (offset + taken < total && used + held.Rows[offset + taken].Length + 1 <= budget)
+        while (offset + taken < pageable && used + held.Rows[offset + taken].Length + 1 <= budget)
         {
             used += held.Rows[offset + taken].Length + 1;
             taken++;
@@ -101,13 +130,16 @@ internal static class ResultSummary
 
         // A row wider than a whole page cannot be emitted without the output cap cutting it mid-token,
         // which is the truncated, unparseable answer this class exists to avoid. Skip it and say so.
-        var oversized = taken == 0 && offset < total;
+        var oversized = taken == 0 && offset < pageable;
         var end = offset + (oversized ? 1 : taken);
 
         var sb = new StringBuilder();
         sb.AppendLine(
             $"Result set: {N(total)} rows, summarised because the full output is {N(held.RawLength)} characters " +
-            $"and the cap is {N(OutputLimit.MaxChars)}. No rows were dropped — they are held for paging.");
+            $"and the cap is {N(OutputLimit.MaxChars)}. " +
+            (held.Partial
+                ? $"Too large to hold whole: the first {N(pageable)} rows can be paged, the remaining {N(total - pageable)} cannot."
+                : "No rows were dropped — they are held for paging."));
 
         if (held.Fields.Count > 0)
         {
@@ -143,10 +175,18 @@ internal static class ResultSummary
 
         sb.AppendLine();
 
-        if (end < total)
+        if (end < pageable)
         {
             sb.AppendLine(
-                $"MORE: {N(total - end)} rows remain. Call 'pnp_get_result_page' with cursor '{held.Cursor}' and offset {end}.");
+                $"MORE: {N(pageable - end)} of the held rows remain. Call 'pnp_get_result_page' with cursor '{held.Cursor}' and offset {end}.");
+        }
+        else if (held.Partial)
+        {
+            // The end of what is held is not the end of the result set, and saying "last page" here
+            // would report a partial answer as a complete one.
+            sb.AppendLine(
+                $"END OF HELD ROWS: rows {N(pageable + 1)}-{N(total)} were never held, so no cursor reaches them. " +
+                "Re-run with a narrower query — fewer fields, a filter, or -PageSize — to see the rest.");
         }
         else if (offset > 0)
         {
