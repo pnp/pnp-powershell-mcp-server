@@ -13,7 +13,7 @@ internal partial class ScriptSampleJsonContext : JsonSerializerContext { }
 internal sealed class SamplesRoot
 {
     public string? Commit { get; set; }
-    public string? Generated { get; set; }
+    public string? SourceDate { get; set; }
     public string? UrlTemplate { get; set; }
     public string? RawUrlTemplate { get; set; }
     public List<ScriptSample> Samples { get; set; } = [];
@@ -39,7 +39,7 @@ internal sealed class ScriptSampleAuthor
 internal sealed class CommandsRoot
 {
     public string? Commit { get; set; }
-    public string? Generated { get; set; }
+    public string? SourceDate { get; set; }
     public string MarkdownUrlTemplate { get; set; } = string.Empty;
     public string DocsUrlTemplate { get; set; } = string.Empty;
     public List<string> Commands { get; set; } = [];

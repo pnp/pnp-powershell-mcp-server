@@ -14,7 +14,7 @@ internal static class CommandIndex
     public static IReadOnlyList<string> Commands => Root.Value.Commands;
 
     public static string Provenance =>
-        $"Vendored cmdlet index: {Root.Value.Commands.Count} cmdlets at commit {Short(Root.Value.Commit)} ({Root.Value.Generated}). " +
+        $"Vendored cmdlet index: {Root.Value.Commands.Count} cmdlets at commit {Short(Root.Value.Commit)} ({Root.Value.SourceDate}). " +
         "It lists the cmdlets that existed when this server was built, not the ones your installed module has.";
 
     /// <summary>The cmdlet name in its documented casing, or null when it is not a PnP cmdlet.</summary>

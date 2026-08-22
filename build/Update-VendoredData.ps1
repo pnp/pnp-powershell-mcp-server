@@ -19,7 +19,10 @@ $docsUrlTemplate      = 'https://pnp.github.io/powershell/cmdlets/{name}.html'
 function Get-SourceCommit([string] $Path) {
     $headers = @{ 'User-Agent' = 'pnp-powershell-mcp-server' }
     if ($env:GITHUB_TOKEN) { $headers['Authorization'] = "Bearer $($env:GITHUB_TOKEN)" }
-    (Invoke-RestMethod "https://api.github.com/repos/$repo/commits?path=$Path&per_page=1" -Headers $headers)[0].sha
+    $commit = (Invoke-RestMethod "https://api.github.com/repos/$repo/commits?path=$Path&per_page=1" -Headers $headers)[0]
+
+    # Dated from the commit, not from today, so regenerating unchanged upstream produces no diff.
+    [pscustomobject]@{ Sha = $commit.sha; Date = ([datetime]$commit.commit.committer.date).ToString('yyyy-MM-dd') }
 }
 
 function Get-SourceJson([string] $Path) {
@@ -30,11 +33,9 @@ function Expand-Template([string] $Template, [string] $Name) {
     $Template.Replace('{name}', $Name)
 }
 
-$generated = (Get-Date).ToString('yyyy-MM-dd')
-
 # Script samples
 
-$samplesCommit = Get-SourceCommit 'data/samples.json'
+$samples_ = Get-SourceCommit 'data/samples.json'
 $samples = (Get-SourceJson 'data/samples.json').samples
 
 $indexed = foreach ($sample in $samples) {
@@ -58,18 +59,18 @@ $indexed = foreach ($sample in $samples) {
 
 [ordered]@{
     source         = "https://github.com/$repo/blob/main/data/samples.json"
-    commit         = $samplesCommit
-    generated      = $generated
+    commit         = $samples_.Sha
+    sourceDate     = $samples_.Date
     urlTemplate    = $sampleUrlTemplate
     rawUrlTemplate = $sampleRawUrlTemplate
     samples        = @($indexed)
 } | ConvertTo-Json -Depth 6 -Compress | Set-Content (Join-Path $OutputDirectory 'script-samples.json') -Encoding utf8NoBOM
 
-Write-Host "script-samples.json: $($indexed.Count) samples at $($samplesCommit.Substring(0,7))"
+Write-Host "script-samples.json: $($indexed.Count) samples at $($samples_.Sha.Substring(0,7))"
 
 # Cmdlet index
 
-$commandsCommit = Get-SourceCommit 'data/pnpPsModel.json'
+$commands_ = Get-SourceCommit 'data/pnpPsModel.json'
 $commands = (Get-SourceJson 'data/pnpPsModel.json').commands
 
 foreach ($command in $commands) {
@@ -81,11 +82,11 @@ foreach ($command in $commands) {
 
 [ordered]@{
     source              = "https://github.com/$repo/blob/main/data/pnpPsModel.json"
-    commit              = $commandsCommit
-    generated           = $generated
+    commit              = $commands_.Sha
+    sourceDate          = $commands_.Date
     markdownUrlTemplate = $markdownUrlTemplate
     docsUrlTemplate     = $docsUrlTemplate
     commands            = @($commands.name | Sort-Object)
 } | ConvertTo-Json -Depth 3 -Compress | Set-Content (Join-Path $OutputDirectory 'pnp-commands.json') -Encoding utf8NoBOM
 
-Write-Host "pnp-commands.json: $($commands.Count) cmdlets at $($commandsCommit.Substring(0,7))"
+Write-Host "pnp-commands.json: $($commands.Count) cmdlets at $($commands_.Sha.Substring(0,7))"

@@ -36,7 +36,7 @@ internal static class ScriptSampleIndex
         Normalize(root);
 
         return (root.Samples,
-            $"Index: {root.Samples.Count} samples, vendored at commit {Short(root.Commit)} ({root.Generated}). " +
+            $"Index: {root.Samples.Count} samples, vendored at commit {Short(root.Commit)} ({root.SourceDate}). " +
             "A newer sample will not be listed until this server is updated; browse https://pnp.github.io/script-samples/ for the live catalogue.");
     }
 

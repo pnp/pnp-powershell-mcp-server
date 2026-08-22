@@ -18,7 +18,27 @@ internal static partial class SessionTranscript
 
     public static string? ReplayDirectory => Directory("PNP_MCP_REPLAY_DIR");
 
-    public static bool IsReplaying => ReplayDirectory is not null;
+    public static bool IsReplaying
+    {
+        get
+        {
+            if (ReplayDirectory is not { } directory)
+            {
+                return false;
+            }
+
+            // Replay makes the server answer from files instead of the tenant, so say so once.
+            if (!_announced)
+            {
+                _announced = true;
+                Console.Error.WriteLine($"PNP_MCP_REPLAY_DIR is set: commands are answered from {directory}, not from Microsoft 365.");
+            }
+
+            return true;
+        }
+    }
+
+    private static bool _announced;
 
     /// <summary>Identifies a fixture by its scrubbed script, so record and replay agree.</summary>
     public static string Key(string script, string? transcriptKey = null) =>
