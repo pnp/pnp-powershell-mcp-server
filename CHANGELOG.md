@@ -44,10 +44,6 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
-- Fixed the bare-runner CI job, which asserted that `ubuntu-latest` has no `pwsh` when in fact it ships PowerShell preinstalled. The job now takes `pwsh` off PATH itself and fails if it cannot, so the offline paths are tested against a genuinely bare machine instead of an assumed one.
-- Fixed an unbounded hold in the paging code. A tenant-wide query could pin its entire result set in the session until the next command ran there. At most 8 MB of rows are now kept; the true row count is still reported, and the pages that cannot be reached say so rather than reading as a complete result set.
-- Fixed a path-traversal hole in the script-sample index. A sample name is substituted into both a filesystem path and a GitHub URL, and two of the three index sources are files this server does not control, so a name carrying separators could read an arbitrary file into the models context. Names must now be a single ordinary folder segment, and entries that are not are dropped.
-
 - Fixed the destructive command confirmation bypass by removing `confirmDestructive` from the tool schema and binding an approval to an HMAC keyed fingerprint of the command, so the model can no longer approve its own destructive command. `PNP_MCP_CONFIRM_DESTRUCTIVE=false` is now the only way to bypass the gate. [#15](https://github.com/pnp/pnp-powershell-mcp-server/pull/15)
 - Fixed the order in which error hints are matched, so the most specific hint wins. [#15](https://github.com/pnp/pnp-powershell-mcp-server/pull/15)
 
