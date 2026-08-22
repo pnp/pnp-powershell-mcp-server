@@ -105,7 +105,7 @@ internal sealed partial class ScriptSampleTools
     private static string Provenance => "\n\n" + ScriptSampleIndex.Provenance;
 
     private static string NoMatch(string query) =>
-        $"No script samples matched '{query}'.\n" +
+        $"No script samples matched '{OutputLimit.Echo(query)}'.\n" +
         "Try broader terms such as: site, list, teams, permissions, export, bulk, user, flow, app, hub.\n" +
         $"Browse the whole catalogue at https://pnp.github.io/script-samples/\n\n{ScriptSampleIndex.Provenance}";
 
@@ -161,7 +161,7 @@ internal sealed partial class ScriptSampleTools
             (s.Url.Length > 0 && s.Url.Contains(wanted, StringComparison.OrdinalIgnoreCase)));
 
         if (sample is null)
-            return $"Sample '{wanted}' was not found in the index.\n" +
+            return $"Sample '{OutputLimit.Echo(wanted)}' was not found in the index.\n" +
                    $"Use 'pnp_search_script_samples' to find the correct sample name.\n\n{ScriptSampleIndex.Provenance}";
 
         var sb = new StringBuilder();
@@ -214,7 +214,7 @@ internal sealed partial class ScriptSampleTools
         var scripts = await Task.WhenAll(matches.Select(m => FetchScript(m, cancellationToken)));
 
         var sb = new StringBuilder();
-        sb.AppendLine($"# Script Suggestions for: \"{task}\"");
+        sb.AppendLine($"# Script Suggestions for: \"{OutputLimit.Echo(task)}\"");
         sb.AppendLine($"\nFound **{matches.Count}** relevant community sample(s).\n");
 
         for (int i = 0; i < matches.Count; i++)

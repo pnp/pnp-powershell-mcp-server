@@ -113,7 +113,7 @@ internal partial class PnPPowerShellTools
 
         if (matches.Count == 0)
         {
-            sb.AppendLine($"No vendored cmdlet name matched '{query}'.");
+            sb.AppendLine($"No vendored cmdlet name matched '{OutputLimit.Echo(query)}'.");
         }
         else
         {
@@ -313,7 +313,7 @@ internal partial class PnPPowerShellTools
         if (session?.Held is not { } held)
         {
             return
-                $"Error: No held result set matches cursor '{cursor}'. A cursor is dropped when the next command runs in " +
+                $"Error: No held result set matches cursor '{OutputLimit.Echo(cursor)}'. A cursor is dropped when the next command runs in " +
                 "its session, when the session is reset, and when the server restarts. Re-run the original command to get a new one.";
         }
 
@@ -465,7 +465,7 @@ internal partial class PnPPowerShellTools
         var result = await sessions.Get(sessionId).ExecuteAsync(script, MetadataTimeout, cancellationToken, "connection-status");
 
         return $"""
-            Session: {(string.IsNullOrWhiteSpace(sessionId) ? PowerShellSessionManager.DefaultSessionId : sessionId.Trim())}
+            Session: {OutputLimit.Echo(string.IsNullOrWhiteSpace(sessionId) ? PowerShellSessionManager.DefaultSessionId : sessionId.Trim())}
 
             {result}
             """ + PnPErrorHints.HintFor(result);
@@ -477,13 +477,13 @@ internal partial class PnPPowerShellTools
         PowerShellSessionManager sessions,
         [Description("Session to end (default: \"default\")")] string? sessionId = null)
     {
-        var name = string.IsNullOrWhiteSpace(sessionId) ? PowerShellSessionManager.DefaultSessionId : sessionId.Trim();
+        var name = OutputLimit.Echo(string.IsNullOrWhiteSpace(sessionId) ? PowerShellSessionManager.DefaultSessionId : sessionId.Trim());
         var existed = await sessions.ResetAsync(sessionId);
 
         var active = sessions.Describe();
         var summary = active.Count == 0
             ? "No sessions are currently running."
-            : "Sessions: " + string.Join(", ", active.Select(s => $"{s.Id} ({(s.IsAlive ? "running" : "stopped")})"));
+            : "Sessions: " + string.Join(", ", active.Select(s => $"{OutputLimit.Echo(s.Id)} ({(s.IsAlive ? "running" : "stopped")})"));
 
         return existed
             ? $"Session '{name}' was ended. The next command will start a fresh session and will need to reconnect with Connect-PnPOnline.\n\n{summary}"
@@ -528,7 +528,7 @@ internal partial class PnPPowerShellTools
         if (!BestPracticeSections.TryGetValue(key, out var headings))
         {
             return
-                $"Error: Unknown section '{key}'. Valid sections are: {string.Join(", ", BestPracticeSections.Keys)}. " +
+                $"Error: Unknown section '{OutputLimit.Echo(key)}'. Valid sections are: {string.Join(", ", BestPracticeSections.Keys)}. " +
                 "Omit the section to get the whole document.";
         }
 
