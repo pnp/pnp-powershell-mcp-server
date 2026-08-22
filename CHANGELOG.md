@@ -1,4 +1,4 @@
-<!-- markdownlint-disable MD024 -->
+<!-- markdownlint-disable MD024 MD012 -->
 # PnP PowerShell MCP Server Changelog
 
 *Please do not commit changes to this file, it is maintained by the repo owner.*
@@ -6,6 +6,7 @@
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
+
 
 ## [Current version]
 
@@ -31,12 +32,20 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 - Changed the README and the best practices resource to document read only mode, the output size limit and their implications. [#12](https://github.com/pnp/pnp-powershell-mcp-server/pull/12), [#13](https://github.com/pnp/pnp-powershell-mcp-server/pull/13)
 
+### Contributors
+
+- Gautam Sheth [gautamdsheth]
+
 ## [0.1.3-beta]
 
 ### Changed
 
 - Changed the release workflow, the package identity and the documented naming convention so that the published NuGet package and the release assets line up. [#8](https://github.com/pnp/pnp-powershell-mcp-server/pull/8)
 - Changed the version to `0.1.3-beta` across the project file, the MCP server manifest and the documentation. [#10](https://github.com/pnp/pnp-powershell-mcp-server/pull/10)
+
+### Contributors
+
+- Nishkalank Bezawada [NishkalankBezawada]
 
 ## [0.1.2-beta]
 
@@ -53,11 +62,19 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 - Changed the MCP SDK from 1.2.0 to 2.2.0, added `ModelContextProtocol.Extensions.Tasks` and moved `Microsoft.Extensions.Hosting` from 8.0.1 to 10.0.11. [#6](https://github.com/pnp/pnp-powershell-mcp-server/pull/6)
 - Changed the hard two minute kill of a running command into a configurable timeout defaulting to ten minutes, so a long running tenant operation is no longer terminated halfway through. [#6](https://github.com/pnp/pnp-powershell-mcp-server/pull/6)
 
+### Contributors
+
+- Gautam Sheth [gautamdsheth]
+
 ## [0.1.1-beta]
 
 ### Changed
 
 - Changed the MCP server manifest and package metadata to match the version published to NuGet. [#4](https://github.com/pnp/pnp-powershell-mcp-server/pull/4)
+
+### Contributors
+
+- Nishkalank Bezawada [NishkalankBezawada]
 
 ## [0.1.0-beta]
 
@@ -71,4 +88,4 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 ### Contributors
 
 - Nishkalank Bezawada [NishkalankBezawada]
-- Gautam Sheth [gautamdsheth]
+
