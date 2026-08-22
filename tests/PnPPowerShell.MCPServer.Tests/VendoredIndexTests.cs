@@ -108,6 +108,50 @@ public class VendoredIndexTests
         Assert.Equal(["spo-good-sample"], kept.Select(s => s.Name));
     }
 
+    /// <summary>The docs error path returned raw, and a session error carries unbounded prior output.</summary>
+    [Fact]
+    public async Task Command_docs_stays_within_the_cap_when_the_session_fails_with_a_large_error()
+    {
+        var directory = Directory.CreateTempSubdirectory("pnp-docs-cap");
+
+        try
+        {
+            // A command that printed a lot and then failed: PowerShellSession returns both, uncapped.
+            var failure = "Error: the command failed\n\nOutput before the failure:\n" + new string('x', 200_000);
+            var key = SessionTranscript.Key(string.Empty, "command-docs\nGet-PnPWeb");
+            File.WriteAllText(Path.Combine(directory.FullName, key + ".transcript"), $"# key: {key}\n\n--- output ---\n{failure}");
+
+            using var replay = new EnvVar("PNP_MCP_REPLAY_DIR", directory.FullName);
+            await using var sessions = new PowerShellSessionManager();
+
+            var output = await PnPPowerShellTools.GetPnpCommandDocs(sessions, "Get-PnPWeb");
+
+            Assert.True(output.Length <= OutputLimit.MaxChars, $"{output.Length} characters against a {OutputLimit.MaxChars} cap.");
+            Assert.Contains("Get-PnPWeb.md", output, StringComparison.Ordinal);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    /// <summary>Provenance is a footer, so truncation takes it first — exactly when it is most wanted.</summary>
+    [Theory]
+    [InlineData("search")]
+    [InlineData("suggest")]
+    public async Task Provenance_survives_a_response_that_has_to_be_truncated(string tool)
+    {
+        using var cap = new EnvVar("PNP_MCP_MAX_OUTPUT_CHARS", OutputLimit.MinimumMaxChars.ToString());
+
+        var output = tool == "search"
+            ? ScriptSampleTools.SearchScriptSamples("site list user teams permission export", 50)
+            : await ScriptSampleTools.SuggestScript("export every list item to a csv file", 5);
+
+        Assert.Contains(OutputLimit.TruncationMarker, output, StringComparison.Ordinal);
+        Assert.Contains(ScriptSampleIndex.Provenance, output, StringComparison.Ordinal);
+        Assert.True(output.Length <= OutputLimit.MaxChars, $"{output.Length} characters against a {OutputLimit.MaxChars} cap.");
+    }
+
     [Fact]
     public void Every_vendored_sample_name_is_a_plain_folder_segment()
     {

@@ -179,9 +179,14 @@ internal partial class PnPPowerShellTools
 
         var help = await sessions.Get(null).ExecuteAsync(script, MetadataTimeout, cancellationToken, $"command-docs\n{commandName.Trim()}");
 
+        // Capped like every other path: a session error carries whatever the command printed before it
+        // failed, which is unbounded, so returning it raw would let this tool exceed the output limit.
         if (help.StartsWith("Error:", StringComparison.OrdinalIgnoreCase) && links.Length > 0)
         {
-            return help + "\n\nLocal help is unavailable, but the published documentation is not:\n\n" + links + PnPErrorHints.HintFor(help);
+            return OutputLimit.Apply(
+                help + "\n\nLocal help is unavailable, but the published documentation is not:\n",
+                "Read the documentation pages linked below for the reference this session could not produce.",
+                "\n" + links + PnPErrorHints.HintFor(help));
         }
 
         return OutputLimit.Apply(links + help, "Read the documentation pages linked above for the full reference.", PnPErrorHints.HintFor(help));
