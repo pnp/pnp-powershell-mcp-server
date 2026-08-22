@@ -6,7 +6,11 @@ This guide provides best practices for using PnP PowerShell commands through the
 
 Use this flow for reliable execution:
 
-1. **Check connection** with `pnp_get_connection_status` to see if you are already authenticated.
+1. **Check you can run anything at all** with `pnp_diagnose_connection`. Make this your first call in
+   a new session: it answers, in one round trip, whether `pwsh` is on `PATH`, whether the
+   `PnP.PowerShell` module is installed, and what connection the session holds — and every failing
+   check names its cause and the exact next command to run. Use `pnp_get_connection_status` instead
+   when you only need to re-check the connection on a session you have already diagnosed.
 2. **Search commands** with `pnp_search_commands` to find the right command for your task.
 3. **Read documentation** with `pnp_get_command_docs` to understand syntax, parameters, and examples. Both this and `pnp_search_commands` return the cmdlet's published documentation URL, which is worth citing to the user and often carries examples the shipped help omits.
 4. **Search community samples** with `pnp_search_script_samples` or `pnp_suggest_script` before writing a script from scratch — there is a good chance someone has already solved a similar problem.
@@ -103,6 +107,11 @@ fabricated link that 404s is worse than no link.
   Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force
   ```
   The module is imported once when a session starts, and a clear error with the install command above is returned if it is missing, instead of a raw PowerShell exception.
+- **`pnp_diagnose_connection` checks both of these**, plus what connection the session holds, in one
+  call. Every failing check names its cause and the exact next command. The `pwsh` and module checks
+  need no tenant and no network, so they still answer on a machine that is not set up yet — which is
+  exactly when they are useful. Once a connection exists, inspecting it asks PnP for a Graph token,
+  so that part does reach Entra ID.
 
 ## Sessions
 
@@ -240,11 +249,15 @@ This check favours asking too often over missing something: it also matches a de
 appears only as text (for example inside a string), so you may occasionally be asked to confirm a
 command that turns out to be harmless.
 
-- On clients that support prompting, you will be asked to confirm the exact command first.
-- On clients that do not, the command is blocked and must be re-sent with `confirmDestructive: true`.
-  Always show the user the exact command and get a real answer before doing that.
-- Set `PNP_MCP_CONFIRM_DESTRUCTIVE=false` to disable the check entirely (not recommended outside
-  automation where the commands are already reviewed).
+- On clients that support prompting, you will be asked to confirm the exact command first. The
+  approval is bound to that exact command text, so a retry carrying different arguments prompts again.
+- On clients that do not, the command is blocked and **there is no way to approve it from inside the
+  conversation**. There is deliberately no tool parameter that asserts approval on the user's behalf:
+  the model is the party being gated, so a gate the model can switch off is not a gate. Show the user
+  the command and let them run it themselves, or use a client that supports MCP elicitation.
+- Set `PNP_MCP_CONFIRM_DESTRUCTIVE=false` to disable the check entirely. This is an operator decision
+  taken outside the conversation, and is not recommended outside automation where the commands are
+  already reviewed.
 
 ## Authentication Best Practices
 

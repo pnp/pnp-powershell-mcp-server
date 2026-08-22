@@ -77,6 +77,23 @@ public sealed class RequiresPnPFactAttribute : FactAttribute
     }
 }
 
+/// <summary>
+/// The mirror of <see cref="RequiresPnPFactAttribute"/>: runs only where pwsh or PnP.PowerShell is
+/// absent. The cold-start states cannot be manufactured on a developer machine that has both — pwsh
+/// re-adds the default module paths, so PSModulePath cannot hide the module, and uninstalling it is
+/// not something a test may do. A bare CI runner is that clean container, so the check runs there.
+/// </summary>
+public sealed class BarePnPFactAttribute : FactAttribute
+{
+    public BarePnPFactAttribute()
+    {
+        if (TestEnvironment.PnPAvailable)
+        {
+            Skip = "Runs only where pwsh or PnP.PowerShell is missing, which is the state it asserts.";
+        }
+    }
+}
+
 /// <summary>Sets an environment variable for the duration of a test and restores it afterwards.</summary>
 internal sealed class EnvVar : IDisposable
 {

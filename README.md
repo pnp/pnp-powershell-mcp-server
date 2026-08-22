@@ -180,11 +180,27 @@ Can you check if I have a Power Automate flow called 'HoursReportingReminder' an
 | pnp_get_command_docs | Gets detailed documentation for a specific PnP PowerShell command including syntax, parameters, and examples, plus a link to the online documentation. |
 | pnp_run_command | Executes one or more PnP PowerShell commands and returns the result. Runs in a persistent session, so a `Connect-PnPOnline` connection is reused across calls. Destructive commands require confirmation first. |
 | pnp_get_connection_status | Checks the current PnP PowerShell connection status before running commands. |
+| pnp_diagnose_connection | Checks everything that has to be true before a command can run: `pwsh` on `PATH`, the `PnP.PowerShell` module, and what connection the session holds. Every failing check names its cause and the exact next command. The `pwsh` and module checks need no tenant and no network, so it still works on a machine that is not set up yet; once a connection exists it also inspects that connection, which asks PnP for a Graph token and so reaches Entra ID. |
 | pnp_reset_session | Ends a session and its PnP connection. Use it to sign out, switch accounts, or recover a session that has stopped responding. |
-| pnp_get_best_practices | Returns best practices for using PnP PowerShell via this MCP server. Takes an optional `section` (`workflow`, `docs`, `sessions`, `config`, `readonly`, `destructive`, `auth`, `execution`, `patterns`) to retrieve one topic instead of the whole guide, which keeps the response small. |
+| pnp_get_best_practices | Returns best practices for using PnP PowerShell via this MCP server. Takes an optional `section` (`workflow`, `docs`, `sessions`, `config`, `readonly`, `output`, `destructive`, `auth`, `execution`, `patterns`) to retrieve one topic instead of the whole guide, which keeps the response small. |
 | pnp_search_script_samples | Searches the community [PnP Script Samples](https://pnp.github.io/script-samples/) index for scripts matching a keyword or use case. |
 | pnp_get_script_sample | Retrieves the full PnP PowerShell script code for a specific script sample by name, fetched live from GitHub. |
 | pnp_suggest_script | Finds the most relevant community script samples for a task and returns their full script code plus adaptation guidance, in one call. |
+
+Every tool declares its `readOnlyHint`, `idempotentHint` and `openWorldHint` annotations, and the two
+that can change state also declare `destructiveHint`, so a client can decide what to auto-approve
+without guessing.
+
+### 📚 Resources
+
+The same guidance and cmdlet documentation is also exposed as MCP **resources**, so a client that
+supports them can browse and cache the content instead of spending a tool call on it.
+
+| URI | Contents |
+| --- | --- |
+| `pnp://best-practices` | The whole guidance document. |
+| `pnp://best-practices/{section}` | One section: `workflow`, `docs`, `sessions`, `config`, `readonly`, `output`, `destructive`, `auth`, `execution`, `patterns`. |
+| `pnp://cmdlet/{name}` | Help text for one cmdlet, preceded by its published documentation URL — e.g. `pnp://cmdlet/Get-PnPWeb`. |
 
 ### Sessions and `sessionId`
 
@@ -247,7 +263,7 @@ Connect to contoso, find all site collections with no owner, and export them to 
 | Environment variable | Default | Description |
 | --- | --- | --- |
 | `PNP_MCP_COMMAND_TIMEOUT_SECONDS` | `600` | Wall-clock limit for a single `pnp_run_command` call. On timeout the session is terminated and the connection is lost. |
-| `PNP_MCP_CONFIRM_DESTRUCTIVE` | `true` | Set to `false` to run destructive commands (`Remove-*`, `Clear-*`, ...) without asking for confirmation. |
+| `PNP_MCP_CONFIRM_DESTRUCTIVE` | `true` | Set to `false` to run destructive commands (`Remove-*`, `Clear-*`, ...) without asking for confirmation. This is the only way to bypass the gate: there is no tool parameter that lets the model approve its own destructive command, so on a client that cannot show a confirmation prompt, destructive commands are simply blocked. |
 | `PNP_MCP_READONLY` | `false` | Set to `true` to refuse any command that would change Microsoft 365. Allowed verbs: `Get-`, `Export-`, `Test-`, `Convert-`/`ConvertTo-`/`ConvertFrom-`, `Read-`, `Measure-`, `Connect-`/`Disconnect-`, `Find-`, `Format-`, `Resolve-`, `Write-`, `Search-`, `Show-`, `Compare-`, plus pipeline shaping (`Select-`, `Where-`, `Sort-`, `Group-`, `ForEach-`, `Out-`, `Join-`, `Split-`). Refused: `Set-`, `Remove-`, `Add-`, `New-`, `Clear-`, `Invoke-`, `Update-`, `Move-`, `Enable-`/`Disable-`, `Grant-`/`Revoke-`, `Copy-`, `Import-`, `Restore-`, `Reset-`, `Rename-`, `Start-`/`Stop-`, `Register-`/`Unregister-`, and every other change verb — along with indirectly invoked commands, native executables, and state-changing method calls such as `ExecuteQuery`. See [Best Practices](./best-practices.md#read-only-mode) for the full table. Local file output (`Out-File`, `Export-*`) is still permitted. |
 | `PNP_MCP_MAX_OUTPUT_CHARS` | `50000` | Largest tool response returned, in characters. Longer output is truncated to its first whole lines with a note saying how much was dropped. Values below 2000 are ignored, since the note itself would leave no room for output. |
 | `PNP_SCRIPT_SAMPLES_PATH` | _(unset)_ | Path to a local clone of the PnP script samples repository, used as a fallback when GitHub is unreachable. |
@@ -359,7 +375,7 @@ After changing any of these, **restart the MCP server** (in most clients, reload
 the server off and on) — the client passes the environment in when it launches the process, so an
 already-running server keeps the old values.
 
-Two cautions: `PNP_MCP_CONFIRM_DESTRUCTIVE=false` removes the only prompt standing between an agent
+Two cautions: `PNP_MCP_CONFIRM_DESTRUCTIVE=false` removes the only thing standing between an agent
 and `Remove-PnPTenantSite`, so set it only where the commands are reviewed some other way. And both
 booleans are matched exactly — `PNP_MCP_READONLY` enables only on the literal string `true`
 (case-insensitive), and `PNP_MCP_CONFIRM_DESTRUCTIVE` disables only on `false`; anything else, `1` and

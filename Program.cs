@@ -32,6 +32,7 @@ builder.Services
             };
         })
     .WithTools<PnPPowerShellTools>()
-    .WithTools<ScriptSampleTools>();
+    .WithTools<ScriptSampleTools>()
+    .WithResources<PnPResources>();
 
 await builder.Build().RunAsync();

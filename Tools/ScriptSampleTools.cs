@@ -201,7 +201,7 @@ internal sealed partial class ScriptSampleTools
 
     //Tool 1: Search script samples
 
-    [McpServerTool(Name = "pnp_search_script_samples")]
+    [McpServerTool(Name = "pnp_search_script_samples", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description(
         "Searches the PnP Script Samples index (sourced from the PnP PowerShell VS Code extension) for " +
         "community-contributed PowerShell scripts matching a keyword or use case. Returns titles, descriptions, " +
@@ -264,7 +264,7 @@ internal sealed partial class ScriptSampleTools
 
     //Tool 2: Get full script for a named sample (fetches live from GitHub)
 
-    [McpServerTool(Name = "pnp_get_script_sample")]
+    [McpServerTool(Name = "pnp_get_script_sample", ReadOnly = true, Idempotent = true, OpenWorld = true)]
     [Description(
         "Retrieves the full PnP PowerShell script code for a specific script sample by fetching its README " +
         "directly from the pnp/script-samples GitHub repository. Use this after pnp_search_script_samples " +
@@ -344,7 +344,7 @@ internal sealed partial class ScriptSampleTools
 
     //Tool 3: Suggest scripts for a task (search + fetch code in one call)
 
-    [McpServerTool(Name = "pnp_suggest_script")]
+    [McpServerTool(Name = "pnp_suggest_script", ReadOnly = true, Idempotent = true, OpenWorld = true)]
     [Description(
         "Finds the most relevant PnP community script samples for a given task and returns their full " +
         "PnP PowerShell script code along with adaptation guidance — all in a single call. " +
