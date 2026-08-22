@@ -16,6 +16,33 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+## [0.1.5-beta]
+
+### Added
+
+- Added the `pnp_diagnose_connection` tool and the supporting `ConnectionPreflight` service, which checks everything that has to be true before a command can run — `pwsh` on `PATH`, the `PnP.PowerShell` module and the connection held by the session — and names both the cause and the exact next command for every failing check. The `pwsh` and module checks need no tenant and no network, so it also works on a machine that is not set up yet. [#15](https://github.com/pnp/pnp-powershell-mcp-server/pull/15)
+- Added MCP resources through `PnPResources`, exposing the guidance and cmdlet help as `pnp://best-practices`, `pnp://best-practices/{section}` and `pnp://cmdlet/{name}`, so a client which supports resources can browse and cache the content instead of spending a tool call on it. [#15](https://github.com/pnp/pnp-powershell-mcp-server/pull/15)
+- Added tool annotations to the three remaining tools, so all ten now declare `readOnlyHint`, `idempotentHint` and `openWorldHint`, and the two which can change state also declare `destructiveHint`. A client can therefore decide what to auto-approve without guessing. [#15](https://github.com/pnp/pnp-powershell-mcp-server/pull/15)
+- Added error hints for the pre-connection case and for app registration and consent failures. [#15](https://github.com/pnp/pnp-powershell-mcp-server/pull/15)
+- Added an `output` section to the best practices resource and to the `section` parameter of `pnp_get_best_practices`. [#15](https://github.com/pnp/pnp-powershell-mcp-server/pull/15)
+- Added tests covering approval binding, connection preflight, resources, tool annotations and the new error hints. [#15](https://github.com/pnp/pnp-powershell-mcp-server/pull/15)
+- Added CHANGELOG.md for better maintainability. [#16](https://github.com/pnp/pnp-powershell-mcp-server/pull/16)
+
+### Changed
+
+- Changed the version to `0.1.5-beta` across the project file, the MCP server manifest and the documentation. [#15](https://github.com/pnp/pnp-powershell-mcp-server/pull/15)
+- Changed the README and the best practices resource to document the new tool, the resources, the annotations and the confirmation gate. [#15](https://github.com/pnp/pnp-powershell-mcp-server/pull/15)
+
+### Fixed
+
+- Fixed the destructive command confirmation bypass by removing `confirmDestructive` from the tool schema and binding an approval to an HMAC keyed fingerprint of the command, so the model can no longer approve its own destructive command. `PNP_MCP_CONFIRM_DESTRUCTIVE=false` is now the only way to bypass the gate. [#15](https://github.com/pnp/pnp-powershell-mcp-server/pull/15)
+- Fixed the order in which error hints are matched, so the most specific hint wins. [#15](https://github.com/pnp/pnp-powershell-mcp-server/pull/15)
+
+### Contributors
+
+- Gautam Sheth [gautamdsheth]
+- Nishkalank Bezawada [NishkalankBezawada]
+
 ## [0.1.4-beta]
 
 ### Added
