@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 
@@ -150,12 +151,28 @@ internal sealed class McpStdioClient : IDisposable
         var candidates = Directory
             .EnumerateFiles(Path.Combine(directory!.FullName, "bin"), name, SearchOption.AllDirectories)
             .Where(p => File.Exists(Path.Combine(Path.GetDirectoryName(p)!, "PnPPowerShell.MCPServer.runtimeconfig.json")))
-            .OrderByDescending(File.GetLastWriteTimeUtc)
             .ToList();
 
         Assert.True(candidates.Count > 0, $"No built server found under {directory.FullName}/bin. Run 'dotnet build' first.");
 
-        return candidates[0];
+        // Newest-first alone picks whatever was built last, which on a machine holding several builds
+        // can be another configuration or another architecture entirely — a stale or unrunnable binary
+        // that the test would then report on as though it were the code under test.
+        var configuration = AppContext.BaseDirectory.Contains($"{Path.DirectorySeparatorChar}Release{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
+            ? "Release"
+            : "Debug";
+
+        var matched = candidates
+            .Where(p => p.Contains($"{Path.DirectorySeparatorChar}{configuration}{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            .Where(p => p.Contains(RuntimeInformation.RuntimeIdentifier, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(File.GetLastWriteTimeUtc)
+            .ToList();
+
+        Assert.True(
+            matched.Count > 0,
+            $"No {configuration} server built for {RuntimeInformation.RuntimeIdentifier}. Found only:\n  {string.Join("\n  ", candidates)}");
+
+        return matched[0];
     }
 
     public JsonElement Initialize()

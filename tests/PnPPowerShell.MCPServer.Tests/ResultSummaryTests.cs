@@ -152,6 +152,20 @@ public class ResultSummaryTests
         Assert.True(held.Rows.Sum(r => (long)r.Length) <= 8_010_000, "The hold exceeded its ceiling.");
     }
 
+    /// <summary>Many tiny rows cost far more than their characters, so the row count is capped too.</summary>
+    [Fact]
+    public void A_result_set_of_very_many_tiny_rows_is_bounded_by_row_count_not_just_characters()
+    {
+        // Scalars, as `Select-Object -ExpandProperty Id` produces: a few characters each, so the
+        // character ceiling alone would let millions of string objects accumulate.
+        var raw = "[" + string.Join(",", Enumerable.Range(0, 400_000)) + "]";
+        var held = ResultSummary.TryCapture(raw)!;
+
+        Assert.Equal(400_000, held.TotalRows);
+        Assert.True(held.Partial);
+        Assert.True(held.Rows.Count <= 100_000, $"{held.Rows.Count} rows held, above the row ceiling.");
+    }
+
     [Fact]
     public void A_partial_hold_reports_the_true_total_and_refuses_to_claim_it_is_complete()
     {

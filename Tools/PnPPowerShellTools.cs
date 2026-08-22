@@ -308,14 +308,16 @@ internal partial class PnPPowerShellTools
     {
         var session = sessions.FindHolder(cursor);
 
-        if (session?.Held is null)
+        // Read once: a command running concurrently in that session clears Held, so checking the
+        // property and then rendering it are two different values.
+        if (session?.Held is not { } held)
         {
             return
                 $"Error: No held result set matches cursor '{cursor}'. A cursor is dropped when the next command runs in " +
                 "its session, when the session is reset, and when the server restarts. Re-run the original command to get a new one.";
         }
 
-        return OutputLimit.Apply(ResultSummary.Render(session.Held, offset, session.Id));
+        return OutputLimit.Apply(ResultSummary.Render(held, offset, session.Id));
     }
 
     /// <summary>Splits a command budget into an analysis cap and a reserved execution slice.</summary>

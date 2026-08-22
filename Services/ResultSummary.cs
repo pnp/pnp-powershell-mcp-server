@@ -42,6 +42,11 @@ internal static class ResultSummary
     // told the true total and how much of it is pageable, rather than being quietly given a short answer.
     private const int MaxHeldChars = 8_000_000;
 
+    /// <summary>Companion ceiling on row count, since the character one does not bound object overhead.</summary>
+    // A million one-token rows — Select-Object -ExpandProperty Id over a large list — costs far more in
+    // string and list overhead than the characters suggest, so the cheap cap has to be counted too.
+    private const int MaxHeldRows = 100_000;
+
     /// <summary>Captures a JSON array of two or more elements; null for anything else.</summary>
     public static HeldResultSet? TryCapture(string? output)
     {
@@ -69,8 +74,8 @@ internal static class ResultSummary
             {
                 total++;
 
-                // Counting continues past the ceiling so the reported total stays true.
-                if (held < MaxHeldChars)
+                // Counting continues past the ceilings so the reported total stays true.
+                if (held < MaxHeldChars && rows.Count < MaxHeldRows)
                 {
                     var row = element.GetRawText();
                     rows.Add(row);
