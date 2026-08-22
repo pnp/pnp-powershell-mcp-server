@@ -12,18 +12,18 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
-- Added vendored `data/script-samples.json` and `data/pnp-commands.json` as embedded resources, so `pnp_search_script_samples`, `pnp_get_script_sample` and `pnp_suggest_script` answer offline instead of erroring unless an unrelated VS Code extension is installed, and `pnp_search_commands` still names cmdlets where `pwsh` or the module is missing.
-- Added the `pnp_get_result_page` tool: a JSON result set over the output cap is summarised with its true row count, field names and as many whole rows as fit, then paged from the session that produced it rather than by re-running the command against the tenant.
-- Added a raw-markdown documentation link to `pnp_get_command_docs`, the source the HTML page is generated from, which carries the same content for a fraction of the tokens.
-- Added record-and-playback fixtures, a BM25 tool-selection gate, stdio protocol tests and scrubber fuzzing, so the suite now runs with no tenant and no `pwsh`.
+- Added vendored script-sample and cmdlet indexes as embedded resources, so the script-sample tools and `pnp_search_commands` work offline. [#18](https://github.com/pnp/pnp-powershell-mcp-server/pull/18)
+- Added the `pnp_get_result_page` tool, which summarises an oversized result set and pages it from the session instead of re-running the command. [#18](https://github.com/pnp/pnp-powershell-mcp-server/pull/18)
+- Added a raw-markdown documentation link to `pnp_get_command_docs`, the same content as the HTML page for a fraction of the tokens. [#18](https://github.com/pnp/pnp-powershell-mcp-server/pull/18)
+- Added record-and-playback fixtures, a tool-selection gate, stdio protocol tests and scrubber fuzzing, so the suite runs with no tenant and no `pwsh`. [#18](https://github.com/pnp/pnp-powershell-mcp-server/pull/18)
 
 ### Changed
 
-- Changed every tool description, driven by what the selection gate measured: `pnp_run_command` described its mechanism rather than its job and no task-shaped prompt selected it at all.
+- Changed every tool description to state what the tool is for rather than how it works. [#18](https://github.com/pnp/pnp-powershell-mcp-server/pull/18)
 
 ### Fixed
 
-- Fixed a path traversal in the script-sample tools, where a sample name from a local clone's `sample.json` was substituted into a file path unchecked; names must now be a single ordinary folder segment.
+- Fixed a path traversal where a script-sample name from a local clone was substituted into a file path unchecked. [#18](https://github.com/pnp/pnp-powershell-mcp-server/pull/18)
 
 ## [0.1.5-beta]
 
