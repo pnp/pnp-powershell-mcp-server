@@ -31,7 +31,6 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>PnP.PowerShell.MCPServer</PackageId>
     <PackageVersion>0.1.5-beta</PackageVersion>
-    <InformationalVersion>$(PackageVersion)</InformationalVersion>
     <Authors>PnP Community</Authors>
     <PackageTags>AI; MCP; server; stdio; PnP; PowerShell; SharePoint; Microsoft365</PackageTags>
     <Description>Model Context Protocol (MCP) server for PnP PowerShell that allows managing Microsoft 365 (SharePoint Online, Teams, Entra ID, and more) using natural language, and helps developers author complex PnP PowerShell scripts.</Description>
