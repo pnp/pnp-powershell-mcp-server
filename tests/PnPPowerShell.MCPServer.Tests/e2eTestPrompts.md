@@ -96,3 +96,19 @@ exactly what an MCP client sees, so a prompt it cannot route is one a client may
 - Help me build a script that reports on site collection permissions
 - Give me a starting point for archiving inactive sites
 - Automate removing orphaned users across the tenant
+
+## pnp_ping
+
+- Lightweight health check to confirm the server is responsive
+- What version and uptime does the server report
+- Is the server responsive and what is its read-only mode status
+- Show me the server version and active session count
+- Run a health check and tell me the uptime
+
+## pnp_list_sessions
+
+- List all active PowerShell sessions with their status
+- What sessions exist before I decide which to connect or reuse
+- Show me each session and its last activity time
+- Which active sessions are running and what is their status
+- List sessions so I can decide which to reset or reuse

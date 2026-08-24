@@ -187,6 +187,8 @@ Can you check if I have a Power Automate flow called 'HoursReportingReminder' an
 | pnp_search_script_samples | Lists community [PnP Script Samples](https://pnp.github.io/script-samples/) matching a keyword — titles, descriptions and links, no code. Answers from an index compiled into the server, so it needs no network. |
 | pnp_get_script_sample | Retrieves the full PnP PowerShell script code for one named script sample. The index entry is local; the script body is fetched from GitHub. |
 | pnp_suggest_script | Finds the most relevant community script samples for a task and returns their full script code plus adaptation guidance, in one call. |
+| pnp_ping | Returns the server version, uptime, read-only mode status, and active session count. Use this as a lightweight health check to confirm the server is responsive. |
+| pnp_list_sessions | Lists all active PowerShell sessions with their status and last activity time. Use this to see what sessions exist before deciding which to connect, reset, or reuse. |
 
 Every tool declares its `readOnlyHint`, `idempotentHint` and `openWorldHint` annotations, and the two
 that can change state also declare `destructiveHint`, so a client can decide what to auto-approve
