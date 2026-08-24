@@ -109,3 +109,47 @@ internal sealed class EnvVar : IDisposable
 
     public void Dispose() => Environment.SetEnvironmentVariable(_name, _original);
 }
+
+/// <summary>True when the maintainer asked for fixtures to be re-recorded against a live tenant.</summary>
+internal static class FixtureRecording
+{
+    public const string Reason = "Set PNP_MCP_RECORD_FIXTURES=1 with a connected dev tenant to re-record fixtures.";
+
+    public static bool Requested => Environment.GetEnvironmentVariable("PNP_MCP_RECORD_FIXTURES") == "1";
+}
+
+/// <summary>A fact that only runs during a recording session.</summary>
+public sealed class RecordingFactAttribute : FactAttribute
+{
+    public RecordingFactAttribute()
+    {
+        if (!FixtureRecording.Requested)
+        {
+            Skip = FixtureRecording.Reason;
+        }
+    }
+}
+
+/// <summary>A fact that steps aside during a recording session, so recording does not assert against stale fixtures.</summary>
+public sealed class PlaybackFactAttribute : FactAttribute
+{
+    public PlaybackFactAttribute()
+    {
+        if (FixtureRecording.Requested)
+        {
+            Skip = "Recording, not replaying.";
+        }
+    }
+}
+
+/// <summary>The theory form of <see cref="PlaybackFactAttribute"/>.</summary>
+public sealed class PlaybackTheoryAttribute : TheoryAttribute
+{
+    public PlaybackTheoryAttribute()
+    {
+        if (FixtureRecording.Requested)
+        {
+            Skip = "Recording, not replaying.";
+        }
+    }
+}

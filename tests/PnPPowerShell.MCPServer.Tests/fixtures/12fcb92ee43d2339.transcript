@@ -1,0 +1,24 @@
+# key: 12fcb92ee43d2339
+# operation: run | Get-PnPWeb | Select-Object Title, Url
+# Scrubbed by TranscriptScrubber. Read it before committing: display names in free text are not detectable.
+
+--- command ---
+Get-PnPWeb | Select-Object Title, Url
+
+--- script ---
+$__pnpCommandText = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('R2V0LVBuUFdlYiB8IFNlbGVjdC1PYmplY3QgVGl0bGUsIFVybA=='))
+$__pnpCommandResult = Invoke-Expression $__pnpCommandText
+if ($null -ne $__pnpCommandResult) {
+  try {
+    $__pnpCommandResult | ConvertTo-Json -Depth 20 -Compress
+  }
+  catch {
+    $__pnpCommandResult | Out-String
+  }
+} else {
+  Write-Output 'Command completed successfully (no output).'
+}
+Remove-Variable -Name __pnpCommandText, __pnpCommandResult -ErrorAction SilentlyContinue
+
+--- output ---
+{"Title":"contoso","Url":"https://contoso.sharepoint.com/sites/contoso"}

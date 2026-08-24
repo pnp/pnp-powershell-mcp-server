@@ -44,33 +44,51 @@ internal sealed class PowerShellSession : IAsyncDisposable
     /// <summary>True while a command holds the session, keeping the idle evictor off work in progress.</summary>
     public bool IsBusy => _gate.CurrentCount == 0;
 
+    /// <summary>The last oversized result set, kept for paging. Latest only, not a cache.</summary>
+    public HeldResultSet? Held { get; set; }
+
     private string EndMarker => $"__PNP_END_{_token}__";
 
     private string ErrorMarker => $"__PNP_ERR_{_token}__";
 
-    /// <summary>Runs a script in this session, starting the process on first use; calls are serialized.</summary>
-    public async Task<string> ExecuteAsync(string script, TimeSpan timeout, CancellationToken cancellationToken = default)
+    /// <summary>Runs a script here; calls are serialized.</summary>
+    // transcriptKey files the fixture, so rewording the script does not orphan it.
+    public async Task<string> ExecuteAsync(
+        string script, TimeSpan timeout, CancellationToken cancellationToken = default, string? transcriptKey = null) =>
+        (await RunAsync(script, timeout, capture: false, transcriptKey, cancellationToken)).Output;
+
+    /// <summary>Runs a script and holds an oversized JSON array for paging.</summary>
+    // Also returned: a concurrent command can replace the hold.
+    public Task<(string Output, HeldResultSet? Held)> ExecuteAndCaptureAsync(
+        string script, TimeSpan timeout, CancellationToken cancellationToken = default, string? transcriptKey = null) =>
+        RunAsync(script, timeout, capture: true, transcriptKey, cancellationToken);
+
+    private async Task<(string Output, HeldResultSet? Held)> RunAsync(
+        string script, TimeSpan timeout, bool capture, string? transcriptKey, CancellationToken cancellationToken)
     {
         // The wait for the session is bounded by the same timeout as the command. Without this, a
         // quick metadata lookup queues behind a long-running command with no limit of its own.
         if (!await _gate.WaitAsync(timeout, cancellationToken))
         {
-            return
+            return (
                 "Error: This session is busy running another command. Wait for it to finish, or end it with 'pnp_reset_session'. " +
-                "To work in parallel, use a different sessionId.";
+                "To work in parallel, use a different sessionId.", null);
         }
 
         try
         {
             LastUsedUtc = DateTimeOffset.UtcNow;
+            Held = null;
 
-            var startError = await EnsureStartedAsync(cancellationToken);
-            if (startError is not null)
-            {
-                return startError;
-            }
+            // Playback answers from a fixture without starting pwsh, which is what lets CI test this at all.
+            var output = SessionTranscript.IsReplaying
+                ? SessionTranscript.Replay(script, transcriptKey)
+                : await EnsureStartedAsync(cancellationToken) ?? await ExecuteAndRecordAsync(script, timeout, transcriptKey, cancellationToken);
 
-            return await ExecuteCoreAsync(script, timeout, cancellationToken);
+            // Captured under the gate, so a concurrent command cannot clear the hold after it is set.
+            Held = capture && output.Length > OutputLimit.MaxChars ? ResultSummary.TryCapture(output) : null;
+
+            return (output, Held);
         }
         finally
         {
@@ -79,6 +97,15 @@ internal sealed class PowerShellSession : IAsyncDisposable
             LastUsedUtc = DateTimeOffset.UtcNow;
             _gate.Release();
         }
+    }
+
+    private async Task<string> ExecuteAndRecordAsync(
+        string script, TimeSpan timeout, string? transcriptKey, CancellationToken cancellationToken)
+    {
+        var output = await ExecuteCoreAsync(script, timeout, cancellationToken);
+        SessionTranscript.Record(script, output, transcriptKey);
+
+        return output;
     }
 
     /// <summary>Terminates the process; the next call starts a fresh one and discards the PnP connection.</summary>
@@ -352,6 +379,8 @@ internal sealed class PowerShellSession : IAsyncDisposable
     {
         // Guarded because ResetAsync may terminate without holding the gate, concurrently with a
         // command that is mid-read.
+        Held = null;
+
         Process? process;
         lock (_processLock)
         {

@@ -1,0 +1,24 @@
+# key: ca7f2242b91c2383
+# operation: run | Get-PnPList | Select-Object Title, ItemCount, BaseTemplate
+# Scrubbed by TranscriptScrubber. Read it before committing: display names in free text are not detectable.
+
+--- command ---
+Get-PnPList | Select-Object Title, ItemCount, BaseTemplate
+
+--- script ---
+$__pnpCommandText = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('R2V0LVBuUExpc3QgfCBTZWxlY3QtT2JqZWN0IFRpdGxlLCBJdGVtQ291bnQsIEJhc2VUZW1wbGF0ZQ=='))
+$__pnpCommandResult = Invoke-Expression $__pnpCommandText
+if ($null -ne $__pnpCommandResult) {
+  try {
+    $__pnpCommandResult | ConvertTo-Json -Depth 20 -Compress
+  }
+  catch {
+    $__pnpCommandResult | Out-String
+  }
+} else {
+  Write-Output 'Command completed successfully (no output).'
+}
+Remove-Variable -Name __pnpCommandText, __pnpCommandResult -ErrorAction SilentlyContinue
+
+--- output ---
+[{"Title":"19:user1@contoso.onmicrosoft.com_wiki","ItemCount":3,"BaseTemplate":100},{"Title":"Alerts","ItemCount":11,"BaseTemplate":101},{"Title":"AnotherDocLib101","ItemCount":8,"BaseTemplate":101},{"Title":"AnotherDocLib102","ItemCount":0,"BaseTemplate":101},{"Title":"appdata","ItemCount":0,"BaseTemplate":125},{"Title":"appfiles","ItemCount":0,"BaseTemplate":126},{"Title":"Apps for SharePoint","ItemCount":1,"BaseTemplate":336},{"Title":"Audit5437","ItemCount":6,"BaseTemplate":100},{"Title":"ClaudeThreshold5448","ItemCount":5105,"BaseTemplate":101},{"Title":"Client Side Assets","ItemCount":0,"BaseTemplate":334},{"Title":"Client Side Component Manifests","ItemCount":0,"BaseTemplate":331},{"Title":"Composed Looks","ItemCount":18,"BaseTemplate":124},{"Title":"Converted Forms","ItemCount":0,"BaseTemplate":10102},{"Title":"Custom List","ItemCount":2,"BaseTemplate":100},{"Title":"DO_NOT_DELETE_SPLIST_SITECOLLECTION_AGGREGATED_CONTENTTYPES","ItemCount":0,"BaseTemplate":100},{"Title":"Documents","ItemCount":145,"BaseTemplate":101},{"Title":"Form Templates","ItemCount":0,"BaseTemplate":101},{"Title":"Freigegebene Dokumente","ItemCount":10,"BaseTemplate":101},{"Title":"Images","ItemCount":4,"BaseTemplate":109},{"Title":"Intranet Feedback","ItemCount":6,"BaseTemplate":100},{"Title":"ItemTest","ItemCount":100,"BaseTemplate":100},{"Title":"List Template Gallery","ItemCount":0,"BaseTemplate":114},{"Title":"Maintenance Log Library","ItemCount":21,"BaseTemplate":175},{"Title":"Master Page Gallery","ItemCount":175,"BaseTemplate":116},{"Title":"Permission Inherit","ItemCount":2,"BaseTemplate":100},{"Title":"Play112","ItemCount":2,"BaseTemplate":100},{"Title":"Playlist1111","ItemCount":0,"BaseTemplate":100},{"Title":"SharePointHomeCacheList","ItemCount":5,"BaseTemplate":100},{"Title":"Site Assets","ItemCount":20,"BaseTemplate":101},{"Title":"Site Pages","ItemCount":37,"BaseTemplate":119},{"Title":"Solution Gallery","ItemCount":0,"BaseTemplate":121},{"Title":"Style Library","ItemCount":0,"BaseTemplate":101},{"Title":"TaxonomyHiddenList","ItemCount":12,"BaseTemplate":100},{"Title":"Teams Wiki Data","ItemCount":2,"BaseTemplate":101},{"Title":"Tenant Wide Extensions","ItemCount":0,"BaseTemplate":337},{"Title":"test-1","ItemCount":0,"BaseTemplate":101},{"Title":"Test1008","ItemCount":17,"BaseTemplate":101},{"Title":"Test101","ItemCount":5,"BaseTemplate":101},{"Title":"TestCT","ItemCount":100,"BaseTemplate":101},{"Title":"TestDocLib","ItemCount":11,"BaseTemplate":101},{"Title":"TestDocLib10101","ItemCount":16,"BaseTemplate":101},{"Title":"TestDocsLimit","ItemCount":3,"BaseTemplate":101},{"Title":"TestSCList","ItemCount":0,"BaseTemplate":100},{"Title":"TestThresholdLimit","ItemCount":5018,"BaseTemplate":101},{"Title":"Theme Gallery","ItemCount":41,"BaseTemplate":123},{"Title":"User Information List","ItemCount":23,"BaseTemplate":112},{"Title":"Valo Status","ItemCount":6,"BaseTemplate":100},{"Title":"Web Part Gallery","ItemCount":25,"BaseTemplate":113},{"Title":"Web Template Extensions","ItemCount":57,"BaseTemplate":3415},{"Title":"WhistleBlower Report","ItemCount":5,"BaseTemplate":100},{"Title":"Workplace Harassment","ItemCount":12,"BaseTemplate":100}]

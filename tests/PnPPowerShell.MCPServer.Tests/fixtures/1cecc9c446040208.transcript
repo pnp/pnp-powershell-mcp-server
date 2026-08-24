@@ -1,0 +1,58 @@
+# key: 1cecc9c446040208
+# operation: analyse | Get-PnPTenantSite -Identity 'https://contoso.sharepoint.com/sites/contoso/no-such-site-9f2c'
+# Scrubbed by TranscriptScrubber. Read it before committing: display names in free text are not detectable.
+
+--- command ---
+Get-PnPTenantSite -Identity 'https://contoso.sharepoint.com/sites/contoso/no-such-site-9f2c'
+
+--- script ---
+$__pnpSrc = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('R2V0LVBuUFRlbmFudFNpdGUgLUlkZW50aXR5ICdodHRwczovL2NvbnRvc28uc2hhcmVwb2ludC5jb20vc2l0ZXMvY29udG9zby9uby1zdWNoLXNpdGUtOWYyYyc='))
+$__pnpParseErrors = $null
+$__pnpAst = [System.Management.Automation.Language.Parser]::ParseInput($__pnpSrc, [ref]$null, [ref]$__pnpParseErrors)
+$__pnpFound = @()
+$__pnpMethods = @()
+if ($__pnpAst) {
+  $__pnpNodes = $__pnpAst.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] }, $true)
+  $__pnpFound = @(foreach ($__pnpNode in $__pnpNodes) {
+    $__pnpName = $__pnpNode.GetCommandName()
+    if ([string]::IsNullOrWhiteSpace($__pnpName)) {
+      [PSCustomObject]@{ name = '<dynamic>'; verb = $null; supportsWhatIf = $false; isDynamic = $true }
+    } else {
+      $__pnpCmdInfo = $null
+      try { $__pnpCmdInfo = $ExecutionContext.InvokeCommand.GetCommand($__pnpName, [System.Management.Automation.CommandTypes]::All) } catch { $__pnpCmdInfo = $null }
+      $__pnpGuard = 0
+      while ($__pnpCmdInfo -and $__pnpCmdInfo.CommandType -eq 'Alias' -and $__pnpGuard -lt 10) {
+        $__pnpGuard++
+        $__pnpNext = $null
+        # ResolvedCommand is populated lazily and is null until the alias has been invoked once, so Definition is the reliable target.
+        if ($__pnpCmdInfo.ResolvedCommand) { $__pnpNext = $__pnpCmdInfo.ResolvedCommand }
+        elseif ($__pnpCmdInfo.Definition) {
+          try { $__pnpNext = $ExecutionContext.InvokeCommand.GetCommand([string]$__pnpCmdInfo.Definition, [System.Management.Automation.CommandTypes]::All) } catch { $__pnpNext = $null }
+        }
+        if (-not $__pnpNext) { break }
+        $__pnpCmdInfo = $__pnpNext
+      }
+      # An alias that could not be followed is as unverifiable as an indirect invocation.
+      $__pnpStillAlias = ($__pnpCmdInfo -and $__pnpCmdInfo.CommandType -eq 'Alias')
+      $__pnpEffective = if ($__pnpCmdInfo -and -not $__pnpStillAlias) { [string]$__pnpCmdInfo.Name } else { [string]$__pnpName }
+      $__pnpVerb = $null
+      if ($__pnpCmdInfo -and -not $__pnpStillAlias -and $__pnpCmdInfo.Verb) { $__pnpVerb = [string]$__pnpCmdInfo.Verb }
+      elseif (-not $__pnpStillAlias -and $__pnpEffective -match '^([A-Za-z]+)-') { $__pnpVerb = $Matches[1] }
+      $__pnpWhatIf = $false
+      if ($__pnpCmdInfo -and $__pnpCmdInfo.Parameters -and $__pnpCmdInfo.Parameters.ContainsKey('WhatIf')) { $__pnpWhatIf = $true }
+      [PSCustomObject]@{ name = $__pnpEffective; verb = $__pnpVerb; supportsWhatIf = $__pnpWhatIf; isDynamic = [bool]$__pnpStillAlias }
+    }
+  })
+  # Method calls are collected separately because CSOM mutations are not CommandAst nodes.
+  $__pnpMembers = $__pnpAst.FindAll({ param($node) $node -is [System.Management.Automation.Language.InvokeMemberExpressionAst] }, $true)
+  $__pnpMethods = @(foreach ($__pnpM in $__pnpMembers) {
+    if ($__pnpM.Member -and $__pnpM.Member.Value) { [string]$__pnpM.Member.Value } else { '<dynamic>' }
+  })
+}
+$__pnpParseMessage = $null
+if ($__pnpParseErrors -and @($__pnpParseErrors).Count -gt 0) { $__pnpParseMessage = @($__pnpParseErrors)[0].Message }
+[PSCustomObject]@{ parseError = $__pnpParseMessage; commands = $__pnpFound; methodCalls = $__pnpMethods } | ConvertTo-Json -Depth 6 -Compress
+Remove-Variable -Name __pnpSrc,__pnpParseErrors,__pnpAst,__pnpFound,__pnpMethods,__pnpNodes,__pnpNode,__pnpName,__pnpCmdInfo,__pnpGuard,__pnpNext,__pnpStillAlias,__pnpEffective,__pnpVerb,__pnpWhatIf,__pnpMembers,__pnpM,__pnpParseMessage -ErrorAction SilentlyContinue
+
+--- output ---
+{"parseError":null,"commands":[{"name":"Get-PnPTenantSite","verb":"Get","supportsWhatIf":false,"isDynamic":false}],"methodCalls":[]}

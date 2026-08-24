@@ -113,7 +113,7 @@ internal static class ConnectionPreflight
             return new PreflightFacts(name, environment, null, null);
         }
 
-        var raw = await sessions.Get(sessionId).ExecuteAsync(SessionProbeScript, ProbeTimeout, cancellationToken);
+        var raw = await sessions.Get(sessionId).ExecuteAsync(SessionProbeScript, ProbeTimeout, cancellationToken, "preflight-probe");
 
         if (raw.StartsWith("Error:", StringComparison.Ordinal))
         {

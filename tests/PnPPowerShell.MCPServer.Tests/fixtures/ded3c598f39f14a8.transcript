@@ -1,0 +1,28 @@
+# key: ded3c598f39f14a8
+# operation: run | Get-PnPList -NoSuchParameter9f2c 'x'
+# Scrubbed by TranscriptScrubber. Read it before committing: display names in free text are not detectable.
+
+--- command ---
+Get-PnPList -NoSuchParameter9f2c 'x'
+
+--- script ---
+$__pnpCommandText = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('R2V0LVBuUExpc3QgLU5vU3VjaFBhcmFtZXRlcjlmMmMgJ3gn'))
+$__pnpCommandResult = Invoke-Expression $__pnpCommandText
+if ($null -ne $__pnpCommandResult) {
+  try {
+    $__pnpCommandResult | ConvertTo-Json -Depth 20 -Compress
+  }
+  catch {
+    $__pnpCommandResult | Out-String
+  }
+} else {
+  Write-Output 'Command completed successfully (no output).'
+}
+Remove-Variable -Name __pnpCommandText, __pnpCommandResult -ErrorAction SilentlyContinue
+
+--- output ---
+Error: Invoke-Expression: 
+Line |
+   2 |  $__pnpCommandResult = Invoke-Expression $__pnpCommandText
+     |                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | A parameter cannot be found that matches parameter name 'NoSuchParameter9f2c'.

@@ -32,7 +32,7 @@ internal partial class PnPPowerShellTools
         string.Equals(Environment.GetEnvironmentVariable("PNP_MCP_CONFIRM_DESTRUCTIVE"), "false", StringComparison.OrdinalIgnoreCase);
 
     [McpServerTool(Name = "pnp_search_commands", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-    [Description("Searches PnP PowerShell commands using keyword matching against command names, verbs, and nouns. Use this tool first to find relevant commands before getting full command documentation.")]
+    [Description("Answers the question \"which cmdlet handles this, and what is it called?\". Searches cmdlet names, verbs and nouns by keyword to discover whether one exists for the area you need to manage. Use it whenever the cmdlet name is unknown. Returns names and documentation links, never tenant data.")]
     public static async Task<string> SearchPnpCommands(
         PowerShellSessionManager sessions,
         [Description("One or more space-separated keywords to find relevant commands (e.g., \"site\", \"list item\", \"teams channel\", \"user add\")")] string query,
@@ -74,7 +74,16 @@ internal partial class PnPPowerShellTools
             Remove-Variable -Name __pnpTerms, __pnpCmd, __pnpScore, __pnpTerm -ErrorAction SilentlyContinue
             """;
 
-        var result = await sessions.Get(null).ExecuteAsync(script, MetadataTimeout, cancellationToken);
+        var result = await sessions.Get(null).ExecuteAsync(script, MetadataTimeout, cancellationToken, $"search-commands\n{query}\n{limit}");
+
+        // Searching cmdlet names needs no tenant, so an unusable environment falls back to the vendored index.
+        if (result.StartsWith("Error:", StringComparison.OrdinalIgnoreCase))
+        {
+            return OutputLimit.Apply(
+                SearchVendoredCommands(query!, limit, result),
+                "Search with fewer keywords, or pass a smaller 'limit' to return fewer results.",
+                PnPErrorHints.HintFor(result));
+        }
 
         const string searchTips = """
 
@@ -91,8 +100,40 @@ internal partial class PnPPowerShellTools
             PnPErrorHints.HintFor(result) ?? searchTips);
     }
 
+    /// <summary>Answers a command search from the vendored index when the live one could not run.</summary>
+    private static string SearchVendoredCommands(string query, int limit, string sessionError)
+    {
+        var terms = query.Split([' ', ',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var matches = CommandIndex.Search(terms, limit);
+
+        // Results first, error last: truncation should cost the error, not the cmdlets.
+        var sb = new StringBuilder();
+        sb.AppendLine("Answered from the vendored cmdlet index: the live lookup failed, and its error is at the end.");
+        sb.AppendLine("Nothing below was checked against your installed module, and no command can run until that is fixed.");
+        sb.AppendLine();
+
+        if (matches.Count == 0)
+        {
+            sb.AppendLine($"No vendored cmdlet name matched '{OutputLimit.Echo(query)}'.");
+        }
+        else
+        {
+            foreach (var name in matches)
+            {
+                sb.AppendLine($"- {name} — {CommandIndex.DocsUrl(name)}");
+            }
+        }
+
+        sb.AppendLine();
+        sb.AppendLine(CommandIndex.Provenance);
+        sb.AppendLine();
+        sb.AppendLine(sessionError);
+
+        return sb.ToString();
+    }
+
     [McpServerTool(Name = "pnp_get_command_docs", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-    [Description("Gets detailed documentation for a specific PnP PowerShell command including syntax, parameters, and examples. Use this after searching for commands to understand how to use them correctly.")]
+    [Description("Gets the reference documentation for one named cmdlet: its syntax, every parameter and what it means, the parameter sets, and worked examples. Use it once you know the cmdlet name and need to know how to call it.")]
     public static async Task<string> GetPnpCommandDocs(
         PowerShellSessionManager sessions,
         [Description("The full PnP PowerShell command name (e.g., \"Get-PnPWeb\", \"Connect-PnPOnline\", \"Get-PnPList\")")] string commandName,
@@ -105,37 +146,56 @@ internal partial class PnPPowerShellTools
 
         var safeCommandName = EscapeSingleQuotedPowerShell(commandName.Trim());
 
+        // Markdown first, and before the help: a trailing link is what the cap drops.
+        var links = CommandIndex.MarkdownUrl(commandName) is { } markdown
+            ? $"""
+              MARKDOWN DOCUMENTATION (prefer this — the same page in source form, at a fraction of the tokens): {markdown}
+              HTML DOCUMENTATION: {CommandIndex.DocsUrl(commandName)}
+              TIP: If the syntax or examples below look incomplete, fetch the markdown -- it is generated from the current source and usually carries more parameter detail and examples than the shipped help. If you cannot fetch pages, give the user the link instead.
+
+              """
+            : string.Empty;
+
+        // The session's own HelpUri is consulted only for a cmdlet newer than this build.
         var script = $$"""
             $__pnpName = '{{safeCommandName}}'
             $__pnpHelpText = Get-Help $__pnpName -Full | Out-String
             if ([string]::IsNullOrWhiteSpace($__pnpHelpText)) {
               Write-Output "No documentation found for '$__pnpName'. Verify the command name using 'pnp_search_commands'."
             } else {
-              # The link goes first, not last: help for some cmdlets runs to six figures of characters
-              # (Set-PnPTenant is ~135k), so a trailing link is exactly what the output cap would drop --
-              # and a cmdlet with help that long is the one most likely to need the online page.
-              $__pnpHelpUri = $null
-              try { $__pnpHelpUri = ($ExecutionContext.InvokeCommand.GetCommand($__pnpName, [System.Management.Automation.CommandTypes]::All)).HelpUri } catch { $__pnpHelpUri = $null }
-              if (-not [string]::IsNullOrWhiteSpace($__pnpHelpUri)) {
-                Write-Output "ONLINE DOCUMENTATION: $__pnpHelpUri"
-                Write-Output "TIP: If the syntax or examples below look incomplete, fetch that page with your web-fetch tool -- it is generated from the current source and usually carries more parameter detail and examples than the shipped help. If you cannot fetch pages, give the user the link instead."
-              } else {
-                Write-Output "NOTE: This cmdlet reports no documentation URL, which usually means an older PnP.PowerShell build (HelpUri is populated in current versions)."
-                Write-Output "FALLBACK: Search https://pnp.github.io/powershell/ for '$__pnpName' to find its page, or search the web for 'PnP PowerShell $__pnpName'. Do not hand-assemble a docs URL -- the path pattern is not guaranteed. Updating the module with 'Update-Module PnP.PowerShell' also restores the link."
+              if ({{(links.Length > 0 ? "$false" : "$true")}}) {
+                $__pnpHelpUri = $null
+                try { $__pnpHelpUri = ($ExecutionContext.InvokeCommand.GetCommand($__pnpName, [System.Management.Automation.CommandTypes]::All)).HelpUri } catch { $__pnpHelpUri = $null }
+                if (-not [string]::IsNullOrWhiteSpace($__pnpHelpUri)) {
+                  Write-Output "ONLINE DOCUMENTATION: $__pnpHelpUri"
+                  Write-Output "NOTE: This cmdlet is not in this server's vendored index, so it is newer than this build. The link above comes from your installed module."
+                } else {
+                  Write-Output "NOTE: This cmdlet reports no documentation URL, which usually means an older PnP.PowerShell build (HelpUri is populated in current versions)."
+                  Write-Output "FALLBACK: Search https://pnp.github.io/powershell/ for '$__pnpName' to find its page, or search the web for 'PnP PowerShell $__pnpName'. Do not hand-assemble a docs URL -- the path pattern is not guaranteed. Updating the module with 'Update-Module PnP.PowerShell' also restores the link."
+                }
+                Write-Output ''
               }
-              Write-Output ''
               Write-Output $__pnpHelpText
             }
             Remove-Variable -Name __pnpName, __pnpHelpText, __pnpHelpUri -ErrorAction SilentlyContinue
             """;
 
-        var help = await sessions.Get(null).ExecuteAsync(script, MetadataTimeout, cancellationToken);
+        var help = await sessions.Get(null).ExecuteAsync(script, MetadataTimeout, cancellationToken, $"command-docs\n{commandName.Trim()}");
 
-        return OutputLimit.Apply(help, "Read the online documentation page linked above for the full reference.", PnPErrorHints.HintFor(help));
+        // Capped: a session error carries unbounded prior output.
+        if (help.StartsWith("Error:", StringComparison.OrdinalIgnoreCase) && links.Length > 0)
+        {
+            return OutputLimit.Apply(
+                help + "\n\nLocal help is unavailable, but the published documentation is not:\n",
+                "Read the documentation pages linked below for the reference this session could not produce.",
+                "\n" + links + PnPErrorHints.HintFor(help));
+        }
+
+        return OutputLimit.Apply(links + help, "Read the documentation pages linked above for the full reference.", PnPErrorHints.HintFor(help));
     }
 
     [McpServerTool(Name = "pnp_run_command", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = true)]
-    [Description("Executes one or more PnP PowerShell commands and returns the result. Commands can be chained with semicolons or newlines. The connection established by Connect-PnPOnline persists across calls that use the same sessionId, so you only need to connect once. This tool can be used repeatedly to accomplish complex multi-step tasks.")]
+    [Description("Runs PnP PowerShell against the connected tenant and returns what it produced. This is the tool that does the actual work: use it to create, read, update, set, change, add, remove, delete, list, upload, download, copy, move, restore or report on sites, lists, libraries, files, folders, list items, users, groups, permissions, Teams, Entra ID objects, and tenant or site settings. Chain steps with semicolons or newlines. The Connect-PnPOnline connection persists across calls sharing a sessionId, so connect once and keep going.")]
     public static async Task<string> RunPnpCommand(
         PowerShellSessionManager sessions,
         McpServer server,
@@ -228,11 +288,37 @@ internal partial class PnPPowerShellTools
             remaining = executionFloor;
         }
 
-        var result = await session.ExecuteAsync(script, remaining, cancellationToken);
+        var (result, held) = await session.ExecuteAndCaptureAsync(script, remaining, cancellationToken, $"run\n{command}");
+
+        // Summarised and paged rather than cut mid-token, so the answer stays complete and parseable.
+        if (held is not null)
+        {
+            return OutputLimit.Apply(ResultSummary.Render(held, 0, session.Id));
+        }
 
         // The hint is reserved as a suffix rather than appended after capping, so the response stays
         // inside PNP_MCP_MAX_OUTPUT_CHARS and the "Likely cause" line still survives a truncation.
         return OutputLimit.Apply(result, suffix: PnPErrorHints.HintFor(result));
+    }
+
+    [McpServerTool(Name = "pnp_get_result_page", ReadOnly = true, Idempotent = true, OpenWorld = false)]
+    [Description("Returns the next page of a result set that pnp_run_command summarised because it was too large to return whole. Pages over rows already fetched, so it costs nothing against the tenant and returns exactly the rows the original command saw. Use the cursor and offset printed under the summary.")]
+    public static string GetPnpResultPage(
+        PowerShellSessionManager sessions,
+        [Description("The cursor printed with the summary, e.g. \"a1b2c3d4e5\"")] string cursor,
+        [Description("Zero-based row number to start from, as printed in the MORE line of the previous page")] int offset = 0)
+    {
+        var session = sessions.FindHolder(cursor);
+
+        // Read once: a concurrent command in that session clears Held.
+        if (session?.Held is not { } held)
+        {
+            return
+                $"Error: No held result set matches cursor '{OutputLimit.Echo(cursor)}'. A cursor is dropped when the next command runs in " +
+                "its session, when the session is reset, and when the server restarts. Re-run the original command to get a new one.";
+        }
+
+        return OutputLimit.Apply(ResultSummary.Render(held, offset, session.Id));
     }
 
     /// <summary>Splits a command budget into an analysis cap and a reserved execution slice.</summary>
@@ -339,7 +425,7 @@ internal partial class PnPPowerShellTools
     }
 
     [McpServerTool(Name = "pnp_diagnose_connection", ReadOnly = true, Idempotent = true, OpenWorld = true)]
-    [Description("Checks everything that has to be true before a PnP PowerShell command can run: that pwsh is installed and on PATH, that the PnP.PowerShell module is present, and what connection this session holds. Every failing check names its cause and the exact next command to run. Call this first when a command fails for a reason you cannot explain, or when starting from an unknown machine.")]
+    [Description("Diagnoses a broken or unfamiliar machine. Verifies everything that must be true before anything can run at all: pwsh installed and on PATH, the PnP.PowerShell module present and current enough, and the environment correctly set up. Every failing check names its cause and the exact next command. Call it when nothing works and the reason is unknown, or when the very first attempt failed unexplained.")]
     public static async Task<string> DiagnosePnpConnection(
         PowerShellSessionManager sessions,
         [Description("Session to inspect (default: \"default\")")] string? sessionId = null,
@@ -353,7 +439,7 @@ internal partial class PnPPowerShellTools
     }
 
     [McpServerTool(Name = "pnp_get_connection_status", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-    [Description("Checks the current PnP PowerShell connection status for a session. Use this to verify if you are already connected to a SharePoint site or Microsoft 365 tenant before running commands.")]
+    [Description("Reports the current state of one session: whether it is signed in right now, which site URL it holds, and which account it is authenticated as. Use it to find out who you are and where you are pointed before doing anything else.")]
     public static async Task<string> GetPnpConnectionStatus(
         PowerShellSessionManager sessions,
         [Description("Session to inspect (default: \"default\")")] string? sessionId = null,
@@ -377,28 +463,28 @@ internal partial class PnPPowerShellTools
             Remove-Variable -Name __pnpConn, __pnpInfo -ErrorAction SilentlyContinue
             """;
 
-        var result = await sessions.Get(sessionId).ExecuteAsync(script, MetadataTimeout, cancellationToken);
+        var result = await sessions.Get(sessionId).ExecuteAsync(script, MetadataTimeout, cancellationToken, "connection-status");
 
         return $"""
-            Session: {(string.IsNullOrWhiteSpace(sessionId) ? PowerShellSessionManager.DefaultSessionId : sessionId.Trim())}
+            Session: {OutputLimit.Echo(string.IsNullOrWhiteSpace(sessionId) ? PowerShellSessionManager.DefaultSessionId : sessionId.Trim())}
 
             {result}
             """ + PnPErrorHints.HintFor(result);
     }
 
     [McpServerTool(Name = "pnp_reset_session", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
-    [Description("Ends a PowerShell session and its PnP connection, discarding all in-session state. Use this to sign out, to recover a session that has stopped responding, or to switch the connected account.")]
+    [Description("Signs out. Ends a session and discards everything held in it, so the next call starts fresh and must reconnect. Use it to log out, to switch to a different account, or to recover a session that has wedged or stopped responding.")]
     public static async Task<string> ResetPnpSession(
         PowerShellSessionManager sessions,
         [Description("Session to end (default: \"default\")")] string? sessionId = null)
     {
-        var name = string.IsNullOrWhiteSpace(sessionId) ? PowerShellSessionManager.DefaultSessionId : sessionId.Trim();
+        var name = OutputLimit.Echo(string.IsNullOrWhiteSpace(sessionId) ? PowerShellSessionManager.DefaultSessionId : sessionId.Trim());
         var existed = await sessions.ResetAsync(sessionId);
 
         var active = sessions.Describe();
         var summary = active.Count == 0
             ? "No sessions are currently running."
-            : "Sessions: " + string.Join(", ", active.Select(s => $"{s.Id} ({(!s.IsAlive ? "stopped" : s.IsBusy ? "running" : "idle")})"));
+            : "Sessions: " + string.Join(", ", active.Select(s => $"{OutputLimit.Echo(s.Id)} ({(s.IsAlive ? "running" : "stopped")})"));
 
         return existed
             ? $"Session '{name}' was ended. The next command will start a fresh session and will need to reconnect with Connect-PnPOnline.\n\n{summary}"
@@ -424,7 +510,7 @@ internal partial class PnPPowerShellTools
     };
 
     [McpServerTool(Name = "pnp_get_best_practices", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-    [Description("Returns best practices for using this MCP server with PnP PowerShell. The full document is long, so pass a section to retrieve only what you need.")]
+    [Description("Returns this server's own guidance and recommended workflow: how to approach a task, the rules it enforces, and the conventions to follow. The full document is long, so pass a section to read one topic.")]
     public static string GetPnpBestPractices(
         [Description("Optional topic to return instead of the whole document. One of: workflow, docs, sessions, config, readonly, output, destructive, auth, execution, patterns. Omit for everything.")] string? section = null)
     {
@@ -443,7 +529,7 @@ internal partial class PnPPowerShellTools
         if (!BestPracticeSections.TryGetValue(key, out var headings))
         {
             return
-                $"Error: Unknown section '{key}'. Valid sections are: {string.Join(", ", BestPracticeSections.Keys)}. " +
+                $"Error: Unknown section '{OutputLimit.Echo(key)}'. Valid sections are: {string.Join(", ", BestPracticeSections.Keys)}. " +
                 "Omit the section to get the whole document.";
         }
 

@@ -109,7 +109,7 @@ internal static class ScriptAnalyzer
             Remove-Variable -Name __pnpSrc,__pnpParseErrors,__pnpAst,__pnpFound,__pnpMethods,__pnpNodes,__pnpNode,__pnpName,__pnpCmdInfo,__pnpGuard,__pnpNext,__pnpStillAlias,__pnpEffective,__pnpVerb,__pnpWhatIf,__pnpMembers,__pnpM,__pnpParseMessage -ErrorAction SilentlyContinue
             """;
 
-        var raw = (await session.ExecuteAsync(script, timeout, cancellationToken)).Trim();
+        var raw = (await session.ExecuteAsync(script, timeout, cancellationToken, $"analyse\n{command}")).Trim();
 
         // A session-level failure is returned as-is rather than being read as an unanalysable script.
         if (raw.StartsWith("Error:", StringComparison.Ordinal))
