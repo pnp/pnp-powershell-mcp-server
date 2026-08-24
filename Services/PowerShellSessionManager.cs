@@ -37,8 +37,11 @@ internal sealed class PowerShellSessionManager : IAsyncDisposable
             ? null
             : _sessions.Values.FirstOrDefault(s => s.Held?.Cursor == cursor.Trim());
 
-    public IReadOnlyList<(string Id, bool IsAlive, DateTimeOffset LastUsedUtc)> Describe() =>
-        [.. _sessions.Values
+    public IReadOnlyList<(string Id, bool IsAlive, bool IsBusy, DateTimeOffset LastUsedUtc)> Describe()
+    {
+        var cutoff = DateTimeOffset.UtcNow - IdleTimeout;
+        return [.. _sessions.Values
+            .Where(s => s.IsBusy || s.LastUsedUtc >= cutoff)
             .OrderBy(s => s.Id, StringComparer.OrdinalIgnoreCase)
             .Select(s => (s.Id, s.IsAlive, s.IsBusy, s.LastUsedUtc))];
     }

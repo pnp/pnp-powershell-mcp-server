@@ -484,7 +484,7 @@ internal partial class PnPPowerShellTools
         var active = sessions.Describe();
         var summary = active.Count == 0
             ? "No sessions are currently running."
-            : "Sessions: " + string.Join(", ", active.Select(s => $"{OutputLimit.Echo(s.Id)} ({(s.IsAlive ? "running" : "stopped")})"));
+            : "Sessions: " + string.Join(", ", active.Select(s => $"{OutputLimit.Echo(s.Id)} ({(!s.IsAlive ? "stopped" : s.IsBusy ? "running" : "idle")})"));
 
         return existed
             ? $"Session '{name}' was ended. The next command will start a fresh session and will need to reconnect with Connect-PnPOnline.\n\n{summary}"
@@ -630,7 +630,7 @@ internal partial class PnPPowerShellTools
         return value.Replace("'", "''");
     }
 
-    private static readonly DateTimeOffset ServerStartedUtc =
+    private static DateTimeOffset ServerStartedUtc =>
         System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime();
 
     [McpServerTool(Name = "pnp_ping", ReadOnly = true, Idempotent = true, OpenWorld = false)]
@@ -677,7 +677,7 @@ internal partial class PnPPowerShellTools
         foreach (var (id, isAlive, isBusy, lastUsed) in active)
         {
             var status = !isAlive ? "stopped" : isBusy ? "running" : "idle";
-            var safeId = id.Replace("|", "\\|").Replace("\r", "").Replace("\n", " ");
+            var safeId = id.Replace("\\", "\\\\").Replace("|", "\\|").Replace("\r", "").Replace("\n", " ");
             sb.AppendLine($"| {safeId} | {status} | {lastUsed:yyyy-MM-dd HH:mm:ss} |");
         }
 
