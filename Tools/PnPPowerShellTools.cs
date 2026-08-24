@@ -2,6 +2,7 @@ using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using PnPPowerShell.MCPServer.Services;
 using System.ComponentModel;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -397,7 +398,7 @@ internal partial class PnPPowerShellTools
         var active = sessions.Describe();
         var summary = active.Count == 0
             ? "No sessions are currently running."
-            : "Sessions: " + string.Join(", ", active.Select(s => $"{s.Id} ({(s.IsAlive ? "running" : "stopped")})"));
+            : "Sessions: " + string.Join(", ", active.Select(s => $"{s.Id} ({(!s.IsAlive ? "stopped" : s.IsBusy ? "running" : "idle")})"));
 
         return existed
             ? $"Session '{name}' was ended. The next command will start a fresh session and will need to reconnect with Connect-PnPOnline.\n\n{summary}"
@@ -543,13 +544,17 @@ internal partial class PnPPowerShellTools
         return value.Replace("'", "''");
     }
 
-    private static readonly DateTimeOffset ServerStartedUtc = DateTimeOffset.UtcNow;
+    private static readonly DateTimeOffset ServerStartedUtc =
+        System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime();
 
     [McpServerTool(Name = "pnp_ping", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description("Returns the server version, uptime, read-only mode status, and active session count. Use this as a lightweight health check to confirm the server is responsive.")]
     public static string Ping(PowerShellSessionManager sessions)
     {
         var version = typeof(PnPPowerShellTools).Assembly.GetName().Version;
+        var packageVersion = typeof(PnPPowerShellTools).Assembly
+            .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion ?? version?.ToString(3) ?? "0.0.0";
         var uptime = DateTimeOffset.UtcNow - ServerStartedUtc;
         var active = sessions.Describe();
         var readOnly = CommandPolicy.ReadOnlyMode;
@@ -558,7 +563,7 @@ internal partial class PnPPowerShellTools
             {
               "status": "ok",
               "version": "{{version?.ToString(3) ?? "0.0.0"}}",
-              "packageVersion": "0.1.5-beta",
+              "packageVersion": "{{packageVersion}}",
               "uptime": "{{uptime:d\d\ hh\:mm\:ss}}",
               "startedUtc": "{{ServerStartedUtc:O}}",
               "readOnlyMode": {{(readOnly ? "true" : "false")}},
@@ -575,7 +580,7 @@ internal partial class PnPPowerShellTools
 
         if (active.Count == 0)
         {
-            return "No sessions are currently running. A session is created automatically when you first call pnp_run_command or pnp_search_commands.";
+            return "No sessions are currently running. A session is created automatically when you first call a tool that requires one.";
         }
 
         var sb = new StringBuilder();
@@ -583,16 +588,17 @@ internal partial class PnPPowerShellTools
         sb.AppendLine("| Session | Status | Last Activity (UTC) |");
         sb.AppendLine("|---------|--------|---------------------|");
 
-        foreach (var (id, isAlive, lastUsed) in active)
+        foreach (var (id, isAlive, isBusy, lastUsed) in active)
         {
-            var status = isAlive ? "running" : "stopped";
-            sb.AppendLine($"| {id} | {status} | {lastUsed:yyyy-MM-dd HH:mm:ss} |");
+            var status = !isAlive ? "stopped" : isBusy ? "running" : "idle";
+            var safeId = id.Replace("|", "\\|").Replace("\r", "").Replace("\n", " ");
+            sb.AppendLine($"| {safeId} | {status} | {lastUsed:yyyy-MM-dd HH:mm:ss} |");
         }
 
         sb.AppendLine();
         sb.AppendLine("TIP: Use `pnp_get_connection_status` with a sessionId to check what a session is connected to.");
         sb.AppendLine("TIP: Use `pnp_reset_session` to end a session that is no longer needed.");
 
-        return sb.ToString();
+        return OutputLimit.Apply(sb.ToString());
     }
 }
