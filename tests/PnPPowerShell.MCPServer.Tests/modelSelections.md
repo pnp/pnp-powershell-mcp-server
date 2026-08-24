@@ -80,6 +80,16 @@ open between two tools; those are excluded from the agreement figure and listed 
 - pnp_suggest_script :: Help me build a script that reports on site collection permissions
 - pnp_suggest_script :: Give me a starting point for archiving inactive sites
 - pnp_suggest_script :: Automate removing orphaned users across the tenant (ambiguous)
+- pnp_ping :: Lightweight health check to confirm the server is responsive
+- pnp_ping :: What version and uptime does the server report
+- pnp_ping :: Is the server responsive and what is its read-only mode status
+- pnp_ping :: Show me the server version and active session count
+- pnp_ping :: Run a health check and tell me the uptime
+- pnp_list_sessions :: List all active PowerShell sessions with their status
+- pnp_list_sessions :: What sessions exist before I decide which to connect or reuse
+- pnp_list_sessions :: Show me each session and its last activity time
+- pnp_list_sessions :: Which active sessions are running and what is their status
+- pnp_list_sessions :: List sessions so I can decide which to reset or reuse
 
 ## Ambiguous
 
