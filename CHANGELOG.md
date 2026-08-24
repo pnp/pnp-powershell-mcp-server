@@ -10,21 +10,6 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [Current version]
 
-### Added
-
-- Added vendored script-sample and cmdlet indexes as embedded resources, so the script-sample tools and `pnp_search_commands` work offline. [#18](https://github.com/pnp/pnp-powershell-mcp-server/pull/18)
-- Added the `pnp_get_result_page` tool, which summarises an oversized result set and pages it from the session instead of re-running the command. [#18](https://github.com/pnp/pnp-powershell-mcp-server/pull/18)
-- Added a raw-markdown documentation link to `pnp_get_command_docs`, the same content as the HTML page for a fraction of the tokens. [#18](https://github.com/pnp/pnp-powershell-mcp-server/pull/18)
-- Added record-and-playback fixtures, a tool-selection gate, stdio protocol tests and scrubber fuzzing, so the suite runs with no tenant and no `pwsh`. [#18](https://github.com/pnp/pnp-powershell-mcp-server/pull/18)
-
-### Changed
-
-- Changed every tool description to state what the tool is for rather than how it works. [#18](https://github.com/pnp/pnp-powershell-mcp-server/pull/18)
-
-### Fixed
-
-- Fixed a path traversal where a script-sample name from a local clone was substituted into a file path unchecked. [#18](https://github.com/pnp/pnp-powershell-mcp-server/pull/18)
-
 ## [0.1.5-beta]
 
 ### Added
@@ -36,16 +21,27 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 - Added an `output` section to the best practices resource and to the `section` parameter of `pnp_get_best_practices`. [#15](https://github.com/pnp/pnp-powershell-mcp-server/pull/15)
 - Added tests covering approval binding, connection preflight, resources, tool annotations and the new error hints. [#15](https://github.com/pnp/pnp-powershell-mcp-server/pull/15)
 - Added CHANGELOG.md for better maintainability. [#16](https://github.com/pnp/pnp-powershell-mcp-server/pull/16)
+- Added vendored script-sample and cmdlet indexes as embedded resources, so the script-sample tools and `pnp_search_commands` work offline. [#18](https://github.com/pnp/pnp-powershell-mcp-server/pull/18)
+- Added the `pnp_get_result_page` tool, which summarises an oversized result set and pages it from the session instead of re-running the command. [#18](https://github.com/pnp/pnp-powershell-mcp-server/pull/18)
+- Added a raw-markdown documentation link to `pnp_get_command_docs`, the same content as the HTML page for a fraction of the tokens. [#18](https://github.com/pnp/pnp-powershell-mcp-server/pull/18)
+- Added record-and-playback fixtures, a tool-selection gate, stdio protocol tests and scrubber fuzzing, so the suite runs with no tenant and no `pwsh`. [#18](https://github.com/pnp/pnp-powershell-mcp-server/pull/18)
+- Added the `pnp_list_sessions` tool, which lists every active session with its status (`running`, `idle`, `stopped`) and last activity time, so a client can see which sessions exist before deciding which to reuse, reconnect or reset. [#17](https://github.com/pnp/pnp-powershell-mcp-server/pull/17)
+- Added the `pnp_ping` tool, a lightweight health check returning the server version, uptime, read-only mode and active session count, so a client can confirm the server is responsive at startup without touching a tenant. [#17](https://github.com/pnp/pnp-powershell-mcp-server/pull/17)
+- Added tests for the two new tools, plus `modelSelections.md` and `e2eTestPrompts.md` recording the prompts used to check tool selection end to end. [#17](https://github.com/pnp/pnp-powershell-mcp-server/pull/17)
 
 ### Changed
 
 - Changed the version to `0.1.5-beta` across the project file, the MCP server manifest and the documentation. [#15](https://github.com/pnp/pnp-powershell-mcp-server/pull/15)
 - Changed the README and the best practices resource to document the new tool, the resources, the annotations and the confirmation gate. [#15](https://github.com/pnp/pnp-powershell-mcp-server/pull/15)
+- Changed every tool description to state what the tool is for rather than how it works. [#18](https://github.com/pnp/pnp-powershell-mcp-server/pull/18)
+- Changed session reporting to distinguish an idle session from one that is actively running a command, and to drop sessions past the idle timeout, so the status shown reflects what the session is really doing. [#17](https://github.com/pnp/pnp-powershell-mcp-server/pull/17)
+- Changed the README tool table to document `pnp_ping` and `pnp_list_sessions`. [#17](https://github.com/pnp/pnp-powershell-mcp-server/pull/17)
 
 ### Fixed
 
 - Fixed the destructive command confirmation bypass by removing `confirmDestructive` from the tool schema and binding an approval to an HMAC keyed fingerprint of the command, so the model can no longer approve its own destructive command. `PNP_MCP_CONFIRM_DESTRUCTIVE=false` is now the only way to bypass the gate. [#15](https://github.com/pnp/pnp-powershell-mcp-server/pull/15)
 - Fixed the order in which error hints are matched, so the most specific hint wins. [#15](https://github.com/pnp/pnp-powershell-mcp-server/pull/15)
+- Fixed a path traversal where a script-sample name from a local clone was substituted into a file path unchecked. [#18](https://github.com/pnp/pnp-powershell-mcp-server/pull/18)
 
 ### Contributors
 
