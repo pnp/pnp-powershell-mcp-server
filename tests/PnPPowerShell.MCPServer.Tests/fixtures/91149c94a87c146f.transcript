@@ -1,0 +1,24 @@
+# key: 91149c94a87c146f
+# operation: run | Connect-PnPOnline -Url 'https://contoso.sharepoint.com/sites/contoso' -ClientId '00000000-0000-4000-8000-000000000001' -PersistLogin
+# Scrubbed by TranscriptScrubber. Read it before committing: display names in free text are not detectable.
+
+--- command ---
+Connect-PnPOnline -Url 'https://contoso.sharepoint.com/sites/contoso' -ClientId '00000000-0000-4000-8000-000000000001' -PersistLogin
+
+--- script ---
+$__pnpCommandText = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('Q29ubmVjdC1QblBPbmxpbmUgLVVybCAnaHR0cHM6Ly9jb250b3NvLnNoYXJlcG9pbnQuY29tL3NpdGVzL2NvbnRvc28nIC1DbGllbnRJZCAnMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxJyAtUGVyc2lzdExvZ2lu'))
+$__pnpCommandResult = Invoke-Expression $__pnpCommandText
+if ($null -ne $__pnpCommandResult) {
+  try {
+    $__pnpCommandResult | ConvertTo-Json -Depth 20 -Compress
+  }
+  catch {
+    $__pnpCommandResult | Out-String
+  }
+} else {
+  Write-Output 'Command completed successfully (no output).'
+}
+Remove-Variable -Name __pnpCommandText, __pnpCommandResult -ErrorAction SilentlyContinue
+
+--- output ---
+Command completed successfully (no output).

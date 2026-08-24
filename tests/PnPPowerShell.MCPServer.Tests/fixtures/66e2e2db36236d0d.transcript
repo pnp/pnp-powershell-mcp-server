@@ -1,0 +1,29 @@
+# key: 66e2e2db36236d0d
+# operation: search-commands | tenant site | 5
+# Scrubbed by TranscriptScrubber. Read it before committing: display names in free text are not detectable.
+
+--- command ---
+(none — this script carries no encoded payload)
+
+--- script ---
+$__pnpTerms = @('tenant','site')
+Get-Command -Module PnP.PowerShell |
+  ForEach-Object {
+    $__pnpCmd = $_
+    $__pnpScore = 0
+    foreach ($__pnpTerm in $__pnpTerms) {
+      if ($__pnpCmd.Name -like "*$__pnpTerm*") { $__pnpScore += 10 }
+      if ($__pnpCmd.Verb -like "*$__pnpTerm*") { $__pnpScore += 4 }
+      if ($__pnpCmd.Noun -like "*$__pnpTerm*") { $__pnpScore += 6 }
+    }
+    if ($__pnpScore -gt 0) {
+      [PSCustomObject]@{ Name = $__pnpCmd.Name; Verb = $__pnpCmd.Verb; Noun = $__pnpCmd.Noun; HelpUri = $__pnpCmd.HelpUri; Score = $__pnpScore }
+    }
+  } |
+  Sort-Object -Property Score -Descending |
+  Select-Object -First 5 Name, Verb, Noun, HelpUri |
+  ConvertTo-Json -Depth 5 -Compress
+Remove-Variable -Name __pnpTerms, __pnpCmd, __pnpScore, __pnpTerm -ErrorAction SilentlyContinue
+
+--- output ---
+[{"Name":"Get-PnPTenantSite","Verb":"Get","Noun":"PnPTenantSite","HelpUri":"https://pnp.github.io/powershell/cmdlets/Get-PnPTenantSite.html"},{"Name":"Remove-PnPTenantSite","Verb":"Remove","Noun":"PnPTenantSite","HelpUri":"https://pnp.github.io/powershell/cmdlets/Remove-PnPTenantSite.html"},{"Name":"Rename-PnPTenantSite","Verb":"Rename","Noun":"PnPTenantSite","HelpUri":"https://pnp.github.io/powershell/cmdlets/Rename-PnPTenantSite.html"},{"Name":"Restore-PnPTenantSite","Verb":"Restore","Noun":"PnPTenantSite","HelpUri":"https://pnp.github.io/powershell/cmdlets/Restore-PnPTenantSite.html"},{"Name":"New-PnPTenantSite","Verb":"New","Noun":"PnPTenantSite","HelpUri":"https://pnp.github.io/powershell/cmdlets/New-PnPTenantSite.html"}]

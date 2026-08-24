@@ -19,6 +19,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="e2eTestPrompts.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="modelSelections.md" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\PnPPowerShell.MCPServer.csproj" />
   </ItemGroup>
 

@@ -31,6 +31,12 @@ internal sealed class PowerShellSessionManager : IAsyncDisposable
         return true;
     }
 
+    /// <summary>The session holding a paged result set under this cursor, or null when none does.</summary>
+    public PowerShellSession? FindHolder(string? cursor) =>
+        string.IsNullOrWhiteSpace(cursor)
+            ? null
+            : _sessions.Values.FirstOrDefault(s => s.Held?.Cursor == cursor.Trim());
+
     public IReadOnlyList<(string Id, bool IsAlive, DateTimeOffset LastUsedUtc)> Describe() =>
         [.. _sessions.Values
             .OrderBy(s => s.Id, StringComparer.OrdinalIgnoreCase)
