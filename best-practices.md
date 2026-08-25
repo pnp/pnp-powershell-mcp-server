@@ -296,6 +296,29 @@ command that turns out to be harmless.
   taken outside the conversation, and is not recommended outside automation where the commands are
   already reviewed.
 
+### What is not gated, and why
+
+**An ordinary mutating verb does not prompt.** `Set-*`, `Add-*`, `New-*`, `Enable-*` and `Grant-*` run
+with no confirmation at all, and some of them carry real consequences — `Set-PnPTenant` changes
+tenant-wide settings, and `Grant-PnPAzureADAppSitePermission` gives an application access to a site.
+
+This is a deliberate trade-off, not an oversight. Mutating verbs are most of what this server is asked
+to do, so prompting on all of them would produce a prompt routine enough to stop being read, which
+costs more safety than it buys. The line is drawn at verbs that destroy, overwrite or revoke, because
+those are the cases that running the command again with better arguments cannot undo.
+
+The consequence is worth stating plainly: **on a `Set-*` or `Grant-*` command, you are the only
+review.** Nobody outside the conversation sees it before it runs. So:
+
+- **Say what it will change before you run it**, in terms the user can check — which tenant, which
+  site, which setting, from what to what.
+- **Read the current value first.** `Get-PnPTenant` before `Set-PnPTenant` gives the user something to
+  compare against, and gives you something to restore from.
+- **Change one thing per command**, against a scope you have already confirmed, rather than a chain
+  that leaves a partial change behind when a later step fails.
+- **Prefer `PNP_MCP_READONLY=true` when the task only needs to read.** It refuses every mutating verb
+  outright, which is a stronger guarantee than any prompt.
+
 ## Authentication Best Practices
 
 ### Connect to SharePoint Online
