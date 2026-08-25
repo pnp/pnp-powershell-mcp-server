@@ -77,6 +77,23 @@ public sealed class RequiresPnPFactAttribute : FactAttribute
     }
 }
 
+/// <summary>
+/// The mirror of <see cref="RequiresPnPFactAttribute"/>: runs only where pwsh or PnP.PowerShell is
+/// absent. The cold-start states cannot be manufactured on a developer machine that has both — pwsh
+/// re-adds the default module paths, so PSModulePath cannot hide the module, and uninstalling it is
+/// not something a test may do. A bare CI runner is that clean container, so the check runs there.
+/// </summary>
+public sealed class BarePnPFactAttribute : FactAttribute
+{
+    public BarePnPFactAttribute()
+    {
+        if (TestEnvironment.PnPAvailable)
+        {
+            Skip = "Runs only where pwsh or PnP.PowerShell is missing, which is the state it asserts.";
+        }
+    }
+}
+
 /// <summary>Sets an environment variable for the duration of a test and restores it afterwards.</summary>
 internal sealed class EnvVar : IDisposable
 {
@@ -91,4 +108,48 @@ internal sealed class EnvVar : IDisposable
     }
 
     public void Dispose() => Environment.SetEnvironmentVariable(_name, _original);
+}
+
+/// <summary>True when the maintainer asked for fixtures to be re-recorded against a live tenant.</summary>
+internal static class FixtureRecording
+{
+    public const string Reason = "Set PNP_MCP_RECORD_FIXTURES=1 with a connected dev tenant to re-record fixtures.";
+
+    public static bool Requested => Environment.GetEnvironmentVariable("PNP_MCP_RECORD_FIXTURES") == "1";
+}
+
+/// <summary>A fact that only runs during a recording session.</summary>
+public sealed class RecordingFactAttribute : FactAttribute
+{
+    public RecordingFactAttribute()
+    {
+        if (!FixtureRecording.Requested)
+        {
+            Skip = FixtureRecording.Reason;
+        }
+    }
+}
+
+/// <summary>A fact that steps aside during a recording session, so recording does not assert against stale fixtures.</summary>
+public sealed class PlaybackFactAttribute : FactAttribute
+{
+    public PlaybackFactAttribute()
+    {
+        if (FixtureRecording.Requested)
+        {
+            Skip = "Recording, not replaying.";
+        }
+    }
+}
+
+/// <summary>The theory form of <see cref="PlaybackFactAttribute"/>.</summary>
+public sealed class PlaybackTheoryAttribute : TheoryAttribute
+{
+    public PlaybackTheoryAttribute()
+    {
+        if (FixtureRecording.Requested)
+        {
+            Skip = "Recording, not replaying.";
+        }
+    }
 }

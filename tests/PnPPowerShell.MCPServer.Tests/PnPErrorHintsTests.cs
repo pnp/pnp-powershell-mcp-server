@@ -15,6 +15,11 @@ public class PnPErrorHintsTests
     [InlineData("AADSTS50076: due to a configuration change", "MFA")]
     [InlineData("Cannot contact web site", "locked or deleted")]
     [InlineData("A parameter cannot be found that matches parameter name 'Foo'", "pnp_get_command_docs")]
+    [InlineData("Could not launch 'pwsh'. Install PowerShell 7.4 or above", "pnp_diagnose_connection")]
+    [InlineData("The PnP.PowerShell module is not installed", "Install-Module -Name PnP.PowerShell")]
+    [InlineData("AADSTS50011: The redirect URI specified does not match", "http://localhost")]
+    [InlineData("Authorization_RequestDenied: Insufficient privileges", "Application Administrator")]
+    [InlineData("AADSTS99999: something new Microsoft added", "login.microsoftonline.com/error")]
     public void Enrich_appends_a_cause_for_a_known_failure(string error, string expectedHint)
     {
         var result = PnPErrorHints.Enrich("Error: " + error);
@@ -32,6 +37,21 @@ public class PnPErrorHintsTests
             "Error: The remote server returned an error: (403) Forbidden. Url: https://contoso-admin.sharepoint.com");
 
         Assert.Contains("not authorized", result);
+    }
+
+    [Fact]
+    public void A_bare_status_code_never_outranks_a_pattern_that_identifies_the_failure()
+    {
+        var statusCodes = new[] { "(401)", "(403)", "(404)", "(429)", "(503)" };
+        var firstStatusCode = Array.FindIndex(PnPErrorHints.Hints, h => statusCodes.Contains(h.Match));
+        var specific = PnPErrorHints.Hints[..firstStatusCode].Select(h => h.Match).ToList();
+
+        Assert.Contains("does not exist or you do not have permissions", specific);
+        Assert.Contains("AADSTS", specific);
+        Assert.Contains("File Not Found", specific);
+        Assert.All(
+            PnPErrorHints.Hints[firstStatusCode..],
+            h => Assert.Contains(h.Match, statusCodes));
     }
 
     [Fact]

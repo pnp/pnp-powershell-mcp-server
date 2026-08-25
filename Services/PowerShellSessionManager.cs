@@ -31,10 +31,20 @@ internal sealed class PowerShellSessionManager : IAsyncDisposable
         return true;
     }
 
-    public IReadOnlyList<(string Id, bool IsAlive, DateTimeOffset LastUsedUtc)> Describe() =>
-        [.. _sessions.Values
+    /// <summary>The session holding a paged result set under this cursor, or null when none does.</summary>
+    public PowerShellSession? FindHolder(string? cursor) =>
+        string.IsNullOrWhiteSpace(cursor)
+            ? null
+            : _sessions.Values.FirstOrDefault(s => s.Held?.Cursor == cursor.Trim());
+
+    public IReadOnlyList<(string Id, bool IsAlive, bool IsBusy, DateTimeOffset LastUsedUtc)> Describe()
+    {
+        var cutoff = DateTimeOffset.UtcNow - IdleTimeout;
+        return [.. _sessions.Values
+            .Where(s => s.IsBusy || s.LastUsedUtc >= cutoff)
             .OrderBy(s => s.Id, StringComparer.OrdinalIgnoreCase)
-            .Select(s => (s.Id, s.IsAlive, s.LastUsedUtc))];
+            .Select(s => (s.Id, s.IsAlive, s.IsBusy, s.LastUsedUtc))];
+    }
 
     private static string Normalize(string? sessionId) =>
         string.IsNullOrWhiteSpace(sessionId) ? DefaultSessionId : sessionId.Trim();

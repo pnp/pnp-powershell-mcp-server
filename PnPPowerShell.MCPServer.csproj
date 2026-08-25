@@ -30,7 +30,7 @@
     <!-- Set recommended package metadata -->
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>PnP.PowerShell.MCPServer</PackageId>
-    <PackageVersion>0.1.4-beta</PackageVersion>
+    <PackageVersion>0.1.5-beta</PackageVersion>
     <Authors>PnP Community</Authors>
     <PackageTags>AI; MCP; server; stdio; PnP; PowerShell; SharePoint; Microsoft365</PackageTags>
     <Description>Model Context Protocol (MCP) server for PnP PowerShell that allows managing Microsoft 365 (SharePoint Online, Teams, Entra ID, and more) using natural language, and helps developers author complex PnP PowerShell scripts.</Description>
@@ -46,6 +46,9 @@
     <None Include="LICENSE" Pack="true" PackagePath="/" />
     <!-- Compiled in, so the guidance cannot drift from a second copy and is always present at runtime. -->
     <EmbeddedResource Include="best-practices.md" LogicalName="best-practices.md" />
+    <!-- Vendored so the sample and cmdlet indexes answer with no network and no VS Code extension. Refresh with build/Update-VendoredData.ps1. -->
+    <EmbeddedResource Include="data\script-samples.json" LogicalName="script-samples.json" />
+    <EmbeddedResource Include="data\pnp-commands.json" LogicalName="pnp-commands.json" />
   </ItemGroup>
 
   <ItemGroup>

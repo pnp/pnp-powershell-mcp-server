@@ -1,0 +1,24 @@
+# key: 87d6008277c2258a
+# operation: run | Get-PnPList -Identity 'no-such-list-9f2c'
+# Scrubbed by TranscriptScrubber. Read it before committing: display names in free text are not detectable.
+
+--- command ---
+Get-PnPList -Identity 'no-such-list-9f2c'
+
+--- script ---
+$__pnpCommandText = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('R2V0LVBuUExpc3QgLUlkZW50aXR5ICduby1zdWNoLWxpc3QtOWYyYyc='))
+$__pnpCommandResult = Invoke-Expression $__pnpCommandText
+if ($null -ne $__pnpCommandResult) {
+  try {
+    $__pnpCommandResult | ConvertTo-Json -Depth 20 -Compress
+  }
+  catch {
+    $__pnpCommandResult | Out-String
+  }
+} else {
+  Write-Output 'Command completed successfully (no output).'
+}
+Remove-Variable -Name __pnpCommandText, __pnpCommandResult -ErrorAction SilentlyContinue
+
+--- output ---
+Error: Get-PnPList: List 'no-such-list-9f2c' does not exist at site with URL 'https://contoso.sharepoint.com/sites/contoso'.

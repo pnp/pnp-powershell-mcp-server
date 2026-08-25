@@ -16,6 +16,8 @@ internal static class OutputLimit
     // Caller-supplied text is clamped so neither piece can crowd out the body or the warning.
     private const int MaxHintChars = 300;
 
+    private const int MaxEchoChars = 120;
+
     internal const string TruncationMarker = "\n\n[output truncated:";
 
     private const string DefaultHint =
@@ -25,6 +27,14 @@ internal static class OutputLimit
         int.TryParse(Environment.GetEnvironmentVariable("PNP_MCP_MAX_OUTPUT_CHARS"), out var chars) && chars >= MinimumMaxChars
             ? chars
             : DefaultMaxChars;
+
+    /// <summary>Clamps a caller value quoted back in a message, so the error stays an error.</summary>
+    public static string Echo(string? value)
+    {
+        var clean = new string([.. (value ?? string.Empty).Where(c => !char.IsControl(c)).Take(MaxEchoChars + 1)]);
+
+        return clean.Length > MaxEchoChars ? clean[..MaxEchoChars] + "..." : clean;
+    }
 
     /// <summary>Caps <paramref name="output"/>, keeping <paramref name="suffix"/> and counting it against the limit.</summary>
     // The returned string is never longer than MaxChars, whatever the caller passes.

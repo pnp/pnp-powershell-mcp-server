@@ -1,4 +1,8 @@
+using ModelContextProtocol.Protocol;
 using PnPPowerShell.MCPServer.Tools;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 
 namespace PnPPowerShell.MCPServer.Tests;
 
@@ -47,6 +51,80 @@ public class ApprovalBindingTests
     public void An_invalid_request_state_is_rejected(string state)
     {
         Assert.False(PnPPowerShellTools.IsApprovalBoundTo(state, Command));
+    }
+
+    [Fact]
+    public void The_tool_exposes_no_parameter_that_approves_a_destructive_command()
+    {
+        var parameters = typeof(PnPPowerShellTools)
+            .GetMethod(nameof(PnPPowerShellTools.RunPnpCommand))!
+            .GetParameters()
+            .Select(p => p.Name);
+
+        Assert.DoesNotContain("confirmDestructive", parameters);
+    }
+
+    [Fact]
+    public void An_approval_the_caller_computed_for_itself_is_rejected()
+    {
+        var unkeyed = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Command)));
+
+        Assert.NotEqual(unkeyed, PnPPowerShellTools.Fingerprint(Command));
+        Assert.False(PnPPowerShellTools.IsApprovalBoundTo(unkeyed, Command));
+    }
+
+    private static ElicitResult Ticked() => new()
+    {
+        Action = "accept",
+        Content = new Dictionary<string, JsonElement> { ["confirm"] = JsonDocument.Parse("true").RootElement },
+    };
+
+    [Fact]
+    public void A_fully_accepted_approval_bound_to_the_command_runs()
+    {
+        Assert.Null(PnPPowerShellTools.EvaluateApproval(PnPPowerShellTools.Fingerprint(Command), Command, Ticked(), "Remove-PnPTenantSite"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("0000000000000000000000000000000000000000000000000000000000000000")]
+    public void An_accepted_approval_without_a_matching_request_state_does_not_run(string? requestState)
+    {
+        var refusal = PnPPowerShellTools.EvaluateApproval(requestState, Command, Ticked(), "Remove-PnPTenantSite");
+
+        Assert.NotNull(refusal);
+        Assert.StartsWith("Cancelled:", refusal);
+    }
+
+    [Fact]
+    public void An_approval_minted_for_a_different_command_does_not_run()
+    {
+        var refusal = PnPPowerShellTools.EvaluateApproval(
+            PnPPowerShellTools.Fingerprint("Remove-PnPTenantSite -Url https://contoso.sharepoint.com/sites/other -Force"),
+            Command,
+            Ticked(),
+            "Remove-PnPTenantSite");
+
+        Assert.NotNull(refusal);
+    }
+
+    [Fact]
+    public void An_accepted_response_with_the_box_unticked_does_not_run()
+    {
+        var untickedBox = new ElicitResult { Action = "accept", Content = new Dictionary<string, JsonElement>() };
+
+        var refusal = PnPPowerShellTools.EvaluateApproval(PnPPowerShellTools.Fingerprint(Command), Command, untickedBox, "Remove-PnPTenantSite");
+
+        Assert.NotNull(refusal);
+    }
+
+    [Fact]
+    public void A_declined_prompt_does_not_run()
+    {
+        var declined = new ElicitResult { Action = "decline" };
+
+        Assert.NotNull(PnPPowerShellTools.EvaluateApproval(PnPPowerShellTools.Fingerprint(Command), Command, declined, "Remove-PnPTenantSite"));
     }
 
     [Fact]

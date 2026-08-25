@@ -1,0 +1,26 @@
+# key: f7160982c389a6c0
+# operation: connection-status
+# Scrubbed by TranscriptScrubber. Read it before committing: display names in free text are not detectable.
+
+--- command ---
+(none — this script carries no encoded payload)
+
+--- script ---
+try {
+  $__pnpConn = Get-PnPConnection
+  $__pnpInfo = [ordered]@{
+    connected = $true
+    url = $__pnpConn.Url
+    tenantAdminUrl = $__pnpConn.TenantAdminUrl
+    connectionType = $__pnpConn.ConnectionType.ToString()
+    account = if ($__pnpConn.PSCredential) { $__pnpConn.PSCredential.UserName } else { $null }
+  }
+  $__pnpInfo | ConvertTo-Json -Depth 5 -Compress
+}
+catch {
+  Write-Output '{"connected":false,"message":"Not connected. Use Connect-PnPOnline to establish a connection. Run pnp_get_command_docs with commandName Connect-PnPOnline for usage details."}'
+}
+Remove-Variable -Name __pnpConn, __pnpInfo -ErrorAction SilentlyContinue
+
+--- output ---
+{"connected":true,"url":"https://contoso.sharepoint.com/sites/contoso","tenantAdminUrl":null,"connectionType":"O365","account":null}

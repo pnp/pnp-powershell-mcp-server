@@ -162,11 +162,35 @@ If you have updated code, you need to test your changes to make sure they work a
    npx @modelcontextprotocol/inspector dotnet run --project ./PnPPowerShell.MCPServer.csproj
    ```
 
+1. Run the test suite. It needs no tenant and no network — the tenant-dependent tests replay recorded
+   fixtures, and the tests that need `pwsh` and the `PnP.PowerShell` module skip themselves when either
+   is absent:
+
+   ```powershell
+   dotnet test
+   ```
+
 1. If you are making packaging changes, verify your publish flow on at least one RID:
 
    ```powershell
    dotnet publish -c Release -r win-x64 --self-contained
    ```
+
+### If you added or changed a tool
+
+- **Add prompts for it** to [e2eTestPrompts.md](./tests/PnPPowerShell.MCPServer.Tests/e2eTestPrompts.md).
+  `ToolSelectionEvaluatorTests` fails on any tool with none, and gates every prompt on ranking its tool
+  in the top three against the published descriptions. When a prompt regresses, fix the tool's
+  `[Description]` rather than the prompt: the evaluator reads exactly what an MCP client reads.
+- **Declare its annotations.** `readOnlyHint`, `idempotentHint` and `openWorldHint` are required, plus
+  `destructiveHint` for anything that can change state. A test enforces this.
+
+### If you changed the script generated for a session
+
+Recorded fixtures are keyed on that script, so changing it invalidates them and playback will say which
+fixture is missing. Re-record from a machine with a connected dev tenant, then **read every fixture
+before committing it** — the scrubber cannot detect a display name in free text. See
+[Recorded-playback tests](./README.md#recorded-playback-tests).
 
 ## Submitting your changes for review
 
