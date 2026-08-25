@@ -46,8 +46,9 @@ internal partial class PnPPowerShellTools
         PowerShell 7 terminal with -PersistLogin so later connects need no prompt.
         """;
 
-    // Anchored and single-statement: a chained connect keeps the full command budget.
-    [GeneratedRegex(@"^Connect-PnPOnline\b[^;\r\n]*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    // Anchored, and no separator that can run a second command: ; newline | & && ||. A chained connect
+    // keeps the full command budget.
+    [GeneratedRegex(@"^Connect-PnPOnline\b[^;|&\r\n]*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SignInOnlyRegex();
 
     // A backtick-newline continues one statement, so it is folded away before the single-line check.
