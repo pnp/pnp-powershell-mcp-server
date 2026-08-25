@@ -6,11 +6,14 @@ This guide provides best practices for using PnP PowerShell commands through the
 
 Use this flow for reliable execution:
 
-1. **Check you can run anything at all** with `pnp_diagnose_connection`. Make this your first call in
-   a new session: it answers, in one round trip, whether `pwsh` is on `PATH`, whether the
-   `PnP.PowerShell` module is installed, and what connection the session holds — and every failing
-   check names its cause and the exact next command to run. Use `pnp_get_connection_status` instead
-   when you only need to re-check the connection on a session you have already diagnosed.
+1. **Check you can run anything at all** with `pnp_diagnose_connection`, passing `targetUrl` when you
+   know which site the task is about. Make this your first call in a new session: it answers, in one
+   round trip, whether `pwsh` is on `PATH`, whether the `PnP.PowerShell` module is installed, what
+   connection the session holds, and — when there is none — which app registration or persisted login
+   this machine can sign in with. Every failing check names its cause and the exact next command, with
+   no placeholder left in it, so **run the command it gives you rather than composing one**. Use
+   `pnp_get_connection_status` instead when you only need to re-check the connection on a session you
+   have already diagnosed.
 2. **Search commands** with `pnp_search_commands` to find the right command for your task.
 3. **Read documentation** with `pnp_get_command_docs` to understand syntax, parameters, and examples. Both this and `pnp_search_commands` return the cmdlet's published documentation URL, which is worth citing to the user and often carries examples the shipped help omits.
 4. **Search community samples** with `pnp_search_script_samples` or `pnp_suggest_script` before writing a script from scratch — there is a good chance someone has already solved a similar problem.
@@ -321,28 +324,71 @@ review.** Nobody outside the conversation sees it before it runs. So:
 
 ## Authentication Best Practices
 
-### Connect to SharePoint Online
+### Ask before you connect
 
-Establish a connection once per session; it persists across later commands:
+**Run `pnp_diagnose_connection` with the site you are targeting, and run the command it gives you.**
 
-```powershell
-# Interactive login (recommended for local/manual use, supports MFA)
-Connect-PnPOnline -Url https://contoso.sharepoint.com/sites/MySite -Interactive
-
-# Certificate-based authentication (recommended for automation/CI-CD)
-Connect-PnPOnline -Url https://contoso.sharepoint.com -ClientId <app-id> -Tenant contoso.onmicrosoft.com -Thumbprint <cert-thumbprint>
-
-# Managed Identity (recommended for Azure-hosted scenarios)
-Connect-PnPOnline -Url https://contoso.sharepoint.com -ManagedIdentity
+```jsonc
+// pnp_diagnose_connection
+{ "targetUrl": "https://contoso.sharepoint.com/sites/marketing" }
 ```
 
-### Authentication Methods
+Section 4 of the report says what this machine can actually authenticate with — persisted logins, a
+cached token, `ENTRAID_APP_ID` / `ENTRAID_CLIENT_ID`, a certificate path — and its `NEXT STEP` is a
+complete command with nothing left to fill in.
 
-- **Interactive scenarios**: Use `-Interactive` for browser-based authentication with MFA support.
-- **Automation/CI-CD**: Use certificate-based authentication (`-ClientId`, `-Tenant`, `-Thumbprint`) or managed identity (`-ManagedIdentity`).
-- **Avoid** storing credentials directly in scripts. Use Azure Key Vault or environment variables.
-- **Check connection** with `pnp_get_connection_status` before running commands to avoid authentication errors.
+**Do not compose a connect from memory, and never assume an environment variable is set.** Since
+September 2024 `-ClientId` is required for the interactive, credentials and OS-login flows, so a connect
+without one works only when a persisted login or one of those variables supplies it. The report tells you
+which of those exist here, so there is nothing left to guess.
 
+### The first sign-in is not yours to run
+
+A first-time sign-in opens a browser and waits for a person. That prompt is invisible from inside this
+conversation, so the call blocks until it times out and nothing gets connected.
+
+So when the report says `BLOCKED`, hand the commands to the user instead of running them:
+
+```powershell
+# A person signing in: register an app, then connect once
+Register-PnPEntraIDAppForInteractiveLogin -ApplicationName "PnP PowerShell" -Tenant contoso.onmicrosoft.com -Interactive
+Connect-PnPOnline -Url https://contoso.sharepoint.com/sites/marketing -ClientId <app id> -PersistLogin
+
+# Unattended instead: register an app with a certificate, then use it
+Register-PnPEntraIDApp -ApplicationName "PnP PowerShell" -Tenant contoso.onmicrosoft.com -OutPath . -DeviceLogin
+Connect-PnPOnline -Url https://contoso.sharepoint.com -ClientId <app id> -Tenant contoso.onmicrosoft.com `
+  -CertificatePath .\PnP-PowerShell.pfx -CertificatePassword (Read-Host -AsSecureString)
+```
+
+Both registration cmdlets need an administrator to consent before the app works.
+
+`-PersistLogin` is the part that matters for the interactive path. It records the app id against that
+tenant and caches the token, so afterwards this server connects with **no client id, no browser and no
+prompt** — which is why the report can name a placeholder-free command at all:
+
+```powershell
+Connect-PnPOnline -Url https://contoso.sharepoint.com/sites/marketing
+```
+
+### Choosing a method
+
+| Situation | Method |
+| --- | --- |
+| The report names a persisted login | `Connect-PnPOnline -Url <site>` — nothing else needed |
+| A client id is available, tenant not yet persisted | add `-ClientId <id> -PersistLogin` |
+| Automation, no person present | `-ClientId -Tenant -CertificatePath -CertificatePassword`, or `-Thumbprint` for a certificate already in the Windows store |
+| Hosted in Azure | `-ManagedIdentity` (Azure Functions, Automation runbooks, Cloud Shell only) |
+| Nothing available | hand the user the commands above; it cannot be done from here |
+
+- `-ClientId` and `-Tenant` are both mandatory for certificate auth, and a `.pfx` normally needs
+  `-CertificatePassword` as a `SecureString`.
+- **Never put a credential in a script.** Use a certificate, a managed identity, or environment variables.
+- A device login is the one method PnP will not elevate to the admin site, so tenant-wide cmdlets refuse
+  rather than return 403. Connect straight to `https://<tenant>-admin.sharepoint.com` for those.
+- Changing an app registration's permissions does **not** refresh a persisted token. Run
+  `Disconnect-PnPOnline -ClearPersistedLogin` and sign in again, or the old scopes keep being used.
+- `AADSTS50173`, `AADSTS700082` and `invalid_grant` all mean the cached credential is dead. **Retrying
+  changes nothing** — it has to be cleared and signed in again.
 ## Execution Best Practices
 
 ### General Tips

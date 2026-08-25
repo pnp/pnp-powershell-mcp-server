@@ -1,5 +1,5 @@
 # key: 91149c94a87c146f
-# operation: run | Connect-PnPOnline -Url 'https://contoso.sharepoint.com/sites/contoso' -ClientId '00000000-0000-4000-8000-000000000001' -PersistLogin
+# operation: run | Connect-PnPOnline -Url 'https://contoso.sharepoint.com/sites/contoso' -ClientId '00000000-0000-4000-8000-000000000...
 # Scrubbed by TranscriptScrubber. Read it before committing: display names in free text are not detectable.
 
 --- command ---

@@ -10,6 +10,15 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [Current version]
 
+### Added
+
+- Added an auth section to `pnp_diagnose_connection`, which now takes a `targetUrl` and names the exact connect command this machine can use, from PnP's persisted-login store, the `ENTRAID_*` variables or a certificate.
+- Added error hints for a revoked or expired cached credential, no app registration for the tenant, and a machine with no browser to sign in with.
+
+### Fixed
+
+- Fixed a sign-in blocking for the full command timeout when nobody answers its prompt; a `Connect-PnPOnline` now gets its own two-minute limit. [#19](https://github.com/pnp/pnp-powershell-mcp-server/issues/19)
+
 ## [0.1.5-beta]
 
 ### Added

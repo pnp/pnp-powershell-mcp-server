@@ -49,7 +49,13 @@ internal sealed class SessionFacts
 }
 
 /// <summary>Everything <see cref="ConnectionPreflight.Render"/> needs, so the report can be tested without a tenant.</summary>
-internal sealed record PreflightFacts(string SessionId, EnvironmentFacts Environment, SessionFacts? Session, string? SessionError);
+internal sealed record PreflightFacts(
+    string SessionId,
+    EnvironmentFacts Environment,
+    SessionFacts? Session,
+    string? SessionError,
+    AuthFacts Auth,
+    string? TargetUrl);
 
 /// <summary>Answers the three questions that decide whether a command can run at all.</summary>
 internal static class ConnectionPreflight
@@ -59,6 +65,8 @@ internal static class ConnectionPreflight
     private const string ModuleMissingCause = "The PnP.PowerShell module is not installed for this user.";
 
     private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(90);
+
+    private const string ProbeTranscriptKey = "environment-probe";
 
     private const string EnvironmentProbeScript = """
         $ErrorActionPreference = 'SilentlyContinue'
@@ -103,24 +111,27 @@ internal static class ConnectionPreflight
     public static async Task<PreflightFacts> GatherAsync(
         PowerShellSessionManager sessions,
         string? sessionId,
+        string? targetUrl,
         CancellationToken cancellationToken)
     {
         var name = string.IsNullOrWhiteSpace(sessionId) ? PowerShellSessionManager.DefaultSessionId : sessionId.Trim();
+        var auth = AuthMaterial.Gather();
         var environment = await ProbeEnvironmentAsync(cancellationToken);
 
         if (environment.PwshVersion is null || environment.ModuleVersion is null)
         {
-            return new PreflightFacts(name, environment, null, null);
+            return new PreflightFacts(name, environment, null, null, auth, targetUrl);
         }
 
         var raw = await sessions.Get(sessionId).ExecuteAsync(SessionProbeScript, ProbeTimeout, cancellationToken, "preflight-probe");
 
         if (raw.StartsWith("Error:", StringComparison.Ordinal))
         {
-            return new PreflightFacts(name, environment, null, raw);
+            return new PreflightFacts(name, environment, null, raw, auth, targetUrl);
         }
 
-        return new PreflightFacts(name, environment, Deserialize(raw, PreflightJsonContext.Default.SessionFacts), null);
+        return new PreflightFacts(
+            name, environment, Deserialize(raw, PreflightJsonContext.Default.SessionFacts), null, auth, targetUrl);
     }
 
     public static string Render(PreflightFacts facts)
@@ -147,8 +158,17 @@ internal static class ConnectionPreflight
             report.AppendLine($"3. Connection (session '{facts.SessionId}')");
 
             var connection = new StringBuilder();
-            next = RenderConnection(connection, facts);
+            var connectionNext = RenderConnection(connection, facts);
             report.Append(connection);
+
+            // Only when there is no connection to use, which is when RenderConnection declines to answer.
+            if (connectionNext is null)
+            {
+                report.AppendLine();
+                connectionNext = AuthMaterial.Render(report, facts.Auth, facts.TargetUrl);
+            }
+
+            next = connectionNext;
         }
 
         report.AppendLine();
@@ -193,7 +213,10 @@ internal static class ConnectionPreflight
 
         if (environment.ModuleVersion is null)
         {
-            const string next = "Run: Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force";
+            // Says who runs it: this server does not install modules.
+            const string next =
+                "Ask the user to run this in their own PowerShell 7 terminal, then run 'pnp_diagnose_connection' " +
+                "again: Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force";
 
             report.AppendLine($"   FAIL - {ModuleMissingCause}");
             return next;
@@ -215,7 +238,8 @@ internal static class ConnectionPreflight
         return null;
     }
 
-    private static string RenderConnection(StringBuilder report, PreflightFacts facts)
+    /// <summary>The next step, or null when section 4 owns it because there is no connection to describe.</summary>
+    private static string? RenderConnection(StringBuilder report, PreflightFacts facts)
     {
         if (facts.SessionError is not null)
         {
@@ -247,16 +271,14 @@ internal static class ConnectionPreflight
         return next;
     }
 
-    private static string DescribeConnection(StringBuilder report, SessionFacts session)
+    private static string? DescribeConnection(StringBuilder report, SessionFacts session)
     {
         if (!session.Connected)
         {
             report.AppendLine("   FAIL - This session holds no connection, so every PnP cmdlet will fail until one is made.");
-            const string next =
-                "Connect first, e.g. Connect-PnPOnline -Url https://<tenant>.sharepoint.com/sites/<site> -Interactive -ClientId <your-app-id>. " +
-                "If you have no app registration yet, run Register-PnPEntraIDAppForInteractiveLogin -ApplicationName \"PnP PowerShell\" -Tenant <tenant>.onmicrosoft.com first.";
 
-            return next;
+            // Section 4 owns the next step here.
+            return null;
         }
 
         report.AppendLine($"   OK - Connected as {session.Account ?? "an identity the connection does not expose"}.");
@@ -315,7 +337,35 @@ internal static class ConnectionPreflight
         return "Ready. Run your command with 'pnp_run_command'.";
     }
 
+
+    // Own pwsh process, so playback is handled here rather than at the session seam.
     private static async Task<EnvironmentFacts> ProbeEnvironmentAsync(CancellationToken cancellationToken)
+    {
+        if (SessionTranscript.IsReplaying)
+        {
+            var replayed = SessionTranscript.Replay(EnvironmentProbeScript, ProbeTranscriptKey);
+
+            // PwshLaunched is recorded, not assumed: assuming it rewrites "not on PATH" as "broken".
+            return Deserialize(replayed, PreflightJsonContext.Default.EnvironmentFacts)
+                ?? new EnvironmentFacts
+                {
+                    PwshLaunched = true,
+                    ProbeError =
+                        "playback is on (PNP_MCP_REPLAY_DIR) and the recorded environment probe could not be read, " +
+                        $"so nothing here describes the real pwsh install: {replayed}",
+                };
+        }
+
+        var facts = await LaunchProbeAsync(cancellationToken);
+        SessionTranscript.Record(
+            EnvironmentProbeScript,
+            JsonSerializer.Serialize(facts, PreflightJsonContext.Default.EnvironmentFacts),
+            ProbeTranscriptKey);
+
+        return facts;
+    }
+
+    private static async Task<EnvironmentFacts> LaunchProbeAsync(CancellationToken cancellationToken)
     {
         var startInfo = new ProcessStartInfo
         {

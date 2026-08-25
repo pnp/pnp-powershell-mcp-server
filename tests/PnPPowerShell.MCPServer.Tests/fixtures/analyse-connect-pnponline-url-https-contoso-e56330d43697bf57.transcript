@@ -1,12 +1,12 @@
-# key: 82cdd13c3229cbb2
-# operation: analyse | Connect-PnPOnline -Url 'https://contoso.sharepoint.com/sites/contoso' -ClientId '00000000-0000-4000-8000-00000...
+# key: e56330d43697bf57
+# operation: analyse | Connect-PnPOnline -Url 'https://contoso.sharepoint.com/sites/x'
 # Scrubbed by TranscriptScrubber. Read it before committing: display names in free text are not detectable.
 
 --- command ---
-Connect-PnPOnline -Url 'https://contoso.sharepoint.com/sites/contoso' -ClientId '00000000-0000-4000-8000-000000000001' -PersistLogin
+Connect-PnPOnline -Url 'https://contoso.sharepoint.com/sites/x'
 
 --- script ---
-$__pnpSrc = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('Q29ubmVjdC1QblBPbmxpbmUgLVVybCAnaHR0cHM6Ly9jb250b3NvLnNoYXJlcG9pbnQuY29tL3NpdGVzL2NvbnRvc28nIC1DbGllbnRJZCAnMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMDAxJyAtUGVyc2lzdExvZ2lu'))
+$__pnpSrc = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('Q29ubmVjdC1QblBPbmxpbmUgLVVybCAnaHR0cHM6Ly9jb250b3NvLnNoYXJlcG9pbnQuY29tL3NpdGVzL3gn'))
 $__pnpParseErrors = $null
 $__pnpAst = [System.Management.Automation.Language.Parser]::ParseInput($__pnpSrc, [ref]$null, [ref]$__pnpParseErrors)
 $__pnpFound = @()

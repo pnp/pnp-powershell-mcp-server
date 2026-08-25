@@ -31,6 +31,27 @@ internal partial class PnPPowerShellTools
     private static bool ConfirmationDisabled =>
         string.Equals(Environment.GetEnvironmentVariable("PNP_MCP_CONFIRM_DESTRUCTIVE"), "false", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>A sign-in answers in seconds or is waiting for a person, so it gets its own short limit.</summary>
+    private static readonly TimeSpan SignInTimeout = TimeSpan.FromMinutes(2);
+
+    /// <summary>What to say instead of the generic timeout advice, which is meaningless for a sign-in.</summary>
+    internal static readonly string SignInTimedOut = $"""
+        Error: The sign-in did not finish within {SignInTimeout.TotalMinutes:0.#} minutes and the session was terminated. Nothing is connected.
+
+        A sign-in that runs this long is waiting for a person: a browser prompt or a device code that nobody
+        answered. That prompt cannot be seen from this conversation, so waiting longer would not have helped.
+
+        Run 'pnp_diagnose_connection' with the site you are targeting. It reports what this machine can sign in
+        with, and if a sign-in has to happen interactively, hand that command to the user to run in their own
+        PowerShell 7 terminal with -PersistLogin so later connects need no prompt.
+        """;
+
+    // Anchored and single-statement: a chained connect keeps the full command budget.
+    [GeneratedRegex(@"^Connect-PnPOnline\b[^;\r\n]*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex SignInOnlyRegex();
+
+    internal static bool IsSignIn(string command) => SignInOnlyRegex().IsMatch(command.Trim());
+
     [McpServerTool(Name = "pnp_search_commands", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description("Answers the question \"which cmdlet handles this, and what is it called?\". Searches cmdlet names, verbs and nouns by keyword to discover whether one exists for the area you need to manage. Use it whenever the cmdlet name is unknown. Returns names and documentation links, never tenant data.")]
     public static async Task<string> SearchPnpCommands(
@@ -215,6 +236,11 @@ internal partial class PnPPowerShellTools
                 Error: The command does not appear to contain a PnP PowerShell cmdlet.
                 PnP PowerShell commands follow the pattern: Verb-PnPNoun (e.g., Get-PnPWeb, Set-PnPList, Add-PnPListItem).
                 Use 'pnp_search_commands' to find the correct command name.
+
+                Installing, updating or registering is not one of those: Install-Module, Update-Module and
+                Register-PnPEntraIDApp* change the user's machine or tenant rather than run against a connection,
+                so this server does not run them. Show the command to the user to run in their own PowerShell 7
+                terminal instead of looking for a cmdlet here.
                 """;
         }
 
@@ -222,7 +248,8 @@ internal partial class PnPPowerShellTools
 
         // Analysis and execution share one budget, so queuing behind a long command still waits out
         // CommandTimeout rather than failing early, and a call cannot exceed the configured limit.
-        var budget = CommandTimeout;
+        var signIn = IsSignIn(command);
+        var budget = signIn ? SignInTimeout : CommandTimeout;
         var (analysisBudget, executionFloor) = SplitBudget(budget);
         var elapsed = System.Diagnostics.Stopwatch.StartNew();
 
@@ -289,6 +316,12 @@ internal partial class PnPPowerShellTools
         }
 
         var (result, held) = await session.ExecuteAndCaptureAsync(script, remaining, cancellationToken, $"run\n{command}");
+
+        // The generic timeout advice is meaningless for a sign-in.
+        if (signIn && result.Contains(PowerShellSession.TerminatedMarker, StringComparison.Ordinal))
+        {
+            return OutputLimit.Apply(SignInTimedOut);
+        }
 
         // Summarised and paged rather than cut mid-token, so the answer stays complete and parseable.
         if (held is not null)
@@ -425,13 +458,14 @@ internal partial class PnPPowerShellTools
     }
 
     [McpServerTool(Name = "pnp_diagnose_connection", ReadOnly = true, Idempotent = true, OpenWorld = true)]
-    [Description("Diagnoses a broken or unfamiliar machine. Verifies everything that must be true before anything can run at all: pwsh installed and on PATH, the PnP.PowerShell module present and current enough, and the environment correctly set up. Every failing check names its cause and the exact next command. Call it when nothing works and the reason is unknown, or when the very first attempt failed unexplained.")]
+    [Description("Diagnoses a broken or unfamiliar machine, and answers how to sign in to it. Verifies everything that must be true before anything can run: pwsh installed and on PATH, the PnP.PowerShell module present and current enough, whether this session is connected, and which app registration, persisted login or certificate this machine can actually authenticate with. Every failing check names its cause and the next command to run, filling in every value the machine's own state can supply. Call it before the first Connect-PnPOnline rather than composing one from memory, and whenever anything fails for a reason that is not obvious.")]
     public static async Task<string> DiagnosePnpConnection(
         PowerShellSessionManager sessions,
         [Description("Session to inspect (default: \"default\")")] string? sessionId = null,
+        [Description("The SharePoint site the caller wants to work against, e.g. \"https://contoso.sharepoint.com/sites/marketing\". Given one, the report names the exact connect command for that host instead of a template.")] string? targetUrl = null,
         CancellationToken cancellationToken = default)
     {
-        var facts = await ConnectionPreflight.GatherAsync(sessions, sessionId, cancellationToken);
+        var facts = await ConnectionPreflight.GatherAsync(sessions, sessionId, targetUrl, cancellationToken);
 
         return OutputLimit.Apply(
             ConnectionPreflight.Render(facts),

@@ -17,7 +17,7 @@ public class ConnectionPreflightTests
     public void Pwsh_missing_from_PATH_names_the_cause_and_the_install_step()
     {
         var report = ConnectionPreflight.Render(
-            new PreflightFacts("default", new EnvironmentFacts { ProbeError = "The system cannot find the file specified." }, null, null));
+            new PreflightFacts("default", new EnvironmentFacts { ProbeError = "The system cannot find the file specified." }, null, null, AuthFacts.None, null));
 
         Assert.Contains("'pwsh' is not on PATH", report);
         Assert.Contains("https://aka.ms/powershell", report);
@@ -34,6 +34,8 @@ public class ConnectionPreflightTests
                 "default",
                 new EnvironmentFacts { PwshLaunched = true, ProbeError = "it did not answer within 90 seconds." },
                 null,
+                null,
+                AuthFacts.None,
                 null));
 
         Assert.DoesNotContain("is not on PATH", report);
@@ -49,7 +51,9 @@ public class ConnectionPreflightTests
                 "default",
                 Working(),
                 null,
-                "Error: This session is busy running another command. Wait for it to finish, or end it with 'pnp_reset_session'."));
+                "Error: This session is busy running another command. Wait for it to finish, or end it with 'pnp_reset_session'.",
+                AuthFacts.None,
+                null));
 
         Assert.Contains("another command is still running", report);
         Assert.DoesNotContain("NEXT STEP: Run 'pnp_reset_session'", report);
@@ -62,11 +66,14 @@ public class ConnectionPreflightTests
         environment.ModuleVersion = null;
         environment.ModuleVersionCount = 0;
 
-        var report = ConnectionPreflight.Render(new PreflightFacts("default", environment, null, null));
+        var report = ConnectionPreflight.Render(new PreflightFacts("default", environment, null, null, AuthFacts.None, null));
 
         Assert.Contains("pwsh 7.5.4", report);
         Assert.Contains("PnP.PowerShell module is not installed", report);
-        Assert.Contains("NEXT STEP: Run: Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force", report);
+        Assert.Contains("Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force", report);
+
+        // Says who runs it: as a bare instruction the model runs it here and is refused.
+        Assert.Contains("Ask the user", report);
     }
 
     [Fact]
@@ -82,7 +89,7 @@ public class ConnectionPreflightTests
             HelpUri = null,
         };
 
-        var report = ConnectionPreflight.Render(new PreflightFacts("default", Working(), session, null));
+        var report = ConnectionPreflight.Render(new PreflightFacts("default", Working(), session, null, AuthFacts.None, null));
 
         Assert.Contains("no HelpUri for Get-PnPWeb", report);
         Assert.Contains("Update-Module -Name PnP.PowerShell -Scope CurrentUser", report);
@@ -101,7 +108,7 @@ public class ConnectionPreflightTests
             using var _ = new EnvVar("PATH", empty.FullName);
             await using var sessions = new PowerShellSessionManager();
 
-            var facts = await ConnectionPreflight.GatherAsync(sessions, null, CancellationToken.None);
+            var facts = await ConnectionPreflight.GatherAsync(sessions, null, null, CancellationToken.None);
 
             Assert.False(facts.Environment.PwshLaunched);
             Assert.Null(facts.Environment.PwshVersion);
@@ -119,7 +126,7 @@ public class ConnectionPreflightTests
     {
         await using var sessions = new PowerShellSessionManager();
 
-        var facts = await ConnectionPreflight.GatherAsync(sessions, null, CancellationToken.None);
+        var facts = await ConnectionPreflight.GatherAsync(sessions, null, null, CancellationToken.None);
         var report = ConnectionPreflight.Render(facts);
 
         Assert.Null(facts.Session);
@@ -142,7 +149,7 @@ public class ConnectionPreflightTests
     {
         await using var sessions = new PowerShellSessionManager();
 
-        var facts = await ConnectionPreflight.GatherAsync(sessions, null, CancellationToken.None);
+        var facts = await ConnectionPreflight.GatherAsync(sessions, null, null, CancellationToken.None);
 
         Assert.True(facts.Environment.PwshLaunched);
         Assert.Matches(@"^\d+\.\d+", facts.Environment.PwshVersion ?? string.Empty);
@@ -167,7 +174,7 @@ public class ConnectionPreflightTests
             HelpUri = "https://pnp.github.io/powershell/cmdlets/Get-PnPWeb.html",
         };
 
-        var report = ConnectionPreflight.Render(new PreflightFacts("default", Working(), session, null));
+        var report = ConnectionPreflight.Render(new PreflightFacts("default", Working(), session, null, AuthFacts.None, null));
 
         Assert.Contains("carries no site URL", report);
         Assert.DoesNotContain("Graph-only", report);
@@ -186,7 +193,7 @@ public class ConnectionPreflightTests
             HelpUri = "https://pnp.github.io/powershell/cmdlets/Get-PnPWeb.html",
         };
 
-        var report = ConnectionPreflight.Render(new PreflightFacts("default", Working(), session, null));
+        var report = ConnectionPreflight.Render(new PreflightFacts("default", Working(), session, null, AuthFacts.None, null));
 
         Assert.Contains("will refuse to run", report);
         Assert.Contains("NEXT STEP: Ready for site-scoped work only", report);
@@ -205,7 +212,7 @@ public class ConnectionPreflightTests
             HelpUri = "https://pnp.github.io/powershell/cmdlets/Get-PnPWeb.html",
         };
 
-        var report = ConnectionPreflight.Render(new PreflightFacts("default", Working(), session, null));
+        var report = ConnectionPreflight.Render(new PreflightFacts("default", Working(), session, null, AuthFacts.None, null));
 
         Assert.Contains("Graph token scopes: Group.ReadWrite.All User.Read", report);
         Assert.Contains("a separate token per resource", report);
@@ -215,7 +222,7 @@ public class ConnectionPreflightTests
     public void A_session_with_no_connection_says_what_to_run_to_get_one()
     {
         var report = ConnectionPreflight.Render(
-            new PreflightFacts("default", Working(), new SessionFacts { HelpUri = "https://pnp.github.io/powershell/cmdlets/Get-PnPWeb.html" }, null));
+            new PreflightFacts("default", Working(), new SessionFacts { HelpUri = "https://pnp.github.io/powershell/cmdlets/Get-PnPWeb.html" }, null, AuthFacts.None, null));
 
         Assert.Contains("holds no connection", report);
         Assert.Contains("Connect-PnPOnline -Url", report);

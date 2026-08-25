@@ -1,0 +1,19 @@
+# key: 326099bf07e7fc89
+# operation: environment-probe
+# Scrubbed by TranscriptScrubber. Read it before committing: display names in free text are not detectable.
+
+--- command ---
+(none — this script carries no encoded payload)
+
+--- script ---
+$ErrorActionPreference = 'SilentlyContinue'
+$mods = @(Get-Module -ListAvailable -Name PnP.PowerShell | Sort-Object Version -Descending)
+[PSCustomObject]@{
+  pwshVersion = $PSVersionTable.PSVersion.ToString()
+  pwshPath = (Get-Process -Id $PID).Path
+  moduleVersion = if ($mods.Count -gt 0) { $mods[0].Version.ToString() } else { $null }
+  moduleVersionCount = $mods.Count
+} | ConvertTo-Json -Compress
+
+--- output ---
+{"pwshVersion":"7.6.5","pwshPath":"C:\\Program Files\\PowerShell\\7\\pwsh.exe","moduleVersion":"3.4.1","moduleVersionCount":3,"probeError":null,"pwshLaunched":true}

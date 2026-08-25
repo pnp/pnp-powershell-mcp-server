@@ -4,7 +4,6 @@ using PnPPowerShell.MCPServer.Tools;
 namespace PnPPowerShell.MCPServer.Tests;
 
 /// <summary>Tenant-dependent behaviour, recorded once and replayed offline.</summary>
-// pnp_diagnose_connection is absent: its pwsh probe is outside this seam.
 public class RecordedPlaybackTests
 {
     private static readonly string FixtureDirectory = Path.Combine(AppContext.BaseDirectory, "fixtures");
@@ -18,11 +17,19 @@ public class RecordedPlaybackTests
         ("status", s => PnPPowerShellTools.GetPnpConnectionStatus(s), "connected"),
         ("search", s => PnPPowerShellTools.SearchPnpCommands(s, "tenant site", 5), "PnP"),
 
+        // Sections 1-3 replay; section 4 reads the local machine and is covered by AuthMaterialTests.
+        ("diagnose", s => PnPPowerShellTools.DiagnosePnpConnection(s, null, SiteUrl()), "PnP PowerShell preflight"),
+
         // Failure states, each an entry in PnPErrorHints, asserted against a real message.
         ("unknown-cmdlet", s => Run(s, "Get-PnPNoSuchCmdlet9f2c"), "Find the right one with pnp_search_commands"),
         ("unknown-parameter", s => Run(s, "Get-PnPList -NoSuchParameter9f2c 'x'"), "Check the exact parameter set"),
         ("missing-list", s => Run(s, "Get-PnPList -Identity 'no-such-list-9f2c'"), "does not exist"),
         ("missing-site", s => Run(s, $"Get-PnPTenantSite -Identity '{SiteUrl()}/no-such-site-9f2c'"), "Error:"),
+
+        // The cold start. Last, because it leaves the session with no connection.
+        ("connect-no-app-registration",
+            s => Run(s, "Connect-PnPOnline -Url 'https://noappreg9f2c.sharepoint.com/sites/x'"),
+            "No app registration was available for that tenant"),
     ];
 
     public static TheoryData<string> ScenarioNames() => [.. Scenarios.Select(s => s.Name)];

@@ -20,6 +20,9 @@ internal sealed class PowerShellSession : IAsyncDisposable
     private const string SessionEndedMessage =
         "Error: The PowerShell session ended unexpectedly. Retry the command; the PnP connection will need to be re-established.";
 
+    /// <summary>How a timed-out command reports itself. Callers match on this to recognise one.</summary>
+    internal const string TerminatedMarker = "the PowerShell session was terminated";
+
     // Sentinels are per-session so that script output echoing a marker from another session
     // cannot terminate this session's read loop early.
     private readonly string _token = Guid.NewGuid().ToString("N");
@@ -297,7 +300,7 @@ internal sealed class PowerShellSession : IAsyncDisposable
                 : $"{timeout.TotalSeconds:0} second(s)";
 
             return
-                $"Error: The command exceeded {limit} and the PowerShell session was terminated. " +
+                $"Error: The command exceeded {limit} and {TerminatedMarker}. " +
                 "Any PnP connection was lost and must be re-established with Connect-PnPOnline. " +
                 "Consider narrowing the operation (-PageSize, Select-Object, a filtered query), or ask the client to run this tool as a task so it can run without a wall-clock limit.";
         }
