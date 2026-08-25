@@ -470,8 +470,8 @@ Tenant-dependent behaviour is recorded once against a dev tenant and replayed of
 CI needs neither `pwsh` nor a tenant. Each fixture is filed under the *operation* it records — `run`
 plus the command, `command-docs` plus the cmdlet — rather than a hash of the generated script, so
 rewording that script does not silently orphan every fixture. The filename says so too:
-`run-get-pnplist-select-object-title-ca7f2242b91c2383.transcript` is that operation, slugged, followed
-by the key. Only the key identifies the fixture — lookup falls back to matching on it — so the readable
+`run-get-pnplist-select-object-title-itemcount-ca7f2242b91c2383.transcript` is that operation, slugged,
+followed by the key. Only the key identifies the fixture — lookup falls back to matching on it — so the readable
 half can be corrected by hand without breaking playback. Fixtures live in
 [tests/PnPPowerShell.MCPServer.Tests/fixtures](./tests/PnPPowerShell.MCPServer.Tests/fixtures) and are
 scrubbed on the way in by `TranscriptScrubber` — tenant hostnames, UPNs, GUIDs, tokens, secrets,

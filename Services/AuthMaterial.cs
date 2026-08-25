@@ -22,7 +22,6 @@ internal sealed class PersistedLoginStore
 
 /// <summary>What this machine can authenticate with, read before any tenant is contacted.</summary>
 internal sealed record AuthFacts(
-    string StorePath,
     IReadOnlyList<PersistedLogin> PersistedLogins,
     bool TokenCachePresent,
     string? ClientIdVariable,
@@ -30,7 +29,7 @@ internal sealed record AuthFacts(
     string? CertificatePath,
     string? StoreError)
 {
-    public static AuthFacts None { get; } = new("(not read)", [], false, null, null, null, null);
+    public static AuthFacts None { get; } = new([], false, null, null, null, null);
 
     /// <summary>The persisted login covering <paramref name="url"/>, or null when none does.</summary>
     // Tenant, not host: PnP resolves these per tenant, admin and -my hosts included.
@@ -64,12 +63,10 @@ internal static class AuthMaterial
         var directory = storeDirectory ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), StoreDirectoryName);
 
-        var store = Path.Combine(directory, StoreFileName);
-        var (logins, error) = ReadStore(store);
+        var (logins, error) = ReadStore(Path.Combine(directory, StoreFileName));
         var clientId = ClientIdVariables.FirstOrDefault(IsSet);
 
         return new AuthFacts(
-            store,
             logins,
             File.Exists(Path.Combine(directory, TokenCacheFileName)),
             clientId,
@@ -122,7 +119,7 @@ internal static class AuthMaterial
         }
         else
         {
-            report.AppendLine($"   Persisted logins ({facts.StorePath}):");
+            report.AppendLine("   Persisted logins:");
 
             foreach (var login in facts.PersistedLogins)
             {

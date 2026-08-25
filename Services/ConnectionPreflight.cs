@@ -22,6 +22,10 @@ internal sealed class EnvironmentFacts
 
     /// <summary>True once the pwsh process actually started, whatever it went on to say.</summary>
     public bool PwshLaunched { get; set; }
+
+    /// <summary>The probe never ran, so nothing here describes the real pwsh. Never recorded.</summary>
+    [JsonIgnore]
+    public bool ProbeUnavailable { get; set; }
 }
 
 /// <summary>What the session probe found about the connection this session holds.</summary>
@@ -187,6 +191,12 @@ internal static class ConnectionPreflight
             return null;
         }
 
+        if (environment.ProbeUnavailable)
+        {
+            report.AppendLine($"   UNKNOWN - {environment.ProbeError}");
+            return "Fix the playback fixture, or unset PNP_MCP_REPLAY_DIR to probe this machine for real. Nothing above describes the real pwsh install.";
+        }
+
         if (!environment.PwshLaunched)
         {
             report.AppendLine($"   FAIL - {PwshMissingCause}");
@@ -349,10 +359,8 @@ internal static class ConnectionPreflight
             return Deserialize(replayed, PreflightJsonContext.Default.EnvironmentFacts)
                 ?? new EnvironmentFacts
                 {
-                    PwshLaunched = true,
-                    ProbeError =
-                        "playback is on (PNP_MCP_REPLAY_DIR) and the recorded environment probe could not be read, " +
-                        $"so nothing here describes the real pwsh install: {replayed}",
+                    ProbeUnavailable = true,
+                    ProbeError = $"playback is on (PNP_MCP_REPLAY_DIR) and the recorded environment probe could not be read: {replayed}",
                 };
         }
 

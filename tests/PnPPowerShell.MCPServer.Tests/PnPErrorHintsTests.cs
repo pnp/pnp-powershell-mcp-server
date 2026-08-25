@@ -105,6 +105,8 @@ public class PnPErrorHintsTests
     // Chaining is documented, and the chained work must keep the full budget.
     [InlineData("Connect-PnPOnline -Url https://contoso.sharepoint.com; Get-PnPTenantSite", false)]
     [InlineData("Connect-PnPOnline -Url https://contoso.sharepoint.com\nGet-PnPTenantSite", false)]
+    // A backtick continues one statement; best-practices.md documents connects written this way.
+    [InlineData("Connect-PnPOnline -Url https://contoso.sharepoint.com `\n  -ClientId abc -PersistLogin", true)]
     public void Only_a_command_that_does_nothing_but_sign_in_gets_the_sign_in_timeout(string command, bool expected) =>
         Assert.Equal(expected, PnPPowerShellTools.IsSignIn(command));
 

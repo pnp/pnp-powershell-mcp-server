@@ -44,6 +44,23 @@ public class ConnectionPreflightTests
     }
 
     [Fact]
+    public void An_unreadable_playback_fixture_is_not_blamed_on_the_pwsh_install()
+    {
+        var report = ConnectionPreflight.Render(
+            new PreflightFacts(
+                "default",
+                new EnvironmentFacts { ProbeUnavailable = true, ProbeError = "playback is on and the probe could not be read." },
+                null,
+                null,
+                AuthFacts.None,
+                null));
+
+        Assert.DoesNotContain("is not on PATH", report);
+        Assert.DoesNotContain("installed and broken", report);
+        Assert.Contains("PNP_MCP_REPLAY_DIR", report);
+    }
+
+    [Fact]
     public void A_busy_session_is_not_told_to_reset_itself()
     {
         var report = ConnectionPreflight.Render(

@@ -50,7 +50,12 @@ internal partial class PnPPowerShellTools
     [GeneratedRegex(@"^Connect-PnPOnline\b[^;\r\n]*$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SignInOnlyRegex();
 
-    internal static bool IsSignIn(string command) => SignInOnlyRegex().IsMatch(command.Trim());
+    // A backtick-newline continues one statement, so it is folded away before the single-line check.
+    [GeneratedRegex(@"`[ \t]*\r?\n[ \t]*", RegexOptions.CultureInvariant)]
+    private static partial Regex LineContinuationRegex();
+
+    internal static bool IsSignIn(string command) =>
+        SignInOnlyRegex().IsMatch(LineContinuationRegex().Replace(command.Trim(), " "));
 
     [McpServerTool(Name = "pnp_search_commands", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description("Answers the question \"which cmdlet handles this, and what is it called?\". Searches cmdlet names, verbs and nouns by keyword to discover whether one exists for the area you need to manage. Use it whenever the cmdlet name is unknown. Returns names and documentation links, never tenant data.")]
