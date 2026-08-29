@@ -349,7 +349,7 @@ internal static class ConnectionPreflight
 
 
     // Own pwsh process, so playback is handled here rather than at the session seam.
-    private static async Task<EnvironmentFacts> ProbeEnvironmentAsync(CancellationToken cancellationToken)
+    internal static async Task<EnvironmentFacts> ProbeEnvironmentAsync(CancellationToken cancellationToken)
     {
         if (SessionTranscript.IsReplaying)
         {

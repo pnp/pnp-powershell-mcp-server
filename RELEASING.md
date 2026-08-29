@@ -50,8 +50,8 @@ packed **on its own matching OS**, with `--runtime <rid>`.
 2. Push a tag:
 
    ```bash
-   git tag v0.1.5-beta
-   git push origin v0.1.5-beta
+   git tag v0.1.6-beta
+   git push origin v0.1.6-beta
    ```
 
 3. [`release.yml`](./.github/workflows/release.yml) then packs each RID on its own runner,

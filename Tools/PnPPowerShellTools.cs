@@ -58,6 +58,31 @@ internal partial class PnPPowerShellTools
     internal static bool IsSignIn(string command) =>
         SignInOnlyRegex().IsMatch(LineContinuationRegex().Replace(command.Trim(), " "));
 
+    /// <summary>Installing a module changes the machine, so it happens only when the operator opts in.</summary>
+    private static bool SetupAllowed =>
+        string.Equals(Environment.GetEnvironmentVariable("PNP_MCP_ALLOW_SETUP"), "true", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>A module install reaches PSGallery and can be slow, so it gets a generous limit of its own.</summary>
+    private static readonly TimeSpan SetupTimeout = TimeSpan.FromMinutes(5);
+
+    /// <summary>The exact install command, so the message and the run cannot describe different things.</summary>
+    internal static string InstallModuleCommand(bool prerelease) =>
+        "Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force -AllowClobber" +
+        (prerelease ? " -AllowPrerelease" : string.Empty);
+
+    /// <summary>What to return when setup is not allowed: the command the user runs by hand instead.</summary>
+    internal static string SetupDisabledMessage(bool prerelease) => $"""
+        Environment setup is disabled, so nothing was installed and your machine was not changed. This
+        server installs software only when you opt in: set PNP_MCP_ALLOW_SETUP=true and call this tool
+        again, or run this yourself in a PowerShell 7 terminal:
+
+          {InstallModuleCommand(prerelease)}
+
+        Add -AllowPrerelease to get the latest pre-release build instead of the released one. This installs
+        the PnP.PowerShell module only; it does not sign you in. After it finishes, call
+        'pnp_diagnose_connection' with your site to see how to connect.
+        """;
+
     [McpServerTool(Name = "pnp_search_commands", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description("Answers the question \"which cmdlet handles this, and what is it called?\". Searches cmdlet names, verbs and nouns by keyword to discover whether one exists for the area you need to manage. Use it whenever the cmdlet name is unknown. Returns names and documentation links, never tenant data.")]
     public static async Task<string> SearchPnpCommands(
@@ -464,7 +489,7 @@ internal partial class PnPPowerShellTools
     }
 
     [McpServerTool(Name = "pnp_diagnose_connection", ReadOnly = true, Idempotent = true, OpenWorld = true)]
-    [Description("Diagnoses a broken or unfamiliar machine, and answers how to sign in to it. Verifies everything that must be true before anything can run: pwsh installed and on PATH, the PnP.PowerShell module present and current enough, whether this session is connected, and which app registration, persisted login or certificate this machine can actually authenticate with. Every failing check names its cause and the next command to run, filling in every value the machine's own state can supply. Call it before the first Connect-PnPOnline rather than composing one from memory, and whenever anything fails for a reason that is not obvious.")]
+    [Description("Diagnoses a broken or unfamiliar machine and reports whether its environment is set up, and answers how to sign in to it. Verifies everything that must be true before anything can run: pwsh installed and on PATH, the PnP.PowerShell module present and current enough, whether this session is connected, and which app registration, persisted login or certificate this machine can actually authenticate with. Every failing check names its cause and the next command to run, filling in every value the machine's own state can supply. Call it before the first Connect-PnPOnline rather than composing one from memory, and whenever anything fails for a reason that is not obvious.")]
     public static async Task<string> DiagnosePnpConnection(
         PowerShellSessionManager sessions,
         [Description("Session to inspect (default: \"default\")")] string? sessionId = null,
@@ -673,9 +698,54 @@ internal partial class PnPPowerShellTools
     private static DateTimeOffset ServerStartedUtc =>
         System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime();
 
+    [McpServerTool(Name = "pnp_setup_environment", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = true)]
+    [Description("Installs the PnP.PowerShell module for the current user so PnP cmdlets can run, choosing the released build or the latest pre-release. It installs only that module: it never signs in, never touches the tenant, and creates no app registration. For safety it installs only when PNP_MCP_ALLOW_SETUP=true; otherwise it returns the exact Install-Module command to run by hand. Use it when the PnP.PowerShell module is not installed.")]
+    public static async Task<string> SetupEnvironment(
+        PowerShellSessionManager sessions,
+        [Description("Install the latest pre-release build instead of the released one (adds -AllowPrerelease). Ask the user which they want. Default: false.")] bool prerelease = false,
+        [Description("Session to run the install in (default: \"default\")")] string? sessionId = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!SetupAllowed)
+        {
+            return OutputLimit.Apply(SetupDisabledMessage(prerelease));
+        }
+
+        // pwsh has to exist before a module can be installed into it.
+        var environment = await ConnectionPreflight.ProbeEnvironmentAsync(cancellationToken);
+
+        if (environment.PwshVersion is null)
+        {
+            return OutputLimit.Apply($"""
+                Error: PowerShell 7 (pwsh) is not available, so the PnP.PowerShell module cannot be installed. {environment.ProbeError}
+                Install PowerShell 7 first from https://aka.ms/powershell, then call this tool again.
+                """);
+        }
+
+        var script = $$"""
+            $ErrorActionPreference = 'Stop'
+            try {
+              {{InstallModuleCommand(prerelease)}}
+              $__pnpMod = Get-Module -ListAvailable -Name PnP.PowerShell | Sort-Object Version -Descending | Select-Object -First 1
+              if ($__pnpMod) { "Installed PnP.PowerShell $($__pnpMod.Version). Next: call pnp_diagnose_connection with your site to see how to connect." }
+              else { "Error: the install command reported success but PnP.PowerShell is still not visible. Check the PowerShell 7 module path." }
+            } catch {
+              "Error: $($_.Exception.Message)"
+            }
+            Remove-Variable -Name __pnpMod -ErrorAction SilentlyContinue
+            """;
+
+        var result = await sessions.Get(sessionId).ExecuteAsync(script, SetupTimeout, cancellationToken, "setup-environment");
+
+        return OutputLimit.Apply(result);
+    }
+
     [McpServerTool(Name = "pnp_ping", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-    [Description("Returns the server version, uptime, read-only mode status, and active session count. Use this as a lightweight health check to confirm the server is responsive.")]
-    public static string Ping(PowerShellSessionManager sessions)
+    [Description("Returns the server version, uptime, read-only mode status, and active session count, and (unless includeReadiness is false) whether pwsh and the PnP.PowerShell module are present on this machine. Use this as a lightweight health check to confirm the server is responsive and ready to run PnP commands.")]
+    public static async Task<string> Ping(
+        PowerShellSessionManager sessions,
+        [Description("Also probe whether pwsh and the PnP.PowerShell module are installed (launches a short-lived pwsh). Default: true.")] bool includeReadiness = true,
+        CancellationToken cancellationToken = default)
     {
         var version = typeof(PnPPowerShellTools).Assembly.GetName().Version;
         var packageVersion = typeof(PnPPowerShellTools).Assembly
@@ -685,6 +755,21 @@ internal partial class PnPPowerShellTools
         var active = sessions.Describe();
         var readOnly = CommandPolicy.ReadOnlyMode;
 
+        var readiness = string.Empty;
+
+        if (includeReadiness)
+        {
+            var environment = await ConnectionPreflight.ProbeEnvironmentAsync(cancellationToken);
+            var moduleVersion = environment.ModuleVersion is null ? "null" : $"\"{environment.ModuleVersion}\"";
+
+            readiness = $$"""
+                ,
+                  "pwshAvailable": {{(environment.PwshVersion is not null ? "true" : "false")}},
+                  "pnpModuleInstalled": {{(environment.ModuleVersion is not null ? "true" : "false")}},
+                  "pnpModuleVersion": {{moduleVersion}}
+                """;
+        }
+
         return $$"""
             {
               "status": "ok",
@@ -693,7 +778,7 @@ internal partial class PnPPowerShellTools
               "uptime": "{{uptime:d\d\ hh\:mm\:ss}}",
               "startedUtc": "{{ServerStartedUtc:O}}",
               "readOnlyMode": {{(readOnly ? "true" : "false")}},
-              "activeSessions": {{active.Count}}
+              "activeSessions": {{active.Count}}{{readiness}}
             }
             """;
     }
