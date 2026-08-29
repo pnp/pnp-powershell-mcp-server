@@ -187,9 +187,14 @@ If you have updated code, you need to test your changes to make sure they work a
 
 ### If you changed the script generated for a session
 
-Recorded fixtures are keyed on that script, so changing it invalidates them and playback will say which
-fixture is missing. Re-record from a machine with a connected dev tenant, then **read every fixture
-before committing it** — the scrubber cannot detect a display name in free text. See
+Nothing to do. Fixtures are keyed on the operation and the command, not on the wrapper script this
+server generates around them, so rewording that wrapper leaves playback working.
+
+### If you changed the operation or command a fixture records
+
+That does change the key, and playback will name the fixture it can no longer find. Re-record from a
+machine with a connected dev tenant, then **read every fixture before committing it** — the scrubber
+cannot detect a display name in free text. See
 [Recorded-playback tests](./README.md#recorded-playback-tests).
 
 ## Submitting your changes for review

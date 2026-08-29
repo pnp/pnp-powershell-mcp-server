@@ -1,0 +1,37 @@
+# key: c2af3f30c2582ffd
+# operation: preflight-probe
+# Scrubbed by TranscriptScrubber. Read it before committing: display names in free text are not detectable.
+
+--- command ---
+(none — this script carries no encoded payload)
+
+--- script ---
+$__pnpDiag = [ordered]@{ connected = $false; url = $null; tenantAdminUrl = $null; connectionType = $null; connectionMethod = $null; account = $null; app = $null; clientId = $null; scopes = $null; helpUri = $null }
+try {
+  $__pnpC = Get-PnPConnection
+  $__pnpDiag.connected = $true
+  $__pnpDiag.url = $__pnpC.Url
+  $__pnpDiag.tenantAdminUrl = $__pnpC.TenantAdminUrl
+  $__pnpDiag.connectionType = [string]$__pnpC.ConnectionType
+  $__pnpDiag.connectionMethod = [string]$__pnpC.ConnectionMethod
+  if ([string]$__pnpC.ConnectionMethod -notin @('ManagedIdentity','AzureADWorkloadIdentity')) { $__pnpDiag.clientId = $__pnpC.ClientId }
+  if ($__pnpC.PSCredential) { $__pnpDiag.account = $__pnpC.PSCredential.UserName }
+} catch { }
+if ($__pnpDiag.connected) {
+  try {
+    $__pnpTok = Get-PnPAccessToken -Decoded -ErrorAction Stop
+    if ($__pnpTok) {
+      foreach ($__pnpClaim in @('upn','preferred_username','name')) {
+        if (-not $__pnpDiag.account) { $__pnpDiag.account = $__pnpTok.Claims | Where-Object { $_.Type -eq $__pnpClaim } | Select-Object -First 1 -ExpandProperty Value }
+      }
+      $__pnpDiag.app = $__pnpTok.Claims | Where-Object { $_.Type -eq 'app_displayname' } | Select-Object -First 1 -ExpandProperty Value
+      $__pnpDiag.scopes = ($__pnpTok.Claims | Where-Object { $_.Type -in @('scp','roles') } | Select-Object -ExpandProperty Value) -join ' '
+    }
+  } catch { }
+}
+try { $__pnpDiag.helpUri = ($ExecutionContext.InvokeCommand.GetCommand('Get-PnPWeb', [System.Management.Automation.CommandTypes]::All)).HelpUri } catch { }
+[PSCustomObject]$__pnpDiag | ConvertTo-Json -Depth 4 -Compress
+Remove-Variable -Name __pnpDiag, __pnpC, __pnpTok, __pnpClaim -ErrorAction SilentlyContinue
+
+--- output ---
+{"connected":true,"url":"https://contoso.sharepoint.com/sites/contoso","tenantAdminUrl":null,"connectionType":"O365","connectionMethod":"Credentials","account":"user1@contoso.onmicrosoft.com","app":"[redacted-app-name]","clientId":"00000000-0000-4000-8000-000000000001","scopes":"AllProfiles.Manage AllSites.FullControl Application.ReadWrite.All AppRoleAssignment.ReadWrite.All Community.ReadWrite.All Directory.Read.All ExternalConnection.Read.All ExternalConnection.ReadWrite.All ExternalItem.Read.All ExternalItem.ReadWrite.All Files.Read.All Files.ReadWrite.All Group.ReadWrite.All InformationProtectionPolicy.Read Mail.Send ProfilePhoto.ReadWrite.All RecordsManagement.Read.All RecordsManagement.ReadWrite.All Sites.Read.All Tasks.ReadWrite TeamMember.ReadWrite.All User.Read User.Read.All User.ReadWrite.All profile openid email","helpUri":"https://pnp.github.io/powershell/cmdlets/Get-PnPWeb.html"}

@@ -1,4 +1,5 @@
 using PnPPowerShell.MCPServer.Services;
+using PnPPowerShell.MCPServer.Tools;
 
 namespace PnPPowerShell.MCPServer.Tests;
 
@@ -94,5 +95,74 @@ public class PnPErrorHintsTests
     public void Enrich_handles_empty_output(string output)
     {
         Assert.Equal(output, PnPErrorHints.Enrich(output));
+    }
+
+    [Theory]
+    [InlineData("Connect-PnPOnline -Url https://contoso.sharepoint.com -Interactive", true)]
+    [InlineData("  connect-pnponline -url https://contoso.sharepoint.com  ", true)]
+    [InlineData("Get-PnPListItem -List Big", false)]
+    [InlineData("Disconnect-PnPOnline", false)]
+    // Chaining is documented, and the chained work must keep the full budget. Every separator that can
+    // run a second command counts, not just the semicolon.
+    [InlineData("Connect-PnPOnline -Url https://contoso.sharepoint.com; Get-PnPTenantSite", false)]
+    [InlineData("Connect-PnPOnline -Url https://contoso.sharepoint.com\nGet-PnPTenantSite", false)]
+    [InlineData("Connect-PnPOnline -Url https://contoso.sharepoint.com | Out-Null", false)]
+    [InlineData("Connect-PnPOnline -Url https://contoso.sharepoint.com && Get-PnPTenantSite", false)]
+    [InlineData("Connect-PnPOnline -Url https://contoso.sharepoint.com || Write-Output failed", false)]
+    [InlineData("Connect-PnPOnline -Url https://contoso.sharepoint.com &", false)]
+    // A backtick continues one statement; best-practices.md documents connects written this way.
+    [InlineData("Connect-PnPOnline -Url https://contoso.sharepoint.com `\n  -ClientId abc -PersistLogin", true)]
+    public void Only_a_command_that_does_nothing_but_sign_in_gets_the_sign_in_timeout(string command, bool expected) =>
+        Assert.Equal(expected, PnPPowerShellTools.IsSignIn(command));
+
+    [Fact]
+    public void A_timed_out_sign_in_is_not_told_to_narrow_its_query()
+    {
+        Assert.DoesNotContain("PageSize", PnPPowerShellTools.SignInTimedOut);
+        Assert.Contains("waiting for a person", PnPPowerShellTools.SignInTimedOut);
+        Assert.Contains("pnp_diagnose_connection", PnPPowerShellTools.SignInTimedOut);
+    }
+
+    [Fact]
+    public void The_no_app_registration_failure_is_explained_rather_than_echoed()
+    {
+        // Both halves of what PnP really says, recorded from a real tenant.
+        foreach (var output in (string[])[
+            "Error: Connect-PnPOnline: Specified method is not supported.\n\nOutput before the failure:\nWARNING: Please specify a valid client id for an Entra ID App Registration.",
+            "Error: Connect-PnPOnline: Specified method is not supported."])
+        {
+            var hint = PnPErrorHints.HintFor(output);
+
+            Assert.NotNull(hint);
+            Assert.Contains("pnp_diagnose_connection", hint);
+        }
+    }
+
+    [Theory]
+    [InlineData("AADSTS50173", "revoked")]
+    [InlineData("AADSTS700082", "expired through inactivity")]
+    [InlineData("invalid_grant", "can no longer be exchanged")]
+    public void A_revoked_or_expired_token_is_distinguished_from_a_misconfiguration(string code, string expected)
+    {
+        var hint = PnPErrorHints.HintFor($"Error: Connect-PnPOnline: {code}: something went wrong.");
+
+        Assert.NotNull(hint);
+        Assert.Contains(expected, hint);
+    }
+
+    [Fact]
+    public void The_specific_token_codes_are_ordered_ahead_of_the_generic_AADSTS_catch_all()
+    {
+        var matches = PnPErrorHints.Hints.Select(h => h.Match).ToList();
+        var generic = matches.IndexOf("AADSTS");
+
+        Assert.True(generic >= 0, "The generic AADSTS entry is gone; this test guards its position.");
+
+        foreach (var code in (string[])["AADSTS50173", "AADSTS700082", "AADSTS50058"])
+        {
+            Assert.True(
+                matches.IndexOf(code) < generic,
+                $"{code} must be listed before the generic AADSTS entry or first-match-wins hides it.");
+        }
     }
 }

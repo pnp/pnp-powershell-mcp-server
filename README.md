@@ -181,7 +181,7 @@ Can you check if I have a Power Automate flow called 'HoursReportingReminder' an
 | pnp_run_command | Runs PnP PowerShell against the connected tenant and returns the result. Runs in a persistent session, so a `Connect-PnPOnline` connection is reused across calls. Destructive commands require confirmation first. A result set too large for the output cap is summarised and paged rather than truncated. |
 | pnp_get_result_page | Returns the next page of a result set `pnp_run_command` summarised. Pages over rows already fetched, so it costs nothing against the tenant and returns exactly the rows the original command saw. |
 | pnp_get_connection_status | Checks whether the session is signed in, to which site, and as which account. |
-| pnp_diagnose_connection | Checks everything that has to be true before a command can run: `pwsh` on `PATH`, the `PnP.PowerShell` module, and what connection the session holds. Every failing check names its cause and the exact next command. The `pwsh` and module checks need no tenant and no network, so it still works on a machine that is not set up yet; once a connection exists it also inspects that connection, which asks PnP for a Graph token and so reaches Entra ID. |
+| pnp_diagnose_connection | Checks everything that has to be true before a command can run: `pwsh` on `PATH`, the `PnP.PowerShell` module, what connection the session holds, and — when it holds none — which app registration, persisted login or certificate this machine can actually sign in with. Every failing check names its cause and the exact next command, with no placeholder left in it where the facts can fill one in. Pass `targetUrl` to get the command for a specific site. The `pwsh`, module and auth-material checks need no tenant and no network, so it still works on a machine that is not set up yet; once a connection exists it also inspects that connection, which asks PnP for a Graph token and so reaches Entra ID. |
 | pnp_reset_session | Ends a session and its PnP connection. Use it to sign out, switch accounts, or recover a session that has stopped responding. |
 | pnp_get_best_practices | Returns best practices for using PnP PowerShell via this MCP server. Takes an optional `section` (`workflow`, `docs`, `sessions`, `config`, `readonly`, `output`, `destructive`, `auth`, `execution`, `patterns`) to retrieve one topic instead of the whole guide, which keeps the response small. |
 | pnp_search_script_samples | Lists community [PnP Script Samples](https://pnp.github.io/script-samples/) matching a keyword — titles, descriptions and links, no code. Answers from an index compiled into the server, so it needs no network. |
@@ -469,7 +469,10 @@ the servers own build output.
 Tenant-dependent behaviour is recorded once against a dev tenant and replayed offline forever after, so
 CI needs neither `pwsh` nor a tenant. Each fixture is filed under the *operation* it records — `run`
 plus the command, `command-docs` plus the cmdlet — rather than a hash of the generated script, so
-rewording that script does not silently orphan every fixture. Fixtures live in
+rewording that script does not silently orphan every fixture. The filename says so too:
+`run-get-pnplist-select-object-title-itemcount-ca7f2242b91c2383.transcript` is that operation, slugged,
+followed by the key. Only the key identifies the fixture — lookup falls back to matching on it — so the readable
+half can be corrected by hand without breaking playback. Fixtures live in
 [tests/PnPPowerShell.MCPServer.Tests/fixtures](./tests/PnPPowerShell.MCPServer.Tests/fixtures) and are
 scrubbed on the way in by `TranscriptScrubber` — tenant hostnames, UPNs, GUIDs, tokens, secrets,
 thumbprints and certificate blocks, including inside the base64 payload a command is wrapped in.

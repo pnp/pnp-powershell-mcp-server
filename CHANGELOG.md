@@ -10,6 +10,27 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [Current version]
 
+### Added
+
+- Added an auth section to `pnp_diagnose_connection`, which now takes a `targetUrl` and names the exact connect command this machine can use, from PnP's persisted-login store, the `ENTRAID_*` variables or a certificate. [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
+- Added error hints for a revoked or expired cached credential, no app registration for the tenant, and a machine with no browser to sign in with. [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
+- Added tests covering auth material and the connect command it names, sign-in detection, the new error hints and their ordering, the readable fixture filenames, and app display-name scrubbing. [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
+
+### Changed
+
+- Changed `pnp_run_command` to decline `Install-Module`, `Update-Module` and `Register-PnPEntraIDApp*`, since those change the user's machine or tenant rather than run against a connection, and to point the user at their own PowerShell 7 terminal instead. [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
+- Changed recorded fixtures to be named for the operation they record — a readable slug plus the key — with lookup falling back to the key, so the readable half can be corrected by hand without orphaning the fixture. [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
+- Changed `TranscriptScrubber` to redact the `app_displayname` an app registration records, so a tenant's app name cannot reach a committed fixture. [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
+- Changed playback to report an unreadable environment-probe fixture as a fixture failure rather than claiming `pwsh` started but is broken. [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
+
+### Fixed
+
+- Fixed a sign-in blocking for the full command timeout when nobody answers its prompt; a `Connect-PnPOnline` now gets its own two-minute limit. [#19](https://github.com/pnp/pnp-powershell-mcp-server/issues/19) [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
+
+### Contributors
+
+- Gautam Sheth [gautamdsheth]
+
 ## [0.1.5-beta]
 
 ### Added

@@ -68,6 +68,31 @@ internal static class PnPErrorHints
         ("Insufficient privileges to complete the operation",
             "The account or app is missing a directory permission. For app-only auth, add the required Graph application permission and grant admin consent; for delegated auth, the signing-in account needs the matching role."),
 
+        // WSL, containers, SSH. PnP fails fast here, so the fix is to move the sign-in.
+        ("Unable to open a web page",
+            "This machine has no browser for an interactive sign-in, so no -Interactive connect can succeed here. Either have the user sign in once on a machine that does have one and use -PersistLogin, which caches the token for this machine too, or switch to auth that never prompts: -CertificatePath with -ClientId and -Tenant, or -ManagedIdentity when hosted in Azure. -DeviceLogin also works if the user can open the code on another device."),
+
+        // Above the generic AADSTS catch-all: none of these is fixed by retrying.
+        ("AADSTS50173",
+            "The cached credential was revoked -- by a password change, an administrator revoking sessions, or a policy reset. Retrying cannot fix it. Clear it and sign in again: Disconnect-PnPOnline -ClearPersistedLogin, then Connect-PnPOnline -Url <site> -ClientId <app id> -PersistLogin in a terminal where a browser can open."),
+
+        ("AADSTS700082",
+            "The cached refresh token expired through inactivity, which is normal after a long gap and means nothing is misconfigured. Sign in once more with -PersistLogin to replace it."),
+
+        ("AADSTS50058",
+            "A silent sign-in found no usable cached credential, so Entra ID wants an interactive one. Run pnp_diagnose_connection to see what this machine has; with no persisted login, the first sign-in has to happen in a terminal where a browser can open."),
+
+        ("invalid_grant",
+            "The cached token can no longer be exchanged, usually revoked or expired. Run Disconnect-PnPOnline -ClearPersistedLogin and sign in again rather than retrying."),
+
+        // PnP puts the useful half on the warning stream, so both halves are caught.
+        ("Please specify a valid client id",
+            "No app registration was available for that tenant: none passed with -ClientId, none in PnP's persisted-login store, and neither ENTRAID_APP_ID nor ENTRAID_CLIENT_ID set. Run pnp_diagnose_connection with the site URL: it reports which of those this machine has and names the command to fix it. Do not guess a client id or assume an environment variable is set."),
+
+        // Qualified: bare "Specified method is not supported" is a .NET message.
+        ("Connect-PnPOnline: Specified method is not supported",
+            "This is how PnP reports a connect it could not attempt, and the cause is usually a missing client id for that tenant. Run pnp_diagnose_connection with the site URL to see what this machine can sign in with; with nothing available, an administrator has to register an app first."),
+
         ("AADSTS",
             "Entra ID rejected the sign-in. Look the AADSTS code up at https://login.microsoftonline.com/error, and run pnp_diagnose_connection to confirm what this session is currently connected as."),
 
