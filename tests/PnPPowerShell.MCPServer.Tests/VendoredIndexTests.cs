@@ -78,14 +78,8 @@ public class VendoredIndexTests
         Assert.Equal("https://pnp.github.io/powershell/cmdlets/Get-PnPWeb.html", CommandIndex.DocsUrl("get-pnpweb"));
     }
 
-    [Fact]
-    public void Searches_cmdlet_names_offline()
-    {
-        var matches = CommandIndex.Search(["tenant", "site"], 10);
-
-        Assert.Contains("Get-PnPTenantSite", matches);
-        Assert.True(matches.Count <= 10);
-    }
+    // Removed with CommandIndex.Search: keyword scoring over bare names existed only as the fallback for
+    // pnp_search_commands, which CommandCorpus now answers offline. CommandCorpusTests covers searching.
 
     /// <summary>A sample name reaches both a file path and a URL, and two of the three sources are not ours.</summary>
     [Theory]
@@ -136,31 +130,18 @@ public class VendoredIndexTests
         }
     }
 
-    /// <summary>The fallback must keep its cmdlets when a large session error is truncated away.</summary>
+    /// <summary>Search needs no session at all now, so a broken environment cannot degrade it.</summary>
+    // This replaces a test of the old pwsh fallback: there is no live search left to fall back from.
     [Fact]
-    public async Task The_vendored_fallback_survives_a_session_error_too_large_to_show()
+    public void Searching_cmdlets_needs_no_session()
     {
-        var directory = Directory.CreateTempSubdirectory("pnp-fallback");
+        using var replay = new EnvVar("PNP_MCP_REPLAY_DIR", Path.Combine(Path.GetTempPath(), "pnp-no-such-replay-dir"));
 
-        try
-        {
-            var failure = "Error: the command failed\n\nOutput before the failure:\n" + new string('x', 200_000);
-            var key = SessionTranscript.Key(string.Empty, "search-commands\ntenant site\n5");
-            File.WriteAllText(Path.Combine(directory.FullName, key + ".transcript"), $"# key: {key}\n\n--- output ---\n{failure}");
+        var output = ToolResults.Text(PnPPowerShellTools.SearchPnpCommands("Get-PnPTenantSite", 5));
 
-            using var replay = new EnvVar("PNP_MCP_REPLAY_DIR", directory.FullName);
-            await using var sessions = new PowerShellSessionManager();
-
-            var output = await PnPPowerShellTools.SearchPnpCommands(sessions, "tenant site", 5);
-
-            Assert.True(output.Length <= OutputLimit.MaxChars, $"{output.Length} characters against a {OutputLimit.MaxChars} cap.");
-            Assert.Contains("Get-PnPTenantSite", output, StringComparison.Ordinal);
-            Assert.Contains(CommandIndex.Provenance, output, StringComparison.Ordinal);
-        }
-        finally
-        {
-            directory.Delete(recursive: true);
-        }
+        Assert.True(output.Length <= OutputLimit.MaxChars, $"{output.Length} characters against a {OutputLimit.MaxChars} cap.");
+        Assert.Contains("Get-PnPTenantSite", output, StringComparison.Ordinal);
+        Assert.Contains(CommandCorpus.Provenance, output, StringComparison.Ordinal);
     }
 
     /// <summary>Provenance is a footer, so truncation takes it first — exactly when it is most wanted.</summary>

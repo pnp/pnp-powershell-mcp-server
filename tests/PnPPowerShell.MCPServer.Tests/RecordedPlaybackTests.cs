@@ -15,7 +15,9 @@ public class RecordedPlaybackTests
         ("web", s => Run(s, "Get-PnPWeb | Select-Object Title, Url"), "Url"),
         ("lists", s => Run(s, "Get-PnPList | Select-Object Title, ItemCount, BaseTemplate"), "Title"),
         ("status", s => PnPPowerShellTools.GetPnpConnectionStatus(s), "connected"),
-        ("search", s => PnPPowerShellTools.SearchPnpCommands(s, "tenant site", 5), "PnP"),
+
+        // No "search" scenario: pnp_search_commands is answered from the compiled-in corpus and never
+        // reaches a session, so there is nothing to record. CommandCorpusTests cover it directly.
 
         // Sections 1-3 replay; section 4 reads the local machine and is covered by AuthMaterialTests.
         ("diagnose", s => PnPPowerShellTools.DiagnosePnpConnection(s, null, SiteUrl()), "PnP PowerShell preflight"),

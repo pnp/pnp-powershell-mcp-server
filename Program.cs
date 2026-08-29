@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Extensions.Tasks;
+using PnPPowerShell.MCPServer.Models;
 using PnPPowerShell.MCPServer.Services;
 using PnPPowerShell.MCPServer.Tools;
 
@@ -31,8 +32,10 @@ builder.Services
                 _ => McpTaskExecutionMode.Synchronous,
             };
         })
-    .WithTools<PnPPowerShellTools>()
-    .WithTools<ScriptSampleTools>()
+    // Registered with a source-generated resolver: tools returning typed structured content cannot be
+    // serialized by reflection under native AOT.
+    .WithTools<PnPPowerShellTools>(ToolJson.Options)
+    .WithTools<ScriptSampleTools>(ToolJson.Options)
     .WithResources<PnPResources>();
 
 await builder.Build().RunAsync();

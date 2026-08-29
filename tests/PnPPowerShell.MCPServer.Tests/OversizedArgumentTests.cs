@@ -39,7 +39,7 @@ public class OversizedArgumentTests
                 "get_connection_status" => await PnPPowerShellTools.GetPnpConnectionStatus(sessions, Huge),
                 "reset_session" => await PnPPowerShellTools.ResetPnpSession(sessions, Huge),
                 "best_practices" => PnPPowerShellTools.GetPnpBestPractices(Huge),
-                "search_commands" => await PnPPowerShellTools.SearchPnpCommands(sessions, Huge, 5),
+                "search_commands" => ToolResults.Text(PnPPowerShellTools.SearchPnpCommands(Huge, 5)),
                 "get_command_docs" => await PnPPowerShellTools.GetPnpCommandDocs(sessions, Huge),
                 "search_script_samples_matching" => ScriptSampleTools.SearchScriptSamples(HugeMatching, 5),
                 "suggest_script_matching" => await ScriptSampleTools.SuggestScript(HugeMatching, 1),

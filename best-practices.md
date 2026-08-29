@@ -54,9 +54,17 @@ You need to filter list items server-side and `Get-PnPListItem`'s local help doe
    ```
 
    ```jsonc
-   { "Name": "Get-PnPListItem", "Verb": "Get", "Noun": "PnPListItem",
-     "HelpUri": "https://pnp.github.io/powershell/cmdlets/Get-PnPListItem.html" }
+   // structuredContent, ranked most relevant first
+   { "query": "list item", "count": 20, "indexedModuleVersion": "3.4.1",
+     "commands": [
+       { "name": "Get-PnPListItem", "verb": "Get", "noun": "PnPListItem",
+         "synopsis": "Retrieves list items",
+         "parameters": ["List", "Id", "UniqueId", "Query", "PageSize", "Connection"],
+         "docsUrl": "https://pnp.github.io/powershell/cmdlets/Get-PnPListItem.html" }
+     ] }
    ```
+
+   The parameter names are a shortlist, not the full syntax — read the docs before calling.
 
 2. Read the local help:
 
@@ -147,8 +155,8 @@ once, then keep running commands against it.
   ```
 
   Each session has its own connection **and** its own variables, so a `$sites` set in one is not
-  visible in the other. `pnp_search_commands` and `pnp_get_command_docs` always use `default`, since
-  cmdlet lookup does not depend on the connection.
+  visible in the other. `pnp_search_commands` uses no session at all, and `pnp_get_command_docs`
+  always uses `default`, since cmdlet lookup does not depend on the connection.
 - **One command at a time per session.** A second call against a busy session waits, then reports that
   the session is busy. Use a different `sessionId` to genuinely run two things at once.
 - **Ending a session.** Use `pnp_reset_session` to sign out, switch accounts, or recover a session

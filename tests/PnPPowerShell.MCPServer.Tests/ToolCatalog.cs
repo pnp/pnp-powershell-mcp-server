@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Server;
+using PnPPowerShell.MCPServer.Models;
 using PnPPowerShell.MCPServer.Services;
 using PnPPowerShell.MCPServer.Tools;
 using System.Reflection;
@@ -47,7 +48,10 @@ internal static class ToolCatalog
     private static IReadOnlyList<McpServerTool> Build()
     {
         var services = new ServiceCollection().AddSingleton<PowerShellSessionManager>().BuildServiceProvider();
-        var options = new McpServerToolCreateOptions { Services = services };
+
+        // SerializerOptions must match Program.cs, or a tool's output schema is built from a different
+        // resolver here than at runtime and the catalogue stops representing what a client sees.
+        var options = new McpServerToolCreateOptions { Services = services, SerializerOptions = ToolJson.Options };
 
         return
         [

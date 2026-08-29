@@ -1,5 +1,6 @@
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
+using PnPPowerShell.MCPServer.Models;
 using PnPPowerShell.MCPServer.Services;
 using System.ComponentModel;
 using System.Reflection;
@@ -58,106 +59,191 @@ internal partial class PnPPowerShellTools
     internal static bool IsSignIn(string command) =>
         SignInOnlyRegex().IsMatch(LineContinuationRegex().Replace(command.Trim(), " "));
 
-    [McpServerTool(Name = "pnp_search_commands", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-    [Description("Answers the question \"which cmdlet handles this, and what is it called?\". Searches cmdlet names, verbs and nouns by keyword to discover whether one exists for the area you need to manage. Use it whenever the cmdlet name is unknown. Returns names and documentation links, never tenant data.")]
-    public static async Task<string> SearchPnpCommands(
-        PowerShellSessionManager sessions,
-        [Description("One or more space-separated keywords to find relevant commands (e.g., \"site\", \"list item\", \"teams channel\", \"user add\")")] string query,
-        [Description("Maximum number of results to return (default: 20, max: 100)")] int limit = 20,
-        CancellationToken cancellationToken = default)
+    [McpServerTool(
+        Name = "pnp_search_commands",
+        ReadOnly = true,
+        Idempotent = true,
+        OpenWorld = false,
+        UseStructuredContent = true,
+        OutputSchemaType = typeof(CommandSearchResult))]
+    [Description("Answers the question \"which cmdlet handles this, and what is it called?\". Searches cmdlet names, verbs, nouns, descriptions, parameters and examples to discover whether one exists for the area you need to manage. Describe the task in your own words -- \"add a column to a list\", \"share a file externally\" -- or pass keywords. Use it whenever the cmdlet name is unknown. Returns names, synopses, parameters and documentation links, never tenant data.")]
+    public static CallToolResult SearchPnpCommands(
+        [Description("What you are trying to do, in plain words or as keywords (e.g., \"find sites with no owner\", \"teams channel\", \"upload file\")")] string query,
+        [Description("Maximum number of results to return (default: 20, max: 100)")] int limit = 20)
     {
         limit = Math.Clamp(limit, 1, 100);
 
-        var terms = (query ?? string.Empty)
-            .Split([' ', ',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(EscapeSingleQuotedPowerShell)
-            .ToArray();
-
-        if (terms.Length == 0)
+        if (string.IsNullOrWhiteSpace(query))
         {
-            return "Error: Please provide at least one search keyword.";
+            return TextResult("Error: Please provide at least one search keyword.", isError: true);
         }
 
-        var termArray = "@(" + string.Join(",", terms.Select(t => $"'{t}'")) + ")";
+        // Answered from the compiled-in corpus: no pwsh round-trip, so this works before the module is
+        // installed and costs no session time. Search resolves a superseded alias to its current cmdlet,
+        // so an alias query needs no special case here.
+        var found = CommandCorpus.Search(query, limit);
+        var aliased = CommandCorpus.AliasTarget(query.Trim());
 
-        var script = $$"""
-            $__pnpTerms = {{termArray}}
-            Get-Command -Module PnP.PowerShell |
-              ForEach-Object {
-                $__pnpCmd = $_
-                $__pnpScore = 0
-                foreach ($__pnpTerm in $__pnpTerms) {
-                  if ($__pnpCmd.Name -like "*$__pnpTerm*") { $__pnpScore += 10 }
-                  if ($__pnpCmd.Verb -like "*$__pnpTerm*") { $__pnpScore += 4 }
-                  if ($__pnpCmd.Noun -like "*$__pnpTerm*") { $__pnpScore += 6 }
-                }
-                if ($__pnpScore -gt 0) {
-                  [PSCustomObject]@{ Name = $__pnpCmd.Name; Verb = $__pnpCmd.Verb; Noun = $__pnpCmd.Noun; HelpUri = $__pnpCmd.HelpUri; Score = $__pnpScore }
-                }
-              } |
-              Sort-Object -Property Score -Descending |
-              Select-Object -First {{limit}} Name, Verb, Noun, HelpUri |
-              ConvertTo-Json -Depth 5 -Compress
-            Remove-Variable -Name __pnpTerms, __pnpCmd, __pnpScore, __pnpTerm -ErrorAction SilentlyContinue
-            """;
-
-        var result = await sessions.Get(null).ExecuteAsync(script, MetadataTimeout, cancellationToken, $"search-commands\n{query}\n{limit}");
-
-        // Searching cmdlet names needs no tenant, so an unusable environment falls back to the vendored index.
-        if (result.StartsWith("Error:", StringComparison.OrdinalIgnoreCase))
+        // Both halves land in the caller's context, so the cap bounds their sum rather than each
+        // separately -- capping them independently would let one call deliver twice the configured
+        // limit of what is largely the same content. Shrinking the one list keeps them consistent.
+        var whole = Render(found.Count, lean: false);
+        if (whole.Total <= OutputLimit.MaxChars)
         {
-            return OutputLimit.Apply(
-                SearchVendoredCommands(query!, limit, result),
-                "Search with fewer keywords, or pass a smaller 'limit' to return fewer results.",
-                PnPErrorHints.HintFor(result));
+            return whole.Result;
         }
 
-        const string searchTips = """
+        // Bisected rather than repeatedly halved: halving stops at the first power of two under the cap,
+        // which returned a single cmdlet at budgets that had room for several.
+        var low = 1;
+        var high = found.Count - 1;
+        var best = 0;
 
-
-            TIP: Before executing any of the commands, run the 'pnp_get_command_docs' tool to retrieve the full syntax, parameters, and examples.
-            TIP: Each result carries a HelpUri, the published documentation page for that cmdlet. Fetch it when you need more detail than the local help gives, or cite it to the user.
-            TIP: For complex tasks, break them into smaller steps and run commands incrementally using 'pnp_run_command'.
-            """;
-
-        // The TIPs are passed as a suffix so they count against the cap instead of being appended past it.
-        return OutputLimit.Apply(
-            result,
-            "Search with fewer keywords, or pass a smaller 'limit' to return fewer results.",
-            PnPErrorHints.HintFor(result) ?? searchTips);
-    }
-
-    /// <summary>Answers a command search from the vendored index when the live one could not run.</summary>
-    private static string SearchVendoredCommands(string query, int limit, string sessionError)
-    {
-        var terms = query.Split([' ', ',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var matches = CommandIndex.Search(terms, limit);
-
-        // Results first, error last: truncation should cost the error, not the cmdlets.
-        var sb = new StringBuilder();
-        sb.AppendLine("Answered from the vendored cmdlet index: the live lookup failed, and its error is at the end.");
-        sb.AppendLine("Nothing below was checked against your installed module, and no command can run until that is fixed.");
-        sb.AppendLine();
-
-        if (matches.Count == 0)
+        while (low <= high)
         {
-            sb.AppendLine($"No vendored cmdlet name matched '{OutputLimit.Echo(query)}'.");
-        }
-        else
-        {
-            foreach (var name in matches)
+            var middle = low + ((high - low) / 2);
+
+            if (Render(middle, lean: false).Total <= OutputLimit.MaxChars)
             {
-                sb.AppendLine($"- {name} — {CommandIndex.DocsUrl(name)}");
+                best = middle;
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle - 1;
             }
         }
 
-        sb.AppendLine();
-        sb.AppendLine(CommandIndex.Provenance);
-        sb.AppendLine();
-        sb.AppendLine(sessionError);
+        // Not even one cmdlet fits with its parameters, so the last resort is to drop per-cmdlet detail.
+        // Nothing shrinks below one result: reporting zero would read as "no cmdlet matched", which is
+        // a different and false answer.
+        return best > 0 ? Render(best, lean: false).Result : Render(Math.Min(1, found.Count), lean: true).Result;
 
-        return sb.ToString();
+        (CallToolResult Result, int Total) Render(int take, bool lean)
+        {
+            var result = Describe(query, found.Count, [.. found.Take(take)], aliased, lean);
+            var structured = JsonSerializer.SerializeToElement(result, ToolOutputJsonContext.Default.CommandSearchResult);
+            var text = RenderSearch(result);
+
+            return (
+                new CallToolResult
+                {
+                    Content = [new TextContentBlock { Text = text }],
+                    StructuredContent = structured,
+                },
+                text.Length + structured.GetRawText().Length);
+        }
     }
+
+    /// <param name="found">How many the search returned, so Truncated needs no separate flag.</param>
+    /// <param name="lean">Omits parameters, examples and permissions, for when one hit alone exceeds the cap.</param>
+    private static CommandSearchResult Describe(
+        string query,
+        int found,
+        IReadOnlyList<IndexedCommand> hits,
+        string? aliased,
+        bool lean) =>
+        new()
+        {
+            // Clamped, like the text half already does: the query is caller-supplied and unbounded, and
+            // echoing it whole let a 100k-character query dominate a payload that shrinking hits could
+            // never bring back under the cap.
+            Query = OutputLimit.Echo(query.Trim()),
+            Truncated = hits.Count < found || lean,
+            AliasResolvedTo = aliased,
+            IndexedModuleVersion = CommandCorpus.ModuleVersion,
+            Commands = [.. hits.Select(c => new CommandSearchHit
+            {
+                Name = c.Name,
+                Verb = c.Verb,
+                Noun = c.Noun,
+                Synopsis = c.Synopsis,
+                Parameters = lean ? null : [.. c.Parameters.Select(p => p.Name)],
+                Examples = !lean && c.Examples is { Count: > 0 } ? c.Examples : null,
+                RequiredPermissions = !lean && c.Permissions is { Count: > 0 } ? c.Permissions : null,
+                DocsUrl = CommandCorpus.DocsUrl(c),
+            })],
+        };
+
+    /// <summary>The human-readable half of a search answer; clients that ignore schemas still get everything.</summary>
+    private static string RenderSearch(CommandSearchResult result)
+    {
+        var sb = new StringBuilder();
+
+        if (result.Count == 0)
+        {
+            sb.AppendLine($"No cmdlet matched '{OutputLimit.Echo(result.Query)}'.");
+            sb.AppendLine();
+
+            // A query the tokenizer discarded entirely looks identical to a genuine miss, which reads as
+            // "no such cmdlet exists" and stops the search there.
+            if (Bm25Tokenizer.Tokenize(result.Query).Count == 0)
+            {
+                sb.AppendLine("Nothing in that query could be indexed. The cmdlet index is English and matches");
+                sb.AppendLine("letters and digits only, so accents aside, other scripts do not match. Try English");
+                sb.AppendLine("keywords -- \"create site\", \"list item\", \"upload file\".");
+            }
+            else
+            {
+                sb.AppendLine("Try fewer or more general words (\"site\" rather than \"site collection owner report\"), or");
+                sb.AppendLine("search the published index at https://pnp.github.io/powershell/cmdlets/index.html.");
+            }
+
+            return OutputLimit.Apply(sb.ToString(), suffix: "\n" + CommandCorpus.Provenance);
+        }
+
+        sb.AppendLine($"{result.Count} cmdlet(s) for '{OutputLimit.Echo(result.Query)}', most relevant first:");
+
+        if (result.AliasResolvedTo is { } current)
+        {
+            sb.AppendLine($"NOTE: you searched a superseded alias; {current} is the current name.");
+        }
+
+        if (result.Truncated)
+        {
+            sb.AppendLine("Fewer than you asked for: the full set exceeded the output cap. Narrow the query for the rest.");
+        }
+
+        sb.AppendLine();
+
+        foreach (var hit in result.Commands)
+        {
+            sb.AppendLine($"- {hit.Name} — {hit.Synopsis}");
+
+            if (hit.Parameters is { Count: > 0 })
+            {
+                sb.AppendLine($"  Parameters: {string.Join(", ", hit.Parameters)}");
+            }
+
+            if (hit.Examples is { Count: > 0 } examples)
+            {
+                sb.AppendLine($"  Example: {examples[0]}");
+            }
+
+            if (hit.DocsUrl is not null)
+            {
+                sb.AppendLine($"  Docs: {hit.DocsUrl}");
+            }
+        }
+
+        // Tips last in the body, provenance alone in the suffix -- the same split ScriptSampleTools uses.
+        // OutputLimit clamps a suffix to a quarter of the budget and keeps it, so anything sharing that
+        // suffix with the provenance line would push it out of a truncated answer. Losing the tips to
+        // truncation is fine; losing which module version answered is not.
+        sb.AppendLine();
+        sb.AppendLine("TIP: Run 'pnp_get_command_docs' for the full syntax and parameter meanings before executing any of these -- the parameters listed above are names only.");
+        sb.AppendLine("TIP: The synopses and parameters above come from the module this server was built against. 'pnp_get_command_docs' reads the module you actually have.");
+        sb.Append("TIP: For complex tasks, break them into smaller steps and run commands incrementally using 'pnp_run_command'.");
+
+        return OutputLimit.Apply(
+            sb.ToString(),
+            "Search with fewer keywords, or pass a smaller 'limit' to return fewer results.",
+            "\n\n" + CommandCorpus.Provenance);
+    }
+
+    private static CallToolResult TextResult(string text, bool isError) =>
+        new() { Content = [new TextContentBlock { Text = text }], IsError = isError };
+
 
     [McpServerTool(Name = "pnp_get_command_docs", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description("Gets the reference documentation for one named cmdlet: its syntax, every parameter and what it means, the parameter sets, and worked examples. Use it once you know the cmdlet name and need to know how to call it.")]
@@ -679,7 +765,7 @@ internal partial class PnPPowerShellTools
     {
         var version = typeof(PnPPowerShellTools).Assembly.GetName().Version;
         var packageVersion = typeof(PnPPowerShellTools).Assembly
-            .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
             ?.InformationalVersion ?? version?.ToString(3) ?? "0.0.0";
         var uptime = DateTimeOffset.UtcNow - ServerStartedUtc;
         var active = sessions.Describe();
