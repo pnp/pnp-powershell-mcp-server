@@ -178,9 +178,78 @@ internal sealed record ConnectionStatus
     public string? Message { get; init; }
 }
 
+/// <summary>What <c>pnp_search_script_samples</c> found. Titles and links only, never code.</summary>
+internal sealed record SampleSearchResult
+{
+    public required string Query { get; init; }
+
+    public int Count => Samples.Count;
+
+    /// <summary>How many matched, before anything was dropped to fit the output cap.</summary>
+    public required int Matched { get; init; }
+
+    public bool Truncated => Count < Matched;
+
+    public required IReadOnlyList<SampleHit> Samples { get; init; }
+}
+
+internal sealed record SampleHit
+{
+    /// <summary>The slug <c>pnp_get_script_sample</c> takes to fetch the code.</summary>
+    public required string Name { get; init; }
+
+    public required string Title { get; init; }
+
+    public required string Url { get; init; }
+}
+
+/// <summary>What <c>pnp_setup_environment</c> did, or declined to do.</summary>
+internal sealed record SetupResult
+{
+    /// <summary>False when PNP_MCP_ALLOW_SETUP is not set, in which case nothing ran.</summary>
+    public required bool Allowed { get; init; }
+
+    public required bool Installed { get; init; }
+
+    /// <summary>The version now present, when the install succeeded.</summary>
+    public string? ModuleVersion { get; init; }
+
+    /// <summary>The exact command, whether it was run here or handed back to run by hand.</summary>
+    public required string Command { get; init; }
+}
+
+/// <summary>
+/// The checks <c>pnp_diagnose_connection</c> ran, as facts rather than a report. The prose half carries
+/// the causes and the next command; this half is what a client can branch on.
+/// </summary>
+internal sealed record ConnectionDiagnosis
+{
+    public required string SessionId { get; init; }
+
+    public required bool PwshAvailable { get; init; }
+
+    public string? PwshVersion { get; init; }
+
+    public required bool ModuleInstalled { get; init; }
+
+    public string? ModuleVersion { get; init; }
+
+    public required bool Connected { get; init; }
+
+    public string? Url { get; init; }
+
+    public string? Account { get; init; }
+
+    /// <summary>True when every check needed to run a cmdlet passed.</summary>
+    public bool Ready => PwshAvailable && ModuleInstalled && Connected;
+}
+
 // Source-generated and combined with the SDK's own resolver: the server publishes native AOT, where
 // reflection-based serialization is unavailable.
 [JsonSerializable(typeof(CommandSearchResult))]
+[JsonSerializable(typeof(SampleSearchResult))]
+[JsonSerializable(typeof(SetupResult))]
+[JsonSerializable(typeof(ConnectionDiagnosis))]
 [JsonSerializable(typeof(ConnectionStatus))]
 [JsonSerializable(typeof(ServerHealth))]
 [JsonSerializable(typeof(SessionListResult))]

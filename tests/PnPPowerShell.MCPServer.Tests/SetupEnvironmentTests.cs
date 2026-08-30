@@ -31,7 +31,7 @@ public sealed class SetupEnvironmentTests : IAsyncDisposable
     public async Task With_setup_disabled_nothing_is_installed_and_the_manual_command_is_given()
     {
         // PNP_MCP_ALLOW_SETUP is cleared by the fixture, so this is the default experience.
-        var report = await PnPPowerShellTools.SetupEnvironment(_sessions, prerelease: false);
+        var report = ToolResults.Text(await PnPPowerShellTools.SetupEnvironment(_sessions, prerelease: false));
 
         Assert.Contains("Environment setup is disabled", report);
         Assert.Contains("PNP_MCP_ALLOW_SETUP=true", report);
@@ -41,7 +41,7 @@ public sealed class SetupEnvironmentTests : IAsyncDisposable
     [Fact]
     public async Task The_disabled_message_offers_the_prerelease_command_when_asked()
     {
-        var report = await PnPPowerShellTools.SetupEnvironment(_sessions, prerelease: true);
+        var report = ToolResults.Text(await PnPPowerShellTools.SetupEnvironment(_sessions, prerelease: true));
 
         Assert.Contains("-AllowPrerelease", report);
     }

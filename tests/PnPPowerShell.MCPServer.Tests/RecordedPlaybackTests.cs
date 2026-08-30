@@ -20,7 +20,7 @@ public class RecordedPlaybackTests
         // reaches a session, so there is nothing to record. CommandCorpusTests cover it directly.
 
         // Sections 1-3 replay; section 4 reads the local machine and is covered by AuthMaterialTests.
-        ("diagnose", s => PnPPowerShellTools.DiagnosePnpConnection(s, null, SiteUrl()), "PnP PowerShell preflight"),
+        ("diagnose", async s => ToolResults.Text(await PnPPowerShellTools.DiagnosePnpConnection(s, null, SiteUrl())), "PnP PowerShell preflight"),
 
         // Failure states, each an entry in PnPErrorHints, asserted against a real message.
         ("unknown-cmdlet", s => Run(s, "Get-PnPNoSuchCmdlet9f2c"), "Find the right one with pnp_search_commands"),

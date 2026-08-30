@@ -66,6 +66,13 @@ internal partial class PnPPowerShellTools
     /// <summary>A module install reaches PSGallery and can be slow, so it gets a generous limit of its own.</summary>
     private static readonly TimeSpan SetupTimeout = TimeSpan.FromMinutes(5);
 
+    // Matches the success line the install script writes, so the typed result reports the version the
+    // script actually saw rather than assuming the command working means the module is there.
+    // The version is taken lazily up to an optional trailing full stop: \S+ swallows the one ending the
+    // sentence, and reported "3.4.1." as the installed version.
+    [GeneratedRegex(@"^Installed PnP\.PowerShell (\S+?)\.?(?=\s|$)", RegexOptions.Multiline | RegexOptions.CultureInvariant)]
+    private static partial Regex InstalledVersionRegex();
+
     /// <summary>The exact install command, so the message and the run cannot describe different things.</summary>
     internal static string InstallModuleCommand(bool prerelease) =>
         "Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force -AllowClobber" +
@@ -573,9 +580,15 @@ internal partial class PnPPowerShellTools
             """;
     }
 
-    [McpServerTool(Name = "pnp_diagnose_connection", ReadOnly = true, Idempotent = true, OpenWorld = true)]
+    [McpServerTool(
+        Name = "pnp_diagnose_connection",
+        ReadOnly = true,
+        Idempotent = true,
+        OpenWorld = true,
+        UseStructuredContent = true,
+        OutputSchemaType = typeof(ConnectionDiagnosis))]
     [Description("Diagnoses a broken or unfamiliar machine and reports whether its environment is set up, and answers how to sign in to it. Verifies everything that must be true before anything can run: pwsh installed and on PATH, the PnP.PowerShell module present and current enough, whether this session is connected, and which app registration, persisted login or certificate this machine can actually authenticate with. Every failing check names its cause and the next command to run, filling in every value the machine's own state can supply. Call it before the first Connect-PnPOnline rather than composing one from memory, and whenever anything fails for a reason that is not obvious.")]
-    public static async Task<string> DiagnosePnpConnection(
+    public static async Task<CallToolResult> DiagnosePnpConnection(
         PowerShellSessionManager sessions,
         [Description("Session to inspect (default: \"default\")")] string? sessionId = null,
         [Description("The SharePoint site the caller wants to work against, e.g. \"https://contoso.sharepoint.com/sites/marketing\". Given one, the report names the exact connect command for that host instead of a template.")] string? targetUrl = null,
@@ -583,9 +596,26 @@ internal partial class PnPPowerShellTools
     {
         var facts = await ConnectionPreflight.GatherAsync(sessions, sessionId, targetUrl, cancellationToken);
 
-        return OutputLimit.Apply(
-            ConnectionPreflight.Render(facts),
-            "Raise PNP_MCP_MAX_OUTPUT_CHARS to see the whole report; this one is a fixed set of checks, so there is nothing to narrow.");
+        // The checks a client can branch on. The prose half keeps the causes, the next commands and the
+        // auth material, none of which is a decision a client makes without a person reading it.
+        var diagnosis = new ConnectionDiagnosis
+        {
+            SessionId = OutputLimit.Echo(facts.SessionId),
+            PwshAvailable = facts.Environment.PwshVersion is not null,
+            PwshVersion = facts.Environment.PwshVersion,
+            ModuleInstalled = facts.Environment.ModuleVersion is not null,
+            ModuleVersion = facts.Environment.ModuleVersion,
+            Connected = facts.Session?.Connected is true,
+            Url = OutputLimit.Clamp(facts.Session?.Url),
+            Account = OutputLimit.Clamp(facts.Session?.Account),
+        };
+
+        return StructuredResult.From(
+            diagnosis,
+            ToolOutputJsonContext.Default.ConnectionDiagnosis,
+            _ => OutputLimit.Apply(
+                ConnectionPreflight.Render(facts),
+                "Raise PNP_MCP_MAX_OUTPUT_CHARS to see the whole report; this one is a fixed set of checks, so there is nothing to narrow."));
     }
 
     [McpServerTool(
@@ -864,17 +894,32 @@ internal partial class PnPPowerShellTools
     // intent, but clients read this hint to decide what to auto-approve, and a tool that can replace
     // commands on the user's machine should not be auto-approved on the strength of a false hint.
     // PNP_MCP_ALLOW_SETUP remains the real gate; this makes the annotation agree with it.
-    [McpServerTool(Name = "pnp_setup_environment", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = true)]
+    [McpServerTool(
+        Name = "pnp_setup_environment",
+        ReadOnly = false,
+        Destructive = true,
+        Idempotent = true,
+        OpenWorld = true,
+        UseStructuredContent = true,
+        OutputSchemaType = typeof(SetupResult))]
     [Description("Installs the PnP.PowerShell module for the current user so PnP cmdlets can run, choosing the released build or the latest pre-release. It installs only that module: it never signs in, never touches the tenant, and creates no app registration. For safety it installs only when PNP_MCP_ALLOW_SETUP=true; otherwise it returns the exact Install-Module command to run by hand. Use it when the PnP.PowerShell module is not installed.")]
-    public static async Task<string> SetupEnvironment(
+    public static async Task<CallToolResult> SetupEnvironment(
         PowerShellSessionManager sessions,
         [Description("Install the latest pre-release build instead of the released one (adds -AllowPrerelease). Ask the user which they want. Default: false.")] bool prerelease = false,
         [Description("Session to run the install in (default: \"default\")")] string? sessionId = null,
         CancellationToken cancellationToken = default)
     {
+        var command = InstallModuleCommand(prerelease);
+
+        CallToolResult Report(bool allowed, string? version, string text) =>
+            StructuredResult.From(
+                new SetupResult { Allowed = allowed, Installed = version is not null, ModuleVersion = version, Command = command },
+                ToolOutputJsonContext.Default.SetupResult,
+                _ => OutputLimit.Apply(text));
+
         if (!SetupAllowed)
         {
-            return OutputLimit.Apply(SetupDisabledMessage(prerelease));
+            return Report(allowed: false, version: null, SetupDisabledMessage(prerelease));
         }
 
         // pwsh has to exist before a module can be installed into it.
@@ -882,7 +927,7 @@ internal partial class PnPPowerShellTools
 
         if (environment.PwshVersion is null)
         {
-            return OutputLimit.Apply($"""
+            return Report(allowed: true, version: null, $"""
                 Error: PowerShell 7 (pwsh) is not available, so the PnP.PowerShell module cannot be installed. {environment.ProbeError}
                 Install PowerShell 7 first from https://aka.ms/powershell, then call this tool again.
                 """);
@@ -903,7 +948,11 @@ internal partial class PnPPowerShellTools
 
         var result = await sessions.Get(sessionId).ExecuteAsync(script, SetupTimeout, cancellationToken, "setup-environment");
 
-        return OutputLimit.Apply(result);
+        // Read back from what the install reported, not from the fact that it ran: the script itself
+        // treats "command succeeded but the module is still invisible" as a failure.
+        var installed = InstalledVersionRegex().Match(result);
+
+        return Report(allowed: true, installed.Success ? installed.Groups[1].Value : null, result);
     }
 
     [McpServerTool(

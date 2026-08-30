@@ -46,7 +46,7 @@ public sealed class SetupEnvironmentEnabledTests(ITestOutputHelper output) : IAs
             using var allow = new EnvVar("PNP_MCP_ALLOW_SETUP", value);
             using var replay = new EnvVar("PNP_MCP_REPLAY_DIR", directory.FullName);
 
-            var report = await PnPPowerShellTools.SetupEnvironment(_sessions, prerelease: false);
+            var report = ToolResults.Text(await PnPPowerShellTools.SetupEnvironment(_sessions, prerelease: false));
 
             output.WriteLine($"'{value}' -> {report.Split('\n')[0]}");
 
@@ -73,7 +73,7 @@ public sealed class SetupEnvironmentEnabledTests(ITestOutputHelper output) : IAs
             using var allow = new EnvVar("PNP_MCP_ALLOW_SETUP", "true");
             using var replay = new EnvVar("PNP_MCP_REPLAY_DIR", directory.FullName);
 
-            var report = await PnPPowerShellTools.SetupEnvironment(_sessions, prerelease: false);
+            var report = ToolResults.Text(await PnPPowerShellTools.SetupEnvironment(_sessions, prerelease: false));
 
             Assert.Contains("PowerShell 7", report, StringComparison.Ordinal);
             Assert.Contains("aka.ms/powershell", report, StringComparison.Ordinal);
@@ -98,7 +98,7 @@ public sealed class SetupEnvironmentEnabledTests(ITestOutputHelper output) : IAs
             using var allow = new EnvVar("PNP_MCP_ALLOW_SETUP", "true");
             using var replay = new EnvVar("PNP_MCP_REPLAY_DIR", directory.FullName);
 
-            var report = await PnPPowerShellTools.SetupEnvironment(_sessions, prerelease: false);
+            var report = ToolResults.Text(await PnPPowerShellTools.SetupEnvironment(_sessions, prerelease: false));
 
             Assert.Contains("Installed PnP.PowerShell 3.4.1", report, StringComparison.Ordinal);
             Assert.Contains("pnp_diagnose_connection", report, StringComparison.Ordinal);
@@ -123,7 +123,7 @@ public sealed class SetupEnvironmentEnabledTests(ITestOutputHelper output) : IAs
             using var allow = new EnvVar("PNP_MCP_ALLOW_SETUP", "true");
             using var replay = new EnvVar("PNP_MCP_REPLAY_DIR", directory.FullName);
 
-            var report = await PnPPowerShellTools.SetupEnvironment(_sessions, prerelease: false);
+            var report = ToolResults.Text(await PnPPowerShellTools.SetupEnvironment(_sessions, prerelease: false));
 
             Assert.Contains("Error:", report, StringComparison.Ordinal);
             Assert.DoesNotContain("Installed PnP.PowerShell", report, StringComparison.Ordinal);
