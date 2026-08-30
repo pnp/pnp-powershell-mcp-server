@@ -220,6 +220,38 @@ public class CommandCorpusTests
         Assert.Equal("object", schema.Value.GetProperty("type").GetString());
     }
 
+    /// <summary>
+    /// The guards on the corpus API, which the tool never reaches because it validates first.
+    ///
+    /// Found by branch coverage rather than by inspection: every existing test drove these through
+    /// pnp_search_commands, which rejects an empty query and clamps limit to at least one, so the
+    /// defensive paths inside CommandCorpus itself had never run. A second caller — roadmap #11 is the
+    /// obvious one — would be the first to exercise them.
+    /// </summary>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Lookup_and_alias_resolution_refuse_an_absent_name(string? name)
+    {
+        Assert.Null(CommandCorpus.Lookup(name));
+        Assert.Null(CommandCorpus.AliasTarget(name));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(int.MinValue)]
+    public void Searching_for_no_results_returns_none_rather_than_throwing(int limit) =>
+        Assert.Empty(CommandCorpus.Search("site", limit));
+
+    [Fact]
+    public void Searching_an_absent_query_returns_nothing()
+    {
+        Assert.Empty(CommandCorpus.Search(null, 10));
+        Assert.Empty(CommandCorpus.Search("   ", 10));
+    }
+
     /// <summary>The corpus and the vendored name list are generated from different sources; they must agree.</summary>
     [Fact]
     public void The_corpus_agrees_with_the_vendored_name_list()

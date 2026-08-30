@@ -75,6 +75,31 @@ public sealed class PingAndSessionListTests : IAsyncDisposable
         Assert.True(installed.ValueKind is JsonValueKind.True or JsonValueKind.False);
     }
 
+    /// <summary>
+    /// The version key tracks whether there is a version, rather than always appearing as null.
+    ///
+    /// A deliberate change from #22, which emitted "pnpModuleVersion": null when the module was absent
+    /// and asserted the key always existed. Every optional field in this payload is omitted when null,
+    /// so an explicit null here would be the one exception — and `pnpModuleInstalled: false` already
+    /// says there is no version. Asserted as a conditional so it holds on a machine with the module and
+    /// on the bare CI runner without it, which is where the original assertion would have failed.
+    /// </summary>
+    [Fact]
+    public async Task Ping_reports_a_module_version_exactly_when_a_module_is_installed()
+    {
+        var health = await PingAsync(includeReadiness: true);
+
+        var installed = health.GetProperty("pnpModuleInstalled").GetBoolean();
+        var hasVersion = health.TryGetProperty("pnpModuleVersion", out var version);
+
+        Assert.Equal(installed, hasVersion);
+
+        if (installed)
+        {
+            Assert.False(string.IsNullOrWhiteSpace(version.GetString()), "The module is installed but reported no version.");
+        }
+    }
+
     /// <summary>A client that ignores schemas must still be told everything.</summary>
     [Fact]
     public async Task Ping_says_the_same_thing_in_prose()

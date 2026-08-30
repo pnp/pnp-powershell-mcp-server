@@ -859,7 +859,12 @@ internal partial class PnPPowerShellTools
     private static DateTimeOffset ServerStartedUtc =>
         System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime();
 
-    [McpServerTool(Name = "pnp_setup_environment", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = true)]
+    // Destructive because the install runs with -Force -AllowClobber, which overwrites an existing
+    // install and can take over command names belonging to other modules. Installing is additive in
+    // intent, but clients read this hint to decide what to auto-approve, and a tool that can replace
+    // commands on the user's machine should not be auto-approved on the strength of a false hint.
+    // PNP_MCP_ALLOW_SETUP remains the real gate; this makes the annotation agree with it.
+    [McpServerTool(Name = "pnp_setup_environment", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = true)]
     [Description("Installs the PnP.PowerShell module for the current user so PnP cmdlets can run, choosing the released build or the latest pre-release. It installs only that module: it never signs in, never touches the tenant, and creates no app registration. For safety it installs only when PNP_MCP_ALLOW_SETUP=true; otherwise it returns the exact Install-Module command to run by hand. Use it when the PnP.PowerShell module is not installed.")]
     public static async Task<string> SetupEnvironment(
         PowerShellSessionManager sessions,
@@ -908,7 +913,10 @@ internal partial class PnPPowerShellTools
         OpenWorld = false,
         UseStructuredContent = true,
         OutputSchemaType = typeof(ServerHealth))]
-    [Description("Returns the server version, uptime, read-only mode status, and active session count, and (unless includeReadiness is false) whether pwsh and the PnP.PowerShell module are present on this machine. Use this as a lightweight health check to confirm the server is responsive and ready to run PnP commands.")]
+    // Deliberately does not repeat "pwsh installed" or "module available": this tool and
+    // pnp_diagnose_connection both report readiness, and while their wording overlapped the shorter
+    // description here outranked the longer one there for questions that belong to diagnosis.
+    [Description("Returns the server version, uptime, read-only mode status, and active session count, plus (unless includeReadiness is false) a one-line readiness flag. Use this as a lightweight health check to confirm the server itself is responsive.")]
     public static async Task<CallToolResult> Ping(
         PowerShellSessionManager sessions,
         [Description("Also probe whether pwsh and the PnP.PowerShell module are installed (launches a short-lived pwsh). Default: true.")] bool includeReadiness = true,
