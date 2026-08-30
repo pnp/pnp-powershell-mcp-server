@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Added the `pnp_setup_environment` tool, which installs the `PnP.PowerShell` module for the current user — the released build or the latest pre-release — so a machine can be prepared without leaving the conversation. It installs that one module only, never signs in or touches the tenant, and runs the install only when `PNP_MCP_ALLOW_SETUP=true`; otherwise it returns the exact `Install-Module` command for the user to run by hand. [#22](https://github.com/pnp/pnp-powershell-mcp-server/issues/22)
+- Added a readiness section to `pnp_ping`, which now reports whether `pwsh` and the `PnP.PowerShell` module are present, so a client can confirm the machine is set up as part of its health check. Pass `includeReadiness=false` to keep the old lightweight ping. [#22](https://github.com/pnp/pnp-powershell-mcp-server/issues/22)
 - Added an auth section to `pnp_diagnose_connection`, which now takes a `targetUrl` and names the exact connect command this machine can use, from PnP's persisted-login store, the `ENTRAID_*` variables or a certificate. [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
 - Added error hints for a revoked or expired cached credential, no app registration for the tenant, and a machine with no browser to sign in with. [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
 - Added tests covering auth material and the connect command it names, sign-in detection, the new error hints and their ordering, the readable fixture filenames, and app display-name scrubbing. [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
@@ -30,6 +32,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 ### Contributors
 
 - Gautam Sheth [gautamdsheth]
+- Nishkalank Bezawada [NishkalankBezawada]
 
 ## [0.1.5-beta]
 

@@ -112,3 +112,11 @@ exactly what an MCP client sees, so a prompt it cannot route is one a client may
 - Show me each session and its last activity time
 - Which active sessions are running and what is their status
 - List sessions so I can decide which to reset or reuse
+
+## pnp_setup_environment
+
+- Install the PnP.PowerShell module for me
+- Install PnP PowerShell so I can run its cmdlets
+- Install the released build of the PnP.PowerShell module
+- Get the latest pre-release build of the PnP.PowerShell module installed
+- The PnP.PowerShell module is not installed, install it for me

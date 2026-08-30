@@ -90,6 +90,11 @@ open between two tools; those are excluded from the agreement figure and listed 
 - pnp_list_sessions :: Show me each session and its last activity time
 - pnp_list_sessions :: Which active sessions are running and what is their status
 - pnp_list_sessions :: List sessions so I can decide which to reset or reuse
+- pnp_setup_environment :: Install the PnP.PowerShell module for me
+- pnp_setup_environment :: Install PnP PowerShell so I can run its cmdlets
+- pnp_setup_environment :: Install the released build of the PnP.PowerShell module
+- pnp_setup_environment :: Get the latest pre-release build of the PnP.PowerShell module installed
+- pnp_setup_environment :: The PnP.PowerShell module is not installed, install it for me
 
 ## Ambiguous
 
