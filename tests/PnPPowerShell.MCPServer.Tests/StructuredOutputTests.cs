@@ -66,7 +66,7 @@ public class StructuredOutputTests
             CallToolResult[] results =
             [
                 PnPPowerShellTools.SearchPnpCommands("site", 20),
-                PnPPowerShellTools.Ping(sessions),
+                await PnPPowerShellTools.Ping(sessions, includeReadiness: false),
                 PnPPowerShellTools.ListSessions(sessions),
                 PnPPowerShellTools.GetPnpResultPage(sessions, "no-such-cursor"),
                 await PnPPowerShellTools.GetPnpConnectionStatus(sessions),
@@ -95,7 +95,7 @@ public class StructuredOutputTests
     {
         await using var sessions = new PowerShellSessionManager();
 
-        var json = PnPPowerShellTools.Ping(sessions).StructuredContent!.Value.GetRawText();
+        var json = (await PnPPowerShellTools.Ping(sessions, includeReadiness: false)).StructuredContent!.Value.GetRawText();
         var health = JsonSerializer.Deserialize(json, ToolOutputJsonContext.Default.ServerHealth);
 
         Assert.NotNull(health);

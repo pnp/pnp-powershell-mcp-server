@@ -187,12 +187,14 @@ Can you check if I have a Power Automate flow called 'HoursReportingReminder' an
 | pnp_search_script_samples | Lists community [PnP Script Samples](https://pnp.github.io/script-samples/) matching a keyword — titles, descriptions and links, no code. Answers from an index compiled into the server, so it needs no network. |
 | pnp_get_script_sample | Retrieves the full PnP PowerShell script code for one named script sample. The index entry is local; the script body is fetched from GitHub. |
 | pnp_suggest_script | Finds the most relevant community script samples for a task and returns their full script code plus adaptation guidance, in one call. |
-| pnp_ping | Returns the server version, uptime, read-only mode status, and active session count. Use this as a lightweight health check to confirm the server is responsive. |
+| pnp_ping | Returns the server version, uptime, read-only mode status, and active session count, and — unless `includeReadiness` is `false` — whether `pwsh` and the `PnP.PowerShell` module are present. Use this as a lightweight health check to confirm the server is responsive and the machine is ready. |
 | pnp_list_sessions | Lists all active PowerShell sessions with their status and last activity time. Use this to see what sessions exist before deciding which to connect, reset, or reuse. |
+| pnp_setup_environment | Installs the `PnP.PowerShell` module for the current user so PnP cmdlets can run, choosing the released or the latest pre-release build. It installs that one module only — it never signs in, touches the tenant, or creates an app registration — and only when `PNP_MCP_ALLOW_SETUP=true`; otherwise it returns the exact `Install-Module` command to run by hand. |
 
-Every tool declares its `readOnlyHint`, `idempotentHint` and `openWorldHint` annotations, and the two
-that can change state also declare `destructiveHint`, so a client can decide what to auto-approve
-without guessing.
+Every tool declares its `readOnlyHint`, `idempotentHint` and `openWorldHint` annotations, and the
+tools that are not read-only also declare `destructiveHint` — `true` for the two that can change
+Microsoft 365 (`pnp_run_command`, `pnp_reset_session`) and `false` for the current-user module
+install (`pnp_setup_environment`) — so a client can decide what to auto-approve without guessing.
 
 Tool descriptions are gated on whether they actually select: `ToolSelectionEvaluatorTests` scores every
 prompt in [e2eTestPrompts.md](./tests/PnPPowerShell.MCPServer.Tests/e2eTestPrompts.md) against the
@@ -274,6 +276,7 @@ Connect to contoso, find all site collections with no owner, and export them to 
 | `PNP_MCP_COMMAND_TIMEOUT_SECONDS` | `600` | Wall-clock limit for a single `pnp_run_command` call. On timeout the session is terminated and the connection is lost. |
 | `PNP_MCP_CONFIRM_DESTRUCTIVE` | `true` | Set to `false` to run destructive commands (`Remove-*`, `Clear-*`, ...) without asking for confirmation. This is the only way to bypass the gate: there is no tool parameter that lets the model approve its own destructive command, so on a client that cannot show a confirmation prompt, destructive commands are simply blocked. |
 | `PNP_MCP_READONLY` | `false` | Set to `true` to refuse any command that would change Microsoft 365. Allowed verbs: `Get-`, `Export-`, `Test-`, `Convert-`/`ConvertTo-`/`ConvertFrom-`, `Read-`, `Measure-`, `Connect-`/`Disconnect-`, `Find-`, `Format-`, `Resolve-`, `Write-`, `Search-`, `Show-`, `Compare-`, plus pipeline shaping (`Select-`, `Where-`, `Sort-`, `Group-`, `ForEach-`, `Out-`, `Join-`, `Split-`). Refused: `Set-`, `Remove-`, `Add-`, `New-`, `Clear-`, `Invoke-`, `Update-`, `Move-`, `Enable-`/`Disable-`, `Grant-`/`Revoke-`, `Copy-`, `Import-`, `Restore-`, `Reset-`, `Rename-`, `Start-`/`Stop-`, `Register-`/`Unregister-`, and every other change verb — along with indirectly invoked commands, native executables, and state-changing method calls such as `ExecuteQuery`. See [Best Practices](./best-practices.md#read-only-mode) for the full table. Local file output (`Out-File`, `Export-*`) is still permitted. |
+| `PNP_MCP_ALLOW_SETUP` | `false` | Set to `true` to let `pnp_setup_environment` install the `PnP.PowerShell` module for the current user. Left unset, that tool changes nothing and returns the `Install-Module` command for you to run by hand. It never installs anything else, signs in, or touches the tenant. |
 | `PNP_MCP_MAX_OUTPUT_CHARS` | `50000` | Largest tool response returned, in characters. A JSON result set over the cap is summarised — true row count, field names, and as many whole rows as fit, plus a cursor for `pnp_get_result_page` — so the response stays complete and parseable. Anything else is truncated to its first whole lines with a note saying how much was dropped. Values below 2000 are ignored, since the note itself would leave no room for output. |
 | `PNP_MCP_REPLAY_DIR` | _(unset)_ | **Testing only.** Answers every command from recorded fixtures in this directory instead of running it, so the server never reaches Microsoft 365. It announces itself on stderr when set. See [Recorded-playback tests](#recorded-playback-tests). |
 | `PNP_MCP_RECORD_DIR` | _(unset)_ | **Testing only.** Writes a scrubbed fixture for every command the server runs, into this directory. |

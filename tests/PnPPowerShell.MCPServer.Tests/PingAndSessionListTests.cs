@@ -1,5 +1,6 @@
 using PnPPowerShell.MCPServer.Services;
 using PnPPowerShell.MCPServer.Tools;
+using System.Text.Json;
 
 namespace PnPPowerShell.MCPServer.Tests;
 
@@ -10,11 +11,15 @@ public sealed class PingAndSessionListTests : IAsyncDisposable
     public async ValueTask DisposeAsync() => await _sessions.DisposeAsync();
 
     // Both tools used to hand-build their payload into a string; the assertions now read the structured
-    // half, which is the same data the client reads rather than a rendering of it.
+    // half, which is the same data the client reads rather than a rendering of it. The readiness cases
+    // came from #22 and are kept as they were, only re-pointed at that half.
+    private async Task<JsonElement> PingAsync(bool includeReadiness = false) =>
+        (await PnPPowerShellTools.Ping(_sessions, includeReadiness)).StructuredContent!.Value;
+
     [Fact]
-    public void Ping_reports_the_expected_fields()
+    public async Task Ping_reports_the_expected_fields()
     {
-        var health = PnPPowerShellTools.Ping(_sessions).StructuredContent!.Value;
+        var health = await PingAsync();
 
         Assert.Equal("ok", health.GetProperty("status").GetString());
         Assert.False(string.IsNullOrWhiteSpace(health.GetProperty("version").GetString()));
@@ -26,30 +31,55 @@ public sealed class PingAndSessionListTests : IAsyncDisposable
     }
 
     [Fact]
-    public void Ping_reports_zero_sessions_on_a_fresh_manager() =>
-        Assert.Equal(0, PnPPowerShellTools.Ping(_sessions).StructuredContent!.Value.GetProperty("activeSessions").GetInt32());
+    public async Task Ping_reports_zero_sessions_on_a_fresh_manager() =>
+        Assert.Equal(0, (await PingAsync()).GetProperty("activeSessions").GetInt32());
 
     [Fact]
-    public void Ping_reports_active_sessions_after_one_is_created()
+    public async Task Ping_reports_active_sessions_after_one_is_created()
     {
         _sessions.Get("alpha");
 
-        Assert.Equal(1, PnPPowerShellTools.Ping(_sessions).StructuredContent!.Value.GetProperty("activeSessions").GetInt32());
+        Assert.Equal(1, (await PingAsync()).GetProperty("activeSessions").GetInt32());
     }
 
     [Fact]
-    public void Ping_reflects_readonly_mode()
+    public async Task Ping_reflects_readonly_mode()
     {
         using var _ = new EnvVar("PNP_MCP_READONLY", "true");
 
-        Assert.True(PnPPowerShellTools.Ping(_sessions).StructuredContent!.Value.GetProperty("readOnlyMode").GetBoolean());
+        Assert.True((await PingAsync()).GetProperty("readOnlyMode").GetBoolean());
+    }
+
+    /// <summary>Not probing must be distinguishable from probing and finding nothing.</summary>
+    // The fields are omitted rather than emitted as false: a client reading false would send the user to
+    // install something that may already be present.
+    [Fact]
+    public async Task Ping_without_readiness_omits_the_environment_fields()
+    {
+        var health = await PingAsync(includeReadiness: false);
+
+        Assert.False(health.TryGetProperty("pwshAvailable", out _));
+        Assert.False(health.TryGetProperty("pnpModuleInstalled", out _));
+        Assert.Contains("not checked", ToolResults.Text(await PnPPowerShellTools.Ping(_sessions, false)), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Ping_with_readiness_reports_pwsh_and_module_state_as_booleans()
+    {
+        var health = await PingAsync(includeReadiness: true);
+
+        // Values depend on the machine; the contract is that the keys exist and are typed.
+        Assert.True(health.TryGetProperty("pwshAvailable", out var pwsh));
+        Assert.True(pwsh.ValueKind is JsonValueKind.True or JsonValueKind.False);
+        Assert.True(health.TryGetProperty("pnpModuleInstalled", out var installed));
+        Assert.True(installed.ValueKind is JsonValueKind.True or JsonValueKind.False);
     }
 
     /// <summary>A client that ignores schemas must still be told everything.</summary>
     [Fact]
-    public void Ping_says_the_same_thing_in_prose()
+    public async Task Ping_says_the_same_thing_in_prose()
     {
-        var result = PnPPowerShellTools.Ping(_sessions);
+        var result = await PnPPowerShellTools.Ping(_sessions, includeReadiness: false);
         var text = ToolResults.Text(result);
         var health = result.StructuredContent!.Value;
 
@@ -90,6 +120,7 @@ public sealed class PingAndSessionListTests : IAsyncDisposable
         var structured = PnPPowerShellTools.ListSessions(_sessions).StructuredContent!.Value;
 
         Assert.Equal(2, structured.GetProperty("count").GetInt32());
+        Assert.Equal(2, structured.GetProperty("total").GetInt32());
 
         var ids = structured.GetProperty("sessions").EnumerateArray().Select(s => s.GetProperty("id").GetString()).ToList();
         Assert.Contains("prod", ids);

@@ -88,6 +88,19 @@ internal sealed record ServerHealth
     public required bool ReadOnlyMode { get; init; }
 
     public required int ActiveSessions { get; init; }
+
+    // Readiness is nullable throughout because the probe is optional. Absent means "not checked", which
+    // is a different claim from false: a client that read false would tell the user to install something
+    // they may already have.
+
+    /// <summary>Whether PowerShell 7 is on PATH, or null when readiness was not probed.</summary>
+    public bool? PwshAvailable { get; init; }
+
+    /// <summary>Whether the PnP.PowerShell module is installed, or null when readiness was not probed.</summary>
+    public bool? PnpModuleInstalled { get; init; }
+
+    /// <summary>The installed module version, or null when it is absent or was not probed.</summary>
+    public string? PnpModuleVersion { get; init; }
 }
 
 /// <summary>What <c>pnp_list_sessions</c> found.</summary>
