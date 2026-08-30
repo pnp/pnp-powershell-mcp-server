@@ -54,13 +54,14 @@ You need to filter list items server-side and `Get-PnPListItem`'s local help doe
    ```
 
    ```jsonc
-   // structuredContent, ranked most relevant first
+   // structuredContent, ranked most relevant first. `count` always equals commands.length.
    { "query": "list item", "count": 20, "indexedModuleVersion": "3.4.1",
      "commands": [
        { "name": "Get-PnPListItem", "verb": "Get", "noun": "PnPListItem",
          "synopsis": "Retrieves list items",
          "parameters": ["List", "Id", "UniqueId", "Query", "PageSize", "Connection"],
          "docsUrl": "https://pnp.github.io/powershell/cmdlets/Get-PnPListItem.html" }
+       // ... 19 more, elided here
      ] }
    ```
 

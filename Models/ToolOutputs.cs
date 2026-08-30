@@ -18,10 +18,19 @@ internal sealed record CommandSearchResult
     public int Count => Commands.Count;
 
     /// <summary>
-    /// True when the answer was cut to fit the output cap — either results dropped, or per-cmdlet
-    /// detail omitted. <see cref="CommandSearchHit.Parameters"/> being absent tells the two apart.
+    /// How many cmdlets matched, before anything was dropped to fit the output cap. Carried so the
+    /// answer can say "showing 6 of 40" instead of stating the page as though it were the whole result.
     /// </summary>
-    public bool Truncated { get; init; }
+    public required int Matched { get; init; }
+
+    /// <summary>Derived, so it cannot claim the answer is whole while listing fewer than it found.</summary>
+    public bool Truncated => Count < Matched;
+
+    /// <summary>
+    /// True when per-cmdlet detail was dropped to fit — a separate fact from <see cref="Truncated"/>,
+    /// which is about how many cmdlets are listed rather than how much is said about each.
+    /// </summary>
+    public bool DetailOmitted { get; init; }
 
     /// <summary>Set when the query named a superseded alias; this is the cmdlet that replaced it.</summary>
     // On the result rather than each hit: the alias was a property of the query, not of any one match.
@@ -60,9 +69,109 @@ internal sealed record CommandSearchHit
     public string? DocsUrl { get; init; }
 }
 
+/// <summary>What <c>pnp_ping</c> reports.</summary>
+// This tool hand-built its JSON into a string, which is the exact failure structured output exists to
+// fix: the shape was already a contract, just an unschema'd one a client had to parse out of prose.
+internal sealed record ServerHealth
+{
+    public required string Status { get; init; }
+
+    public required string Version { get; init; }
+
+    public required string PackageVersion { get; init; }
+
+    public required string Uptime { get; init; }
+
+    public required DateTimeOffset StartedUtc { get; init; }
+
+    /// <summary>True when PNP_MCP_READONLY blocks state-changing cmdlets.</summary>
+    public required bool ReadOnlyMode { get; init; }
+
+    public required int ActiveSessions { get; init; }
+}
+
+/// <summary>What <c>pnp_list_sessions</c> found.</summary>
+internal sealed record SessionListResult
+{
+    /// <summary>How many are listed here, which is fewer than <see cref="Total"/> when truncated.</summary>
+    public int Count => Sessions.Count;
+
+    /// <summary>
+    /// How many sessions actually exist. Carried separately because "N active sessions" is a claim about
+    /// the machine, not about how many fitted the output cap — reporting the page as the total is a
+    /// false statement rather than a truncated one.
+    /// </summary>
+    public required int Total { get; init; }
+
+    public bool Truncated => Count < Total;
+
+    public required IReadOnlyList<SessionSummary> Sessions { get; init; }
+}
+
+internal sealed record SessionSummary
+{
+    public required string Id { get; init; }
+
+    /// <summary>One of <c>running</c>, <c>idle</c> or <c>stopped</c>.</summary>
+    public required string Status { get; init; }
+
+    public required DateTimeOffset LastUsedUtc { get; init; }
+}
+
+/// <summary>
+/// Where one page of a held result set sits, so a client can drive paging without parsing the MORE line.
+///
+/// The rows themselves stay in the text half only. They are the bulk of the payload, and repeating them
+/// here would halve how many fit the output cap to restate what the caller already has.
+/// </summary>
+internal sealed record ResultPage
+{
+    public required string Cursor { get; init; }
+
+    public required string SessionId { get; init; }
+
+    /// <summary>Zero-based row this page starts at, after clamping.</summary>
+    public required int Offset { get; init; }
+
+    /// <summary>Rows in the whole result set, including any too large to hold.</summary>
+    public required int TotalRows { get; init; }
+
+    /// <summary>Rows held for paging; fewer than <see cref="TotalRows"/> when the set was too large.</summary>
+    public required int PageableRows { get; init; }
+
+    /// <summary>Offset to pass for the next page, or null at the end of the held rows.</summary>
+    public int? NextOffset { get; init; }
+}
+
+/// <summary>What one session is connected to, as reported by <c>pnp_get_connection_status</c>.</summary>
+// Deserialized from the JSON the session itself emits, then re-emitted with the session id attached, so
+// a client reads one typed object instead of finding JSON inside prose.
+internal sealed record ConnectionStatus
+{
+    public string SessionId { get; init; } = string.Empty;
+
+    public bool Connected { get; init; }
+
+    public string? Url { get; init; }
+
+    public string? TenantAdminUrl { get; init; }
+
+    /// <summary>How the connection was made, e.g. <c>O365</c> or <c>TenantAdmin</c>.</summary>
+    public string? ConnectionType { get; init; }
+
+    public string? Account { get; init; }
+
+    /// <summary>Why there is no connection, when there is none.</summary>
+    public string? Message { get; init; }
+}
+
 // Source-generated and combined with the SDK's own resolver: the server publishes native AOT, where
 // reflection-based serialization is unavailable.
 [JsonSerializable(typeof(CommandSearchResult))]
+[JsonSerializable(typeof(ConnectionStatus))]
+[JsonSerializable(typeof(ServerHealth))]
+[JsonSerializable(typeof(SessionListResult))]
+[JsonSerializable(typeof(ResultPage))]
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 internal sealed partial class ToolOutputJsonContext : JsonSerializerContext;
 

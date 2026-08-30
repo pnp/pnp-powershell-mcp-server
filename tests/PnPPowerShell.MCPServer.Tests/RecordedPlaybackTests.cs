@@ -14,7 +14,7 @@ public class RecordedPlaybackTests
         ("connect", s => Run(s, ConnectCommand()), "successfully"),
         ("web", s => Run(s, "Get-PnPWeb | Select-Object Title, Url"), "Url"),
         ("lists", s => Run(s, "Get-PnPList | Select-Object Title, ItemCount, BaseTemplate"), "Title"),
-        ("status", s => PnPPowerShellTools.GetPnpConnectionStatus(s), "connected"),
+        ("status", async s => ToolResults.Text(await PnPPowerShellTools.GetPnpConnectionStatus(s)), "connected"),
 
         // No "search" scenario: pnp_search_commands is answered from the compiled-in corpus and never
         // reaches a session, so there is nothing to record. CommandCorpusTests cover it directly.
@@ -72,13 +72,13 @@ public class RecordedPlaybackTests
         var cursor = sessions.Get(null).Held!.Cursor;
         Assert.Contains($"cursor '{cursor}'", first, StringComparison.Ordinal);
 
-        var second = PnPPowerShellTools.GetPnpResultPage(sessions, cursor, NextOffset(first));
+        var second = ToolResults.Text(PnPPowerShellTools.GetPnpResultPage(sessions, cursor, NextOffset(first)));
         Assert.Contains("Rows ", second, StringComparison.Ordinal);
         Assert.DoesNotContain("No held result set", second, StringComparison.Ordinal);
 
         // The cursor belongs to the session, so the next command there invalidates it.
         await Run(sessions, "Get-PnPWeb | Select-Object Title, Url");
-        Assert.Contains("No held result set", PnPPowerShellTools.GetPnpResultPage(sessions, cursor), StringComparison.Ordinal);
+        Assert.Contains("No held result set", ToolResults.Text(PnPPowerShellTools.GetPnpResultPage(sessions, cursor)), StringComparison.Ordinal);
     }
 
     private static int NextOffset(string page) =>

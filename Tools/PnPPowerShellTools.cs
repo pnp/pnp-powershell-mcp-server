@@ -75,7 +75,7 @@ internal partial class PnPPowerShellTools
 
         if (string.IsNullOrWhiteSpace(query))
         {
-            return TextResult("Error: Please provide at least one search keyword.", isError: true);
+            return StructuredResult.Text("Error: Please provide at least one search keyword.", isError: true);
         }
 
         // Answered from the compiled-in corpus: no pwsh round-trip, so this works before the module is
@@ -84,55 +84,13 @@ internal partial class PnPPowerShellTools
         var found = CommandCorpus.Search(query, limit);
         var aliased = CommandCorpus.AliasTarget(query.Trim());
 
-        // Both halves land in the caller's context, so the cap bounds their sum rather than each
-        // separately -- capping them independently would let one call deliver twice the configured
-        // limit of what is largely the same content. Shrinking the one list keeps them consistent.
-        var whole = Render(found.Count, lean: false);
-        if (whole.Total <= OutputLimit.MaxChars)
-        {
-            return whole.Result;
-        }
-
-        // Bisected rather than repeatedly halved: halving stops at the first power of two under the cap,
-        // which returned a single cmdlet at budgets that had room for several.
-        var low = 1;
-        var high = found.Count - 1;
-        var best = 0;
-
-        while (low <= high)
-        {
-            var middle = low + ((high - low) / 2);
-
-            if (Render(middle, lean: false).Total <= OutputLimit.MaxChars)
-            {
-                best = middle;
-                low = middle + 1;
-            }
-            else
-            {
-                high = middle - 1;
-            }
-        }
-
-        // Not even one cmdlet fits with its parameters, so the last resort is to drop per-cmdlet detail.
-        // Nothing shrinks below one result: reporting zero would read as "no cmdlet matched", which is
-        // a different and false answer.
-        return best > 0 ? Render(best, lean: false).Result : Render(Math.Min(1, found.Count), lean: true).Result;
-
-        (CallToolResult Result, int Total) Render(int take, bool lean)
-        {
-            var result = Describe(query, found.Count, [.. found.Take(take)], aliased, lean);
-            var structured = JsonSerializer.SerializeToElement(result, ToolOutputJsonContext.Default.CommandSearchResult);
-            var text = RenderSearch(result);
-
-            return (
-                new CallToolResult
-                {
-                    Content = [new TextContentBlock { Text = text }],
-                    StructuredContent = structured,
-                },
-                text.Length + structured.GetRawText().Length);
-        }
+        // Lean drops per-cmdlet detail, for the case where one cmdlet alone overruns a low cap --
+        // Set-PnPTenant carries some two hundred parameter names.
+        return StructuredResult.FitToCap(
+            found,
+            (hits, lean) => Describe(query, found.Count, hits, aliased, lean),
+            ToolOutputJsonContext.Default.CommandSearchResult,
+            RenderSearch);
     }
 
     /// <param name="found">How many the search returned, so Truncated needs no separate flag.</param>
@@ -149,7 +107,8 @@ internal partial class PnPPowerShellTools
             // echoing it whole let a 100k-character query dominate a payload that shrinking hits could
             // never bring back under the cap.
             Query = OutputLimit.Echo(query.Trim()),
-            Truncated = hits.Count < found || lean,
+            Matched = found,
+            DetailOmitted = lean,
             AliasResolvedTo = aliased,
             IndexedModuleVersion = CommandCorpus.ModuleVersion,
             Commands = [.. hits.Select(c => new CommandSearchHit
@@ -164,6 +123,9 @@ internal partial class PnPPowerShellTools
                 DocsUrl = CommandCorpus.DocsUrl(c),
             })],
         };
+
+    /// <summary>Renders a search answer from a constructed result, so the honesty checks can build wrong ones.</summary>
+    internal static string RenderForTest(CommandSearchResult result) => RenderSearch(result);
 
     /// <summary>The human-readable half of a search answer; clients that ignore schemas still get everything.</summary>
     private static string RenderSearch(CommandSearchResult result)
@@ -192,7 +154,11 @@ internal partial class PnPPowerShellTools
             return OutputLimit.Apply(sb.ToString(), suffix: "\n" + CommandCorpus.Provenance);
         }
 
-        sb.AppendLine($"{result.Count} cmdlet(s) for '{OutputLimit.Echo(result.Query)}', most relevant first:");
+        // The number that matched, not the number that fitted: stating the page as the count is the same
+        // false-rather-than-partial claim that "N active sessions" made.
+        sb.AppendLine(result.Truncated
+            ? $"{result.Matched} cmdlet(s) for '{OutputLimit.Echo(result.Query)}', showing the first {result.Count} — the rest did not fit the output cap:"
+            : $"{result.Count} cmdlet(s) for '{OutputLimit.Echo(result.Query)}', most relevant first:");
 
         if (result.AliasResolvedTo is { } current)
         {
@@ -201,7 +167,12 @@ internal partial class PnPPowerShellTools
 
         if (result.Truncated)
         {
-            sb.AppendLine("Fewer than you asked for: the full set exceeded the output cap. Narrow the query for the rest.");
+            sb.AppendLine("Narrow the query, or pass a smaller 'limit', to see the rest.");
+        }
+
+        if (result.DetailOmitted)
+        {
+            sb.AppendLine("Parameters and examples are omitted below: one cmdlet alone exceeded the output cap.");
         }
 
         sb.AppendLine();
@@ -240,9 +211,6 @@ internal partial class PnPPowerShellTools
             "Search with fewer keywords, or pass a smaller 'limit' to return fewer results.",
             "\n\n" + CommandCorpus.Provenance);
     }
-
-    private static CallToolResult TextResult(string text, bool isError) =>
-        new() { Content = [new TextContentBlock { Text = text }], IsError = isError };
 
 
     [McpServerTool(Name = "pnp_get_command_docs", ReadOnly = true, Idempotent = true, OpenWorld = false)]
@@ -426,9 +394,15 @@ internal partial class PnPPowerShellTools
         return OutputLimit.Apply(result, suffix: PnPErrorHints.HintFor(result));
     }
 
-    [McpServerTool(Name = "pnp_get_result_page", ReadOnly = true, Idempotent = true, OpenWorld = false)]
+    [McpServerTool(
+        Name = "pnp_get_result_page",
+        ReadOnly = true,
+        Idempotent = true,
+        OpenWorld = false,
+        UseStructuredContent = true,
+        OutputSchemaType = typeof(ResultPage))]
     [Description("Returns the next page of a result set that pnp_run_command summarised because it was too large to return whole. Pages over rows already fetched, so it costs nothing against the tenant and returns exactly the rows the original command saw. Use the cursor and offset printed under the summary.")]
-    public static string GetPnpResultPage(
+    public static CallToolResult GetPnpResultPage(
         PowerShellSessionManager sessions,
         [Description("The cursor printed with the summary, e.g. \"a1b2c3d4e5\"")] string cursor,
         [Description("Zero-based row number to start from, as printed in the MORE line of the previous page")] int offset = 0)
@@ -438,12 +412,30 @@ internal partial class PnPPowerShellTools
         // Read once: a concurrent command in that session clears Held.
         if (session?.Held is not { } held)
         {
-            return
+            return StructuredResult.Text(
                 $"Error: No held result set matches cursor '{OutputLimit.Echo(cursor)}'. A cursor is dropped when the next command runs in " +
-                "its session, when the session is reset, and when the server restarts. Re-run the original command to get a new one.";
+                "its session, when the session is reset, and when the server restarts. Re-run the original command to get a new one.",
+                isError: true);
         }
 
-        return OutputLimit.Apply(ResultSummary.Render(held, offset, session.Id));
+        var (start, end, pageable, _) = ResultSummary.Paging(held, offset);
+
+        var page = new ResultPage
+        {
+            Cursor = held.Cursor,
+            SessionId = session.Id,
+            Offset = start,
+            TotalRows = held.TotalRows,
+            PageableRows = pageable,
+            NextOffset = end < pageable ? end : null,
+        };
+
+        // Render already sizes the page against the cap, and the structured half carries only the offsets,
+        // so there is nothing here to shrink.
+        return StructuredResult.From(
+            page,
+            ToolOutputJsonContext.Default.ResultPage,
+            _ => OutputLimit.Apply(ResultSummary.Render(held, offset, session.Id)));
     }
 
     /// <summary>Splits a command budget into an analysis cap and a reserved execution slice.</summary>
@@ -564,9 +556,15 @@ internal partial class PnPPowerShellTools
             "Raise PNP_MCP_MAX_OUTPUT_CHARS to see the whole report; this one is a fixed set of checks, so there is nothing to narrow.");
     }
 
-    [McpServerTool(Name = "pnp_get_connection_status", ReadOnly = true, Idempotent = true, OpenWorld = false)]
+    [McpServerTool(
+        Name = "pnp_get_connection_status",
+        ReadOnly = true,
+        Idempotent = true,
+        OpenWorld = false,
+        UseStructuredContent = true,
+        OutputSchemaType = typeof(ConnectionStatus))]
     [Description("Reports the current state of one session: whether it is signed in right now, which site URL it holds, and which account it is authenticated as. Use it to find out who you are and where you are pointed before doing anything else.")]
-    public static async Task<string> GetPnpConnectionStatus(
+    public static async Task<CallToolResult> GetPnpConnectionStatus(
         PowerShellSessionManager sessions,
         [Description("Session to inspect (default: \"default\")")] string? sessionId = null,
         CancellationToken cancellationToken = default)
@@ -590,12 +588,82 @@ internal partial class PnPPowerShellTools
             """;
 
         var result = await sessions.Get(sessionId).ExecuteAsync(script, MetadataTimeout, cancellationToken, "connection-status");
+        var name = OutputLimit.Echo(string.IsNullOrWhiteSpace(sessionId) ? PowerShellSessionManager.DefaultSessionId : sessionId.Trim());
 
-        return $"""
-            Session: {OutputLimit.Echo(string.IsNullOrWhiteSpace(sessionId) ? PowerShellSessionManager.DefaultSessionId : sessionId.Trim())}
+        // Capped like every other tool that echoes session output: a session-level failure carries
+        // whatever the session printed before it died, which is unbounded. This path was never capped,
+        // and the oversized-argument test missed it because it varies the session id, not the output.
+        var text = OutputLimit.Apply(
+            $"""
+            Session: {name}
 
             {result}
-            """ + PnPErrorHints.HintFor(result);
+            """,
+            suffix: PnPErrorHints.HintFor(result));
+
+        // A session-level failure returns prose, not the JSON the script emits, so there is nothing to
+        // type. Reporting connected:false there would be a claim about the tenant we cannot support.
+        if (ParseStatus(result) is not { } status)
+        {
+            return StructuredResult.Text(text);
+        }
+
+        // Clamped before serializing: these come back from the tenant, and a pathological value would
+        // otherwise put the structured half past the cap on its own. 512 leaves real SharePoint URLs
+        // intact, which OutputLimit.Echo's 120 would not.
+        return StructuredResult.From(
+            status with
+            {
+                SessionId = name,
+                Url = OutputLimit.Clamp(status.Url),
+                TenantAdminUrl = OutputLimit.Clamp(status.TenantAdminUrl),
+                Account = OutputLimit.Clamp(status.Account),
+                Message = OutputLimit.Clamp(status.Message),
+            },
+            ToolOutputJsonContext.Default.ConnectionStatus,
+            _ => text);
+    }
+
+    /// <summary>Reads the status JSON the session emitted, or null when it did not emit any.</summary>
+    // Deliberately strict about what counts as an answer. Deserializing any JSON found in the output
+    // yields an all-defaults record, i.e. a confident "connected: false" -- so an error message that
+    // merely happens to contain braces would be reported as a fact about the tenant. Two guards: a
+    // session-level failure is never parsed, and the payload must carry the property the script always
+    // writes rather than merely being valid JSON.
+    private static ConnectionStatus? ParseStatus(string output)
+    {
+        if (output.StartsWith("Error:", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var start = output.IndexOf('{');
+        var end = output.LastIndexOf('}');
+
+        if (start < 0 || end <= start)
+        {
+            return null;
+        }
+
+        var candidate = output[start..(end + 1)];
+
+        try
+        {
+            using var document = JsonDocument.Parse(candidate);
+
+            if (document.RootElement.ValueKind != JsonValueKind.Object ||
+                !document.RootElement.TryGetProperty("connected", out var connected) ||
+                connected.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+            {
+                return null;
+            }
+
+            return JsonSerializer.Deserialize(candidate, ToolOutputJsonContext.Default.ConnectionStatus);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     [McpServerTool(Name = "pnp_reset_session", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
@@ -759,57 +827,101 @@ internal partial class PnPPowerShellTools
     private static DateTimeOffset ServerStartedUtc =>
         System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime();
 
-    [McpServerTool(Name = "pnp_ping", ReadOnly = true, Idempotent = true, OpenWorld = false)]
+    [McpServerTool(
+        Name = "pnp_ping",
+        ReadOnly = true,
+        Idempotent = true,
+        OpenWorld = false,
+        UseStructuredContent = true,
+        OutputSchemaType = typeof(ServerHealth))]
     [Description("Returns the server version, uptime, read-only mode status, and active session count. Use this as a lightweight health check to confirm the server is responsive.")]
-    public static string Ping(PowerShellSessionManager sessions)
+    public static CallToolResult Ping(PowerShellSessionManager sessions)
     {
         var version = typeof(PnPPowerShellTools).Assembly.GetName().Version;
-        var packageVersion = typeof(PnPPowerShellTools).Assembly
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-            ?.InformationalVersion ?? version?.ToString(3) ?? "0.0.0";
         var uptime = DateTimeOffset.UtcNow - ServerStartedUtc;
-        var active = sessions.Describe();
-        var readOnly = CommandPolicy.ReadOnlyMode;
 
-        return $$"""
-            {
-              "status": "ok",
-              "version": "{{version?.ToString(3) ?? "0.0.0"}}",
-              "packageVersion": "{{packageVersion}}",
-              "uptime": "{{uptime:d\d\ hh\:mm\:ss}}",
-              "startedUtc": "{{ServerStartedUtc:O}}",
-              "readOnlyMode": {{(readOnly ? "true" : "false")}},
-              "activeSessions": {{active.Count}}
-            }
-            """;
+        var health = new ServerHealth
+        {
+            Status = "ok",
+            Version = version?.ToString(3) ?? "0.0.0",
+            PackageVersion = typeof(PnPPowerShellTools).Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion ?? version?.ToString(3) ?? "0.0.0",
+            Uptime = $"{uptime:d\\d\\ hh\\:mm\\:ss}",
+            StartedUtc = ServerStartedUtc,
+            ReadOnlyMode = CommandPolicy.ReadOnlyMode,
+            ActiveSessions = sessions.Describe().Count,
+        };
+
+        // Fixed size whatever the server has been doing, so it needs no shrink-to-fit.
+        return StructuredResult.From(health, ToolOutputJsonContext.Default.ServerHealth, RenderHealth);
     }
 
-    [McpServerTool(Name = "pnp_list_sessions", ReadOnly = true, Idempotent = true, OpenWorld = false)]
+    private static string RenderHealth(ServerHealth health) =>
+        $"""
+        Server: ok, version {health.Version} (package {health.PackageVersion})
+        Uptime: {health.Uptime}, started {health.StartedUtc:u}
+        Read-only mode: {(health.ReadOnlyMode ? "on -- state-changing cmdlets are blocked" : "off")}
+        Active sessions: {health.ActiveSessions}
+        """;
+
+    [McpServerTool(
+        Name = "pnp_list_sessions",
+        ReadOnly = true,
+        Idempotent = true,
+        OpenWorld = false,
+        UseStructuredContent = true,
+        OutputSchemaType = typeof(SessionListResult))]
     [Description("Lists all active PowerShell sessions with their status and last activity time. Use this to see what sessions exist before deciding which to connect, reset, or reuse.")]
-    public static string ListSessions(PowerShellSessionManager sessions)
+    public static CallToolResult ListSessions(PowerShellSessionManager sessions)
     {
         var active = sessions.Describe();
 
-        if (active.Count == 0)
+        // A session id is caller-supplied, so it is clamped here as well as escaped when rendered.
+        return StructuredResult.FitToCap(
+            active,
+            (page, _) => new SessionListResult
+            {
+                Total = active.Count,
+                Sessions = [.. page.Select(s => new SessionSummary
+                {
+                    Id = OutputLimit.Echo(s.Id),
+                    Status = !s.IsAlive ? "stopped" : s.IsBusy ? "running" : "idle",
+                    LastUsedUtc = s.LastUsedUtc,
+                })],
+            },
+            ToolOutputJsonContext.Default.SessionListResult,
+            RenderSessions);
+    }
+
+    private static string RenderSessions(SessionListResult result)
+    {
+        if (result.Total == 0)
         {
             return "No sessions are currently running. A session is created automatically when you first call a tool that requires one.";
         }
 
         var sb = new StringBuilder();
-        sb.AppendLine($"**{active.Count}** active session(s):\n");
+
+        // The total, not the page: stating how many fitted as though it were how many exist would be
+        // wrong rather than merely partial.
+        sb.AppendLine(result.Truncated
+            ? $"**{result.Total}** active session(s), showing the first {result.Count} — the rest did not fit the output cap:\n"
+            : $"**{result.Count}** active session(s):\n");
+
         sb.AppendLine("| Session | Status | Last Activity (UTC) |");
         sb.AppendLine("|---------|--------|---------------------|");
 
-        foreach (var (id, isAlive, isBusy, lastUsed) in active)
+        foreach (var session in result.Sessions)
         {
-            var status = !isAlive ? "stopped" : isBusy ? "running" : "idle";
-            var safeId = id.Replace("\\", "\\\\").Replace("|", "\\|").Replace("\r", "").Replace("\n", " ");
-            sb.AppendLine($"| {safeId} | {status} | {lastUsed:yyyy-MM-dd HH:mm:ss} |");
+            // Escaped for the table: a pipe or newline in an id would otherwise break the row apart.
+            var safeId = session.Id.Replace("\\", "\\\\").Replace("|", "\\|").Replace("\r", "").Replace("\n", " ");
+            sb.AppendLine($"| {safeId} | {session.Status} | {session.LastUsedUtc:yyyy-MM-dd HH:mm:ss} |");
         }
 
         sb.AppendLine();
         sb.AppendLine("TIP: Use `pnp_get_connection_status` with a sessionId to check what a session is connected to.");
-        sb.AppendLine("TIP: Use `pnp_reset_session` to end a session that is no longer needed.");
+        sb.Append("TIP: Use `pnp_reset_session` to end a session that is no longer needed.");
 
         return OutputLimit.Apply(sb.ToString());
     }

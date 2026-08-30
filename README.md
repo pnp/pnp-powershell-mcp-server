@@ -424,8 +424,11 @@ no network, no VS Code extension and no tenant:
 | [data/pnp-commands.json](./data/pnp-commands.json) | Every `PnP.PowerShell` cmdlet name, with the URL templates for its markdown and HTML documentation | `pnp_get_command_docs` |
 | [data/pnp-index.json](./data/pnp-index.json) | The search corpus — synopsis, description, parameters, parameter sets and examples per cmdlet, plus the superseded-alias map | `pnp_search_commands` |
 
-Each records where it came from, and every tool that reads one prints that provenance — a stale index
-is visible rather than silent. Refresh them before a release:
+The two whose *content* can go stale print their provenance with every answer, so a stale index is
+visible rather than silent: `pnp_search_script_samples` names the sample catalogue's commit, and
+`pnp_search_commands` names the module version it was indexed from. `pnp-commands.json` supplies only
+documentation URL templates — `pnp_get_command_docs` reads the help itself from the module you have
+installed — so there is no stale content there to warn about. Refresh all three before a release:
 
 ```powershell
 # Sample and cmdlet-name indexes, from pnp/vscode-pnp-powershell.

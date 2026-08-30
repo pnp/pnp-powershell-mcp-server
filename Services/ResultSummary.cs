@@ -111,26 +111,38 @@ internal static class ResultSummary
     }
 
     /// <summary>Renders one page: what the whole result set is, then as many rows from <paramref name="offset"/> as fit.</summary>
-    public static string Render(HeldResultSet held, int offset, string sessionId)
+    /// <summary>
+    /// Which held rows one page covers. Shared so the rendered page and the offsets reported alongside it
+    /// cannot disagree. <c>Oversized</c> means the row at <c>Start</c> is wider than a whole page.
+    /// </summary>
+    public static (int Start, int End, int Pageable, bool Oversized) Paging(HeldResultSet held, int offset)
     {
         // Paging walks held rows; every reported figure is the true total.
         var pageable = held.Rows.Count;
-        var total = held.TotalRows;
-        offset = Math.Clamp(offset, 0, Math.Max(pageable - 1, 0));
+        var start = Math.Clamp(offset, 0, Math.Max(pageable - 1, 0));
 
         var budget = Math.Max(OutputLimit.MaxChars - Overhead, 500);
         var taken = 0;
         var used = 0;
 
-        while (offset + taken < pageable && used + held.Rows[offset + taken].Length + 1 <= budget)
+        while (start + taken < pageable && used + held.Rows[start + taken].Length + 1 <= budget)
         {
-            used += held.Rows[offset + taken].Length + 1;
+            used += held.Rows[start + taken].Length + 1;
             taken++;
         }
 
         // A row wider than a page would be cut mid-token, so skip it.
-        var oversized = taken == 0 && offset < pageable;
-        var end = offset + (oversized ? 1 : taken);
+        var oversized = taken == 0 && start < pageable;
+
+        return (start, start + (oversized ? 1 : taken), pageable, oversized);
+    }
+
+    public static string Render(HeldResultSet held, int offset, string sessionId)
+    {
+        var (start, end, pageable, oversized) = Paging(held, offset);
+        var total = held.TotalRows;
+        var taken = oversized ? 0 : end - start;
+        offset = start;
 
         var sb = new StringBuilder();
         sb.AppendLine(
