@@ -191,9 +191,10 @@ Can you check if I have a Power Automate flow called 'HoursReportingReminder' an
 | pnp_list_sessions | Lists all active PowerShell sessions with their status and last activity time. Use this to see what sessions exist before deciding which to connect, reset, or reuse. |
 | pnp_setup_environment | Installs the `PnP.PowerShell` module for the current user so PnP cmdlets can run, choosing the released or the latest pre-release build. It installs that one module only — it never signs in, touches the tenant, or creates an app registration — and only when `PNP_MCP_ALLOW_SETUP=true`; otherwise it returns the exact `Install-Module` command to run by hand. |
 
-Every tool declares its `readOnlyHint`, `idempotentHint` and `openWorldHint` annotations, and the two
-that can change state also declare `destructiveHint`, so a client can decide what to auto-approve
-without guessing.
+Every tool declares its `readOnlyHint`, `idempotentHint` and `openWorldHint` annotations, and the
+tools that are not read-only also declare `destructiveHint` — `true` for the two that can change
+Microsoft 365 (`pnp_run_command`, `pnp_reset_session`) and `false` for the current-user module
+install (`pnp_setup_environment`) — so a client can decide what to auto-approve without guessing.
 
 Tool descriptions are gated on whether they actually select: `ToolSelectionEvaluatorTests` scores every
 prompt in [e2eTestPrompts.md](./tests/PnPPowerShell.MCPServer.Tests/e2eTestPrompts.md) against the

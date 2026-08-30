@@ -71,17 +71,24 @@ internal partial class PnPPowerShellTools
         (prerelease ? " -AllowPrerelease" : string.Empty);
 
     /// <summary>What to return when setup is not allowed: the command the user runs by hand instead.</summary>
-    internal static string SetupDisabledMessage(bool prerelease) => $"""
-        Environment setup is disabled, so nothing was installed and your machine was not changed. This
-        server installs software only when you opt in: set PNP_MCP_ALLOW_SETUP=true and call this tool
-        again, or run this yourself in a PowerShell 7 terminal:
+    internal static string SetupDisabledMessage(bool prerelease)
+    {
+        // The command already carries -AllowPrerelease when asked, so only the released path needs the hint.
+        var prereleaseHint = prerelease
+            ? string.Empty
+            : "Add -AllowPrerelease to get the latest pre-release build instead of the released one. ";
 
-          {InstallModuleCommand(prerelease)}
+        return $"""
+            Environment setup is disabled, so nothing was installed and your machine was not changed. This
+            server installs software only when you opt in: set PNP_MCP_ALLOW_SETUP=true and call this tool
+            again, or run this yourself in a PowerShell 7 terminal:
 
-        Add -AllowPrerelease to get the latest pre-release build instead of the released one. This installs
-        the PnP.PowerShell module only; it does not sign you in. After it finishes, call
-        'pnp_diagnose_connection' with your site to see how to connect.
-        """;
+              {InstallModuleCommand(prerelease)}
+
+            {prereleaseHint}This installs the PnP.PowerShell module only; it does not sign you in. After it
+            finishes, call 'pnp_diagnose_connection' with your site to see how to connect.
+            """;
+    }
 
     [McpServerTool(Name = "pnp_search_commands", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description("Answers the question \"which cmdlet handles this, and what is it called?\". Searches cmdlet names, verbs and nouns by keyword to discover whether one exists for the area you need to manage. Use it whenever the cmdlet name is unknown. Returns names and documentation links, never tenant data.")]
