@@ -176,7 +176,7 @@ Can you check if I have a Power Automate flow called 'HoursReportingReminder' an
 
 | Tool | Description |
 | --- | --- |
-| pnp_search_commands | Finds which cmdlet does a job, by keyword against cmdlet names, verbs and nouns. Each result carries the cmdlet's `HelpUri`. Falls back to a vendored cmdlet index when `pwsh` or the module is unavailable, so it still answers on a machine that is not set up yet. |
+| pnp_search_commands | Finds which cmdlet does a job. Scores a compiled-in index of every cmdlet — name, verb, noun, synopsis, description, parameters and examples — with field-weighted BM25, so a plain-language question like "add a column to a list" finds `Add-PnPField`. Answers entirely in process: no `pwsh`, no session and no network, so it works on a machine that is not set up yet. Returns structured content alongside the text, and states the module version it was indexed from. |
 | pnp_get_command_docs | Gets the reference documentation for one named cmdlet — syntax, parameters, parameter sets and examples — preceded by links to both the raw markdown source of its documentation page and the rendered HTML page. The markdown is the same content for a fraction of the tokens. |
 | pnp_run_command | Runs PnP PowerShell against the connected tenant and returns the result. Runs in a persistent session, so a `Connect-PnPOnline` connection is reused across calls. Destructive commands require confirmation first. A result set too large for the output cap is summarised and paged rather than truncated. |
 | pnp_get_result_page | Returns the next page of a result set `pnp_run_command` summarised. Pages over rows already fetched, so it costs nothing against the tenant and returns exactly the rows the original command saw. |
@@ -227,9 +227,10 @@ time**, because a single PnP session can only hold one connection.
 | Connection | one, shared | one per session name |
 | Variables (`$sites`, ...) | shared | isolated per session |
 
-Three tools accept it: `pnp_run_command`, `pnp_get_connection_status` and `pnp_reset_session`. The
-metadata tools (`pnp_search_commands`, `pnp_get_command_docs`) always use `default`, since looking up
-a cmdlet does not depend on which tenant you are connected to.
+Three tools accept it: `pnp_run_command`, `pnp_get_connection_status` and `pnp_reset_session`.
+`pnp_search_commands` uses no session at all — it is answered from the compiled-in index — and
+`pnp_get_command_docs` always uses `default`, since a cmdlet's help does not depend on which tenant
+you are connected to.
 
 #### When to use it
 
@@ -417,21 +418,34 @@ Name it however you like. It's recommended to add it to `workspace` scope for te
 
 ### Vendored data
 
-Two indexes are compiled into the assembly as embedded resources, so the tools that use them work with
+Three indexes are compiled into the assembly as embedded resources, so the tools that use them work with
 no network, no VS Code extension and no tenant:
 
 | File | Contents | Used by |
 | --- | --- | --- |
 | [data/script-samples.json](./data/script-samples.json) | The PnP Script Samples catalogue — name, title, description, tags, authors | `pnp_search_script_samples`, `pnp_get_script_sample`, `pnp_suggest_script` |
-| [data/pnp-commands.json](./data/pnp-commands.json) | Every `PnP.PowerShell` cmdlet name, with the URL templates for its markdown and HTML documentation | `pnp_get_command_docs`, and `pnp_search_commands` when `pwsh` is unavailable |
+| [data/pnp-commands.json](./data/pnp-commands.json) | Every `PnP.PowerShell` cmdlet name, with the URL templates for its markdown and HTML documentation | `pnp_get_command_docs` |
+| [data/pnp-index.json](./data/pnp-index.json) | The search corpus — synopsis, description, parameters, parameter sets and examples per cmdlet, plus the superseded-alias map | `pnp_search_commands` |
 
-Both are generated from [pnp/vscode-pnp-powershell](https://github.com/pnp/vscode-pnp-powershell) and
-record the source commit, which every tool that reads them prints — a stale index is visible rather
-than silent. Refresh them before a release:
+The two whose *content* can go stale print their provenance with every answer, so a stale index is
+visible rather than silent: `pnp_search_script_samples` names the sample catalogue's commit, and
+`pnp_search_commands` names the module version it was indexed from. `pnp-commands.json` supplies only
+documentation URL templates — `pnp_get_command_docs` reads the help itself from the module you have
+installed — so there is no stale content there to warn about. Refresh all three before a release:
 
 ```powershell
+# Sample and cmdlet-name indexes, from pnp/vscode-pnp-powershell.
 pwsh ./build/Update-VendoredData.ps1
+
+# Search corpus, read from the PnP.PowerShell module installed on this machine, whose version it
+# records. Requires PnP.PowerShell; takes a few seconds.
+pwsh ./build/Update-CommandIndex.ps1
 ```
+
+Because the corpus is built from an installed module rather than the caller's, `pnp_search_commands`
+describes the cmdlets that existed when the server was built. It states that version in every answer,
+and `pnp_get_command_docs` reads the module you actually have — use it to confirm syntax before
+running anything.
 
 The script fails rather than guessing if either upstream file stops matching the URL templates.
 

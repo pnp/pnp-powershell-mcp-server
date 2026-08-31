@@ -14,11 +14,13 @@ public class RecordedPlaybackTests
         ("connect", s => Run(s, ConnectCommand()), "successfully"),
         ("web", s => Run(s, "Get-PnPWeb | Select-Object Title, Url"), "Url"),
         ("lists", s => Run(s, "Get-PnPList | Select-Object Title, ItemCount, BaseTemplate"), "Title"),
-        ("status", s => PnPPowerShellTools.GetPnpConnectionStatus(s), "connected"),
-        ("search", s => PnPPowerShellTools.SearchPnpCommands(s, "tenant site", 5), "PnP"),
+        ("status", async s => ToolResults.Text(await PnPPowerShellTools.GetPnpConnectionStatus(s)), "connected"),
+
+        // No "search" scenario: pnp_search_commands is answered from the compiled-in corpus and never
+        // reaches a session, so there is nothing to record. CommandCorpusTests cover it directly.
 
         // Sections 1-3 replay; section 4 reads the local machine and is covered by AuthMaterialTests.
-        ("diagnose", s => PnPPowerShellTools.DiagnosePnpConnection(s, null, SiteUrl()), "PnP PowerShell preflight"),
+        ("diagnose", async s => ToolResults.Text(await PnPPowerShellTools.DiagnosePnpConnection(s, null, SiteUrl())), "PnP PowerShell preflight"),
 
         // Failure states, each an entry in PnPErrorHints, asserted against a real message.
         ("unknown-cmdlet", s => Run(s, "Get-PnPNoSuchCmdlet9f2c"), "Find the right one with pnp_search_commands"),
@@ -70,13 +72,13 @@ public class RecordedPlaybackTests
         var cursor = sessions.Get(null).Held!.Cursor;
         Assert.Contains($"cursor '{cursor}'", first, StringComparison.Ordinal);
 
-        var second = PnPPowerShellTools.GetPnpResultPage(sessions, cursor, NextOffset(first));
+        var second = ToolResults.Text(PnPPowerShellTools.GetPnpResultPage(sessions, cursor, NextOffset(first)));
         Assert.Contains("Rows ", second, StringComparison.Ordinal);
         Assert.DoesNotContain("No held result set", second, StringComparison.Ordinal);
 
         // The cursor belongs to the session, so the next command there invalidates it.
         await Run(sessions, "Get-PnPWeb | Select-Object Title, Url");
-        Assert.Contains("No held result set", PnPPowerShellTools.GetPnpResultPage(sessions, cursor), StringComparison.Ordinal);
+        Assert.Contains("No held result set", ToolResults.Text(PnPPowerShellTools.GetPnpResultPage(sessions, cursor)), StringComparison.Ordinal);
     }
 
     private static int NextOffset(string page) =>

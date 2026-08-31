@@ -49,6 +49,8 @@
     <!-- Vendored so the sample and cmdlet indexes answer with no network and no VS Code extension. Refresh with build/Update-VendoredData.ps1. -->
     <EmbeddedResource Include="data\script-samples.json" LogicalName="script-samples.json" />
     <EmbeddedResource Include="data\pnp-commands.json" LogicalName="pnp-commands.json" />
+    <!-- The search corpus: synopsis, parameters and examples per cmdlet. Refresh with build/Update-CommandIndex.ps1. -->
+    <EmbeddedResource Include="data\pnp-index.json" LogicalName="pnp-index.json" />
   </ItemGroup>
 
   <ItemGroup>

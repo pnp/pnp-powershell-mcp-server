@@ -1,5 +1,6 @@
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
+using PnPPowerShell.MCPServer.Models;
 using PnPPowerShell.MCPServer.Services;
 using System.ComponentModel;
 using System.Reflection;
@@ -65,6 +66,13 @@ internal partial class PnPPowerShellTools
     /// <summary>A module install reaches PSGallery and can be slow, so it gets a generous limit of its own.</summary>
     private static readonly TimeSpan SetupTimeout = TimeSpan.FromMinutes(5);
 
+    // Matches the success line the install script writes, so the typed result reports the version the
+    // script actually saw rather than assuming the command working means the module is there.
+    // The version is taken lazily up to an optional trailing full stop: \S+ swallows the one ending the
+    // sentence, and reported "3.4.1." as the installed version.
+    [GeneratedRegex(@"^Installed PnP\.PowerShell (\S+?)\.?(?=\s|$)", RegexOptions.Multiline | RegexOptions.CultureInvariant)]
+    private static partial Regex InstalledVersionRegex();
+
     /// <summary>The exact install command, so the message and the run cannot describe different things.</summary>
     internal static string InstallModuleCommand(bool prerelease) =>
         "Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force -AllowClobber" +
@@ -90,106 +98,159 @@ internal partial class PnPPowerShellTools
             """;
     }
 
-    [McpServerTool(Name = "pnp_search_commands", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-    [Description("Answers the question \"which cmdlet handles this, and what is it called?\". Searches cmdlet names, verbs and nouns by keyword to discover whether one exists for the area you need to manage. Use it whenever the cmdlet name is unknown. Returns names and documentation links, never tenant data.")]
-    public static async Task<string> SearchPnpCommands(
-        PowerShellSessionManager sessions,
-        [Description("One or more space-separated keywords to find relevant commands (e.g., \"site\", \"list item\", \"teams channel\", \"user add\")")] string query,
-        [Description("Maximum number of results to return (default: 20, max: 100)")] int limit = 20,
-        CancellationToken cancellationToken = default)
+    [McpServerTool(
+        Name = "pnp_search_commands",
+        ReadOnly = true,
+        Idempotent = true,
+        OpenWorld = false,
+        UseStructuredContent = true,
+        OutputSchemaType = typeof(CommandSearchResult))]
+    [Description("Answers the question \"which cmdlet handles this, and what is it called?\". Searches cmdlet names, verbs, nouns, descriptions, parameters and examples to discover whether one exists for the area you need to manage. Describe the task in your own words -- \"add a column to a list\", \"share a file externally\" -- or pass keywords. Use it whenever the cmdlet name is unknown. Returns names, synopses, parameters and documentation links, never tenant data.")]
+    public static CallToolResult SearchPnpCommands(
+        [Description("What you are trying to do, in plain words or as keywords (e.g., \"find sites with no owner\", \"teams channel\", \"upload file\")")] string query,
+        [Description("Maximum number of results to return (default: 20, max: 100)")] int limit = 20)
     {
         limit = Math.Clamp(limit, 1, 100);
 
-        var terms = (query ?? string.Empty)
-            .Split([' ', ',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(EscapeSingleQuotedPowerShell)
-            .ToArray();
-
-        if (terms.Length == 0)
+        if (string.IsNullOrWhiteSpace(query))
         {
-            return "Error: Please provide at least one search keyword.";
+            return StructuredResult.Text("Error: Please provide at least one search keyword.", isError: true);
         }
 
-        var termArray = "@(" + string.Join(",", terms.Select(t => $"'{t}'")) + ")";
+        // Answered from the compiled-in corpus: no pwsh round-trip, so this works before the module is
+        // installed and costs no session time. Search resolves a superseded alias to its current cmdlet,
+        // so an alias query needs no special case here.
+        var found = CommandCorpus.Search(query, limit);
+        var aliased = CommandCorpus.AliasTarget(query.Trim());
 
-        var script = $$"""
-            $__pnpTerms = {{termArray}}
-            Get-Command -Module PnP.PowerShell |
-              ForEach-Object {
-                $__pnpCmd = $_
-                $__pnpScore = 0
-                foreach ($__pnpTerm in $__pnpTerms) {
-                  if ($__pnpCmd.Name -like "*$__pnpTerm*") { $__pnpScore += 10 }
-                  if ($__pnpCmd.Verb -like "*$__pnpTerm*") { $__pnpScore += 4 }
-                  if ($__pnpCmd.Noun -like "*$__pnpTerm*") { $__pnpScore += 6 }
-                }
-                if ($__pnpScore -gt 0) {
-                  [PSCustomObject]@{ Name = $__pnpCmd.Name; Verb = $__pnpCmd.Verb; Noun = $__pnpCmd.Noun; HelpUri = $__pnpCmd.HelpUri; Score = $__pnpScore }
-                }
-              } |
-              Sort-Object -Property Score -Descending |
-              Select-Object -First {{limit}} Name, Verb, Noun, HelpUri |
-              ConvertTo-Json -Depth 5 -Compress
-            Remove-Variable -Name __pnpTerms, __pnpCmd, __pnpScore, __pnpTerm -ErrorAction SilentlyContinue
-            """;
-
-        var result = await sessions.Get(null).ExecuteAsync(script, MetadataTimeout, cancellationToken, $"search-commands\n{query}\n{limit}");
-
-        // Searching cmdlet names needs no tenant, so an unusable environment falls back to the vendored index.
-        if (result.StartsWith("Error:", StringComparison.OrdinalIgnoreCase))
-        {
-            return OutputLimit.Apply(
-                SearchVendoredCommands(query!, limit, result),
-                "Search with fewer keywords, or pass a smaller 'limit' to return fewer results.",
-                PnPErrorHints.HintFor(result));
-        }
-
-        const string searchTips = """
-
-
-            TIP: Before executing any of the commands, run the 'pnp_get_command_docs' tool to retrieve the full syntax, parameters, and examples.
-            TIP: Each result carries a HelpUri, the published documentation page for that cmdlet. Fetch it when you need more detail than the local help gives, or cite it to the user.
-            TIP: For complex tasks, break them into smaller steps and run commands incrementally using 'pnp_run_command'.
-            """;
-
-        // The TIPs are passed as a suffix so they count against the cap instead of being appended past it.
-        return OutputLimit.Apply(
-            result,
-            "Search with fewer keywords, or pass a smaller 'limit' to return fewer results.",
-            PnPErrorHints.HintFor(result) ?? searchTips);
+        // Lean drops per-cmdlet detail, for the case where one cmdlet alone overruns a low cap --
+        // Set-PnPTenant carries some two hundred parameter names.
+        return StructuredResult.FitToCap(
+            found,
+            (hits, lean) => Describe(query, found.Count, hits, aliased, lean),
+            ToolOutputJsonContext.Default.CommandSearchResult,
+            RenderSearch);
     }
 
-    /// <summary>Answers a command search from the vendored index when the live one could not run.</summary>
-    private static string SearchVendoredCommands(string query, int limit, string sessionError)
-    {
-        var terms = query.Split([' ', ',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var matches = CommandIndex.Search(terms, limit);
+    /// <param name="found">How many the search returned, so Truncated needs no separate flag.</param>
+    /// <param name="lean">Omits parameters, examples and permissions, for when one hit alone exceeds the cap.</param>
+    private static CommandSearchResult Describe(
+        string query,
+        int found,
+        IReadOnlyList<IndexedCommand> hits,
+        string? aliased,
+        bool lean) =>
+        new()
+        {
+            // Clamped, like the text half already does: the query is caller-supplied and unbounded, and
+            // echoing it whole let a 100k-character query dominate a payload that shrinking hits could
+            // never bring back under the cap.
+            Query = OutputLimit.Echo(query.Trim()),
+            Matched = found,
+            DetailOmitted = lean,
+            AliasResolvedTo = aliased,
+            IndexedModuleVersion = CommandCorpus.ModuleVersion,
+            Commands = [.. hits.Select(c => new CommandSearchHit
+            {
+                Name = c.Name,
+                Verb = c.Verb,
+                Noun = c.Noun,
+                Synopsis = c.Synopsis,
+                Parameters = lean ? null : [.. c.Parameters.Select(p => p.Name)],
+                Examples = !lean && c.Examples is { Count: > 0 } ? c.Examples : null,
+                RequiredPermissions = !lean && c.Permissions is { Count: > 0 } ? c.Permissions : null,
+                DocsUrl = CommandCorpus.DocsUrl(c),
+            })],
+        };
 
-        // Results first, error last: truncation should cost the error, not the cmdlets.
+    /// <summary>Renders a search answer from a constructed result, so the honesty checks can build wrong ones.</summary>
+    internal static string RenderForTest(CommandSearchResult result) => RenderSearch(result);
+
+    /// <summary>The human-readable half of a search answer; clients that ignore schemas still get everything.</summary>
+    private static string RenderSearch(CommandSearchResult result)
+    {
         var sb = new StringBuilder();
-        sb.AppendLine("Answered from the vendored cmdlet index: the live lookup failed, and its error is at the end.");
-        sb.AppendLine("Nothing below was checked against your installed module, and no command can run until that is fixed.");
+
+        if (result.Count == 0)
+        {
+            sb.AppendLine($"No cmdlet matched '{OutputLimit.Echo(result.Query)}'.");
+            sb.AppendLine();
+
+            // A query the tokenizer discarded entirely looks identical to a genuine miss, which reads as
+            // "no such cmdlet exists" and stops the search there.
+            if (Bm25Tokenizer.Tokenize(result.Query).Count == 0)
+            {
+                sb.AppendLine("Nothing in that query could be indexed. The cmdlet index is English and matches");
+                sb.AppendLine("letters and digits only, so accents aside, other scripts do not match. Try English");
+                sb.AppendLine("keywords -- \"create site\", \"list item\", \"upload file\".");
+            }
+            else
+            {
+                sb.AppendLine("Try fewer or more general words (\"site\" rather than \"site collection owner report\"), or");
+                sb.AppendLine("search the published index at https://pnp.github.io/powershell/cmdlets/index.html.");
+            }
+
+            return OutputLimit.Apply(sb.ToString(), suffix: "\n" + CommandCorpus.Provenance);
+        }
+
+        // The number that matched, not the number that fitted: stating the page as the count is the same
+        // false-rather-than-partial claim that "N active sessions" made.
+        sb.AppendLine(result.Truncated
+            ? $"{result.Matched} cmdlet(s) for '{OutputLimit.Echo(result.Query)}', showing the first {result.Count} — the rest did not fit the output cap:"
+            : $"{result.Count} cmdlet(s) for '{OutputLimit.Echo(result.Query)}', most relevant first:");
+
+        if (result.AliasResolvedTo is { } current)
+        {
+            sb.AppendLine($"NOTE: you searched a superseded alias; {current} is the current name.");
+        }
+
+        if (result.Truncated)
+        {
+            sb.AppendLine("Narrow the query, or pass a smaller 'limit', to see the rest.");
+        }
+
+        if (result.DetailOmitted)
+        {
+            sb.AppendLine("Parameters and examples are omitted below: one cmdlet alone exceeded the output cap.");
+        }
+
         sb.AppendLine();
 
-        if (matches.Count == 0)
+        foreach (var hit in result.Commands)
         {
-            sb.AppendLine($"No vendored cmdlet name matched '{OutputLimit.Echo(query)}'.");
-        }
-        else
-        {
-            foreach (var name in matches)
+            sb.AppendLine($"- {hit.Name} — {hit.Synopsis}");
+
+            if (hit.Parameters is { Count: > 0 })
             {
-                sb.AppendLine($"- {name} — {CommandIndex.DocsUrl(name)}");
+                sb.AppendLine($"  Parameters: {string.Join(", ", hit.Parameters)}");
+            }
+
+            if (hit.Examples is { Count: > 0 } examples)
+            {
+                sb.AppendLine($"  Example: {examples[0]}");
+            }
+
+            if (hit.DocsUrl is not null)
+            {
+                sb.AppendLine($"  Docs: {hit.DocsUrl}");
             }
         }
 
+        // Tips last in the body, provenance alone in the suffix -- the same split ScriptSampleTools uses.
+        // OutputLimit clamps a suffix to a quarter of the budget and keeps it, so anything sharing that
+        // suffix with the provenance line would push it out of a truncated answer. Losing the tips to
+        // truncation is fine; losing which module version answered is not.
         sb.AppendLine();
-        sb.AppendLine(CommandIndex.Provenance);
-        sb.AppendLine();
-        sb.AppendLine(sessionError);
+        sb.AppendLine("TIP: Run 'pnp_get_command_docs' for the full syntax and parameter meanings before executing any of these -- the parameters listed above are names only.");
+        sb.AppendLine("TIP: The synopses and parameters above come from the module this server was built against. 'pnp_get_command_docs' reads the module you actually have.");
+        sb.Append("TIP: For complex tasks, break them into smaller steps and run commands incrementally using 'pnp_run_command'.");
 
-        return sb.ToString();
+        return OutputLimit.Apply(
+            sb.ToString(),
+            "Search with fewer keywords, or pass a smaller 'limit' to return fewer results.",
+            "\n\n" + CommandCorpus.Provenance);
     }
+
 
     [McpServerTool(Name = "pnp_get_command_docs", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description("Gets the reference documentation for one named cmdlet: its syntax, every parameter and what it means, the parameter sets, and worked examples. Use it once you know the cmdlet name and need to know how to call it.")]
@@ -372,9 +433,15 @@ internal partial class PnPPowerShellTools
         return OutputLimit.Apply(result, suffix: PnPErrorHints.HintFor(result));
     }
 
-    [McpServerTool(Name = "pnp_get_result_page", ReadOnly = true, Idempotent = true, OpenWorld = false)]
+    [McpServerTool(
+        Name = "pnp_get_result_page",
+        ReadOnly = true,
+        Idempotent = true,
+        OpenWorld = false,
+        UseStructuredContent = true,
+        OutputSchemaType = typeof(ResultPage))]
     [Description("Returns the next page of a result set that pnp_run_command summarised because it was too large to return whole. Pages over rows already fetched, so it costs nothing against the tenant and returns exactly the rows the original command saw. Use the cursor and offset printed under the summary.")]
-    public static string GetPnpResultPage(
+    public static CallToolResult GetPnpResultPage(
         PowerShellSessionManager sessions,
         [Description("The cursor printed with the summary, e.g. \"a1b2c3d4e5\"")] string cursor,
         [Description("Zero-based row number to start from, as printed in the MORE line of the previous page")] int offset = 0)
@@ -384,12 +451,30 @@ internal partial class PnPPowerShellTools
         // Read once: a concurrent command in that session clears Held.
         if (session?.Held is not { } held)
         {
-            return
+            return StructuredResult.Text(
                 $"Error: No held result set matches cursor '{OutputLimit.Echo(cursor)}'. A cursor is dropped when the next command runs in " +
-                "its session, when the session is reset, and when the server restarts. Re-run the original command to get a new one.";
+                "its session, when the session is reset, and when the server restarts. Re-run the original command to get a new one.",
+                isError: true);
         }
 
-        return OutputLimit.Apply(ResultSummary.Render(held, offset, session.Id));
+        var (start, end, pageable, _) = ResultSummary.Paging(held, offset);
+
+        var page = new ResultPage
+        {
+            Cursor = held.Cursor,
+            SessionId = session.Id,
+            Offset = start,
+            TotalRows = held.TotalRows,
+            PageableRows = pageable,
+            NextOffset = end < pageable ? end : null,
+        };
+
+        // Render already sizes the page against the cap, and the structured half carries only the offsets,
+        // so there is nothing here to shrink.
+        return StructuredResult.From(
+            page,
+            ToolOutputJsonContext.Default.ResultPage,
+            _ => OutputLimit.Apply(ResultSummary.Render(held, offset, session.Id)));
     }
 
     /// <summary>Splits a command budget into an analysis cap and a reserved execution slice.</summary>
@@ -495,9 +580,15 @@ internal partial class PnPPowerShellTools
             """;
     }
 
-    [McpServerTool(Name = "pnp_diagnose_connection", ReadOnly = true, Idempotent = true, OpenWorld = true)]
+    [McpServerTool(
+        Name = "pnp_diagnose_connection",
+        ReadOnly = true,
+        Idempotent = true,
+        OpenWorld = true,
+        UseStructuredContent = true,
+        OutputSchemaType = typeof(ConnectionDiagnosis))]
     [Description("Diagnoses a broken or unfamiliar machine and reports whether its environment is set up, and answers how to sign in to it. Verifies everything that must be true before anything can run: pwsh installed and on PATH, the PnP.PowerShell module present and current enough, whether this session is connected, and which app registration, persisted login or certificate this machine can actually authenticate with. Every failing check names its cause and the next command to run, filling in every value the machine's own state can supply. Call it before the first Connect-PnPOnline rather than composing one from memory, and whenever anything fails for a reason that is not obvious.")]
-    public static async Task<string> DiagnosePnpConnection(
+    public static async Task<CallToolResult> DiagnosePnpConnection(
         PowerShellSessionManager sessions,
         [Description("Session to inspect (default: \"default\")")] string? sessionId = null,
         [Description("The SharePoint site the caller wants to work against, e.g. \"https://contoso.sharepoint.com/sites/marketing\". Given one, the report names the exact connect command for that host instead of a template.")] string? targetUrl = null,
@@ -505,14 +596,37 @@ internal partial class PnPPowerShellTools
     {
         var facts = await ConnectionPreflight.GatherAsync(sessions, sessionId, targetUrl, cancellationToken);
 
-        return OutputLimit.Apply(
-            ConnectionPreflight.Render(facts),
-            "Raise PNP_MCP_MAX_OUTPUT_CHARS to see the whole report; this one is a fixed set of checks, so there is nothing to narrow.");
+        // The checks a client can branch on. The prose half keeps the causes, the next commands and the
+        // auth material, none of which is a decision a client makes without a person reading it.
+        var diagnosis = new ConnectionDiagnosis
+        {
+            SessionId = OutputLimit.Echo(facts.SessionId),
+            PwshAvailable = facts.Environment.PwshVersion is not null,
+            PwshVersion = facts.Environment.PwshVersion,
+            ModuleInstalled = facts.Environment.ModuleVersion is not null,
+            ModuleVersion = facts.Environment.ModuleVersion,
+            Connected = facts.Session?.Connected is true,
+            Url = OutputLimit.Clamp(facts.Session?.Url),
+            Account = OutputLimit.Clamp(facts.Session?.Account),
+        };
+
+        return StructuredResult.From(
+            diagnosis,
+            ToolOutputJsonContext.Default.ConnectionDiagnosis,
+            _ => OutputLimit.Apply(
+                ConnectionPreflight.Render(facts),
+                "Raise PNP_MCP_MAX_OUTPUT_CHARS to see the whole report; this one is a fixed set of checks, so there is nothing to narrow."));
     }
 
-    [McpServerTool(Name = "pnp_get_connection_status", ReadOnly = true, Idempotent = true, OpenWorld = false)]
+    [McpServerTool(
+        Name = "pnp_get_connection_status",
+        ReadOnly = true,
+        Idempotent = true,
+        OpenWorld = false,
+        UseStructuredContent = true,
+        OutputSchemaType = typeof(ConnectionStatus))]
     [Description("Reports the current state of one session: whether it is signed in right now, which site URL it holds, and which account it is authenticated as. Use it to find out who you are and where you are pointed before doing anything else.")]
-    public static async Task<string> GetPnpConnectionStatus(
+    public static async Task<CallToolResult> GetPnpConnectionStatus(
         PowerShellSessionManager sessions,
         [Description("Session to inspect (default: \"default\")")] string? sessionId = null,
         CancellationToken cancellationToken = default)
@@ -536,12 +650,82 @@ internal partial class PnPPowerShellTools
             """;
 
         var result = await sessions.Get(sessionId).ExecuteAsync(script, MetadataTimeout, cancellationToken, "connection-status");
+        var name = OutputLimit.Echo(string.IsNullOrWhiteSpace(sessionId) ? PowerShellSessionManager.DefaultSessionId : sessionId.Trim());
 
-        return $"""
-            Session: {OutputLimit.Echo(string.IsNullOrWhiteSpace(sessionId) ? PowerShellSessionManager.DefaultSessionId : sessionId.Trim())}
+        // Capped like every other tool that echoes session output: a session-level failure carries
+        // whatever the session printed before it died, which is unbounded. This path was never capped,
+        // and the oversized-argument test missed it because it varies the session id, not the output.
+        var text = OutputLimit.Apply(
+            $"""
+            Session: {name}
 
             {result}
-            """ + PnPErrorHints.HintFor(result);
+            """,
+            suffix: PnPErrorHints.HintFor(result));
+
+        // A session-level failure returns prose, not the JSON the script emits, so there is nothing to
+        // type. Reporting connected:false there would be a claim about the tenant we cannot support.
+        if (ParseStatus(result) is not { } status)
+        {
+            return StructuredResult.Text(text);
+        }
+
+        // Clamped before serializing: these come back from the tenant, and a pathological value would
+        // otherwise put the structured half past the cap on its own. 512 leaves real SharePoint URLs
+        // intact, which OutputLimit.Echo's 120 would not.
+        return StructuredResult.From(
+            status with
+            {
+                SessionId = name,
+                Url = OutputLimit.Clamp(status.Url),
+                TenantAdminUrl = OutputLimit.Clamp(status.TenantAdminUrl),
+                Account = OutputLimit.Clamp(status.Account),
+                Message = OutputLimit.Clamp(status.Message),
+            },
+            ToolOutputJsonContext.Default.ConnectionStatus,
+            _ => text);
+    }
+
+    /// <summary>Reads the status JSON the session emitted, or null when it did not emit any.</summary>
+    // Deliberately strict about what counts as an answer. Deserializing any JSON found in the output
+    // yields an all-defaults record, i.e. a confident "connected: false" -- so an error message that
+    // merely happens to contain braces would be reported as a fact about the tenant. Two guards: a
+    // session-level failure is never parsed, and the payload must carry the property the script always
+    // writes rather than merely being valid JSON.
+    private static ConnectionStatus? ParseStatus(string output)
+    {
+        if (output.StartsWith("Error:", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var start = output.IndexOf('{');
+        var end = output.LastIndexOf('}');
+
+        if (start < 0 || end <= start)
+        {
+            return null;
+        }
+
+        var candidate = output[start..(end + 1)];
+
+        try
+        {
+            using var document = JsonDocument.Parse(candidate);
+
+            if (document.RootElement.ValueKind != JsonValueKind.Object ||
+                !document.RootElement.TryGetProperty("connected", out var connected) ||
+                connected.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+            {
+                return null;
+            }
+
+            return JsonSerializer.Deserialize(candidate, ToolOutputJsonContext.Default.ConnectionStatus);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     [McpServerTool(Name = "pnp_reset_session", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
@@ -705,17 +889,37 @@ internal partial class PnPPowerShellTools
     private static DateTimeOffset ServerStartedUtc =>
         System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime();
 
-    [McpServerTool(Name = "pnp_setup_environment", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = true)]
+    // Destructive because the install runs with -Force -AllowClobber, which overwrites an existing
+    // install and can take over command names belonging to other modules. Installing is additive in
+    // intent, but clients read this hint to decide what to auto-approve, and a tool that can replace
+    // commands on the user's machine should not be auto-approved on the strength of a false hint.
+    // PNP_MCP_ALLOW_SETUP remains the real gate; this makes the annotation agree with it.
+    [McpServerTool(
+        Name = "pnp_setup_environment",
+        ReadOnly = false,
+        Destructive = true,
+        Idempotent = true,
+        OpenWorld = true,
+        UseStructuredContent = true,
+        OutputSchemaType = typeof(SetupResult))]
     [Description("Installs the PnP.PowerShell module for the current user so PnP cmdlets can run, choosing the released build or the latest pre-release. It installs only that module: it never signs in, never touches the tenant, and creates no app registration. For safety it installs only when PNP_MCP_ALLOW_SETUP=true; otherwise it returns the exact Install-Module command to run by hand. Use it when the PnP.PowerShell module is not installed.")]
-    public static async Task<string> SetupEnvironment(
+    public static async Task<CallToolResult> SetupEnvironment(
         PowerShellSessionManager sessions,
         [Description("Install the latest pre-release build instead of the released one (adds -AllowPrerelease). Ask the user which they want. Default: false.")] bool prerelease = false,
         [Description("Session to run the install in (default: \"default\")")] string? sessionId = null,
         CancellationToken cancellationToken = default)
     {
+        var command = InstallModuleCommand(prerelease);
+
+        CallToolResult Report(bool allowed, string? version, string text) =>
+            StructuredResult.From(
+                new SetupResult { Allowed = allowed, Installed = version is not null, ModuleVersion = version, Command = command },
+                ToolOutputJsonContext.Default.SetupResult,
+                _ => OutputLimit.Apply(text));
+
         if (!SetupAllowed)
         {
-            return OutputLimit.Apply(SetupDisabledMessage(prerelease));
+            return Report(allowed: false, version: null, SetupDisabledMessage(prerelease));
         }
 
         // pwsh has to exist before a module can be installed into it.
@@ -723,7 +927,7 @@ internal partial class PnPPowerShellTools
 
         if (environment.PwshVersion is null)
         {
-            return OutputLimit.Apply($"""
+            return Report(allowed: true, version: null, $"""
                 Error: PowerShell 7 (pwsh) is not available, so the PnP.PowerShell module cannot be installed. {environment.ProbeError}
                 Install PowerShell 7 first from https://aka.ms/powershell, then call this tool again.
                 """);
@@ -744,78 +948,144 @@ internal partial class PnPPowerShellTools
 
         var result = await sessions.Get(sessionId).ExecuteAsync(script, SetupTimeout, cancellationToken, "setup-environment");
 
-        return OutputLimit.Apply(result);
+        // Read back from what the install reported, not from the fact that it ran: the script itself
+        // treats "command succeeded but the module is still invisible" as a failure.
+        var installed = InstalledVersionRegex().Match(result);
+
+        return Report(allowed: true, installed.Success ? installed.Groups[1].Value : null, result);
     }
 
-    [McpServerTool(Name = "pnp_ping", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-    [Description("Returns the server version, uptime, read-only mode status, and active session count, and (unless includeReadiness is false) whether pwsh and the PnP.PowerShell module are present on this machine. Use this as a lightweight health check to confirm the server is responsive and ready to run PnP commands.")]
-    public static async Task<string> Ping(
+    [McpServerTool(
+        Name = "pnp_ping",
+        ReadOnly = true,
+        Idempotent = true,
+        OpenWorld = false,
+        UseStructuredContent = true,
+        OutputSchemaType = typeof(ServerHealth))]
+    // Deliberately does not repeat "pwsh installed" or "module available": this tool and
+    // pnp_diagnose_connection both report readiness, and while their wording overlapped the shorter
+    // description here outranked the longer one there for questions that belong to diagnosis.
+    [Description("Returns the server version, uptime, read-only mode status, and active session count, plus (unless includeReadiness is false) a one-line readiness flag. Use this as a lightweight health check to confirm the server itself is responsive.")]
+    public static async Task<CallToolResult> Ping(
         PowerShellSessionManager sessions,
         [Description("Also probe whether pwsh and the PnP.PowerShell module are installed (launches a short-lived pwsh). Default: true.")] bool includeReadiness = true,
         CancellationToken cancellationToken = default)
     {
         var version = typeof(PnPPowerShellTools).Assembly.GetName().Version;
-        var packageVersion = typeof(PnPPowerShellTools).Assembly
-            .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()
-            ?.InformationalVersion ?? version?.ToString(3) ?? "0.0.0";
         var uptime = DateTimeOffset.UtcNow - ServerStartedUtc;
-        var active = sessions.Describe();
-        var readOnly = CommandPolicy.ReadOnlyMode;
 
-        var readiness = string.Empty;
+        // The readiness probe launches a short-lived pwsh, so it is skipped when the caller only wants
+        // to know the server is alive.
+        var environment = includeReadiness ? await ConnectionPreflight.ProbeEnvironmentAsync(cancellationToken) : null;
 
-        if (includeReadiness)
+        var health = new ServerHealth
         {
-            var environment = await ConnectionPreflight.ProbeEnvironmentAsync(cancellationToken);
-            var moduleVersion = environment.ModuleVersion is null ? "null" : $"\"{environment.ModuleVersion}\"";
+            Status = "ok",
+            Version = version?.ToString(3) ?? "0.0.0",
+            PackageVersion = typeof(PnPPowerShellTools).Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion ?? version?.ToString(3) ?? "0.0.0",
+            Uptime = $"{uptime:d\\d\\ hh\\:mm\\:ss}",
+            StartedUtc = ServerStartedUtc,
+            ReadOnlyMode = CommandPolicy.ReadOnlyMode,
+            ActiveSessions = sessions.Describe().Count,
 
-            readiness = $$"""
-                ,
-                  "pwshAvailable": {{(environment.PwshVersion is not null ? "true" : "false")}},
-                  "pnpModuleInstalled": {{(environment.ModuleVersion is not null ? "true" : "false")}},
-                  "pnpModuleVersion": {{moduleVersion}}
-                """;
-        }
+            // Null rather than false when not probed: "we did not look" is a different fact from
+            // "it is not installed", and a client acting on the latter would send the user to install
+            // something they may already have.
+            PwshAvailable = environment is null ? null : environment.PwshVersion is not null,
+            PnpModuleInstalled = environment is null ? null : environment.ModuleVersion is not null,
+            PnpModuleVersion = environment?.ModuleVersion,
+        };
 
-        return $$"""
-            {
-              "status": "ok",
-              "version": "{{version?.ToString(3) ?? "0.0.0"}}",
-              "packageVersion": "{{packageVersion}}",
-              "uptime": "{{uptime:d\d\ hh\:mm\:ss}}",
-              "startedUtc": "{{ServerStartedUtc:O}}",
-              "readOnlyMode": {{(readOnly ? "true" : "false")}},
-              "activeSessions": {{active.Count}}{{readiness}}
-            }
-            """;
+        // Fixed size whatever the server has been doing, so it needs no shrink-to-fit.
+        return StructuredResult.From(health, ToolOutputJsonContext.Default.ServerHealth, RenderHealth);
     }
 
-    [McpServerTool(Name = "pnp_list_sessions", ReadOnly = true, Idempotent = true, OpenWorld = false)]
+    private static string RenderHealth(ServerHealth health) =>
+        $"""
+        Server: ok, version {health.Version} (package {health.PackageVersion})
+        Readiness: {RenderReadiness(health)}
+        Uptime: {health.Uptime}, started {health.StartedUtc:u}
+        Read-only mode: {(health.ReadOnlyMode ? "on -- state-changing cmdlets are blocked" : "off")}
+        Active sessions: {health.ActiveSessions}
+        """;
+
+    /// <summary>States "not checked" rather than implying an absence the probe never looked for.</summary>
+    private static string RenderReadiness(ServerHealth health)
+    {
+        if (health.PwshAvailable is not { } pwsh || health.PnpModuleInstalled is not { } module)
+        {
+            return "not checked (pass includeReadiness=true to probe pwsh and the module)";
+        }
+
+        if (!pwsh)
+        {
+            return "PowerShell 7 (pwsh) is not on PATH, so no PnP cmdlet can run. Install it from https://aka.ms/powershell.";
+        }
+
+        return module
+            ? $"pwsh present, PnP.PowerShell {health.PnpModuleVersion} installed"
+            : "pwsh present, but the PnP.PowerShell module is not installed. Use 'pnp_setup_environment' or run Install-Module yourself.";
+    }
+
+    [McpServerTool(
+        Name = "pnp_list_sessions",
+        ReadOnly = true,
+        Idempotent = true,
+        OpenWorld = false,
+        UseStructuredContent = true,
+        OutputSchemaType = typeof(SessionListResult))]
     [Description("Lists all active PowerShell sessions with their status and last activity time. Use this to see what sessions exist before deciding which to connect, reset, or reuse.")]
-    public static string ListSessions(PowerShellSessionManager sessions)
+    public static CallToolResult ListSessions(PowerShellSessionManager sessions)
     {
         var active = sessions.Describe();
 
-        if (active.Count == 0)
+        // A session id is caller-supplied, so it is clamped here as well as escaped when rendered.
+        return StructuredResult.FitToCap(
+            active,
+            (page, _) => new SessionListResult
+            {
+                Total = active.Count,
+                Sessions = [.. page.Select(s => new SessionSummary
+                {
+                    Id = OutputLimit.Echo(s.Id),
+                    Status = !s.IsAlive ? "stopped" : s.IsBusy ? "running" : "idle",
+                    LastUsedUtc = s.LastUsedUtc,
+                })],
+            },
+            ToolOutputJsonContext.Default.SessionListResult,
+            RenderSessions);
+    }
+
+    private static string RenderSessions(SessionListResult result)
+    {
+        if (result.Total == 0)
         {
             return "No sessions are currently running. A session is created automatically when you first call a tool that requires one.";
         }
 
         var sb = new StringBuilder();
-        sb.AppendLine($"**{active.Count}** active session(s):\n");
+
+        // The total, not the page: stating how many fitted as though it were how many exist would be
+        // wrong rather than merely partial.
+        sb.AppendLine(result.Truncated
+            ? $"**{result.Total}** active session(s), showing the first {result.Count} — the rest did not fit the output cap:\n"
+            : $"**{result.Count}** active session(s):\n");
+
         sb.AppendLine("| Session | Status | Last Activity (UTC) |");
         sb.AppendLine("|---------|--------|---------------------|");
 
-        foreach (var (id, isAlive, isBusy, lastUsed) in active)
+        foreach (var session in result.Sessions)
         {
-            var status = !isAlive ? "stopped" : isBusy ? "running" : "idle";
-            var safeId = id.Replace("\\", "\\\\").Replace("|", "\\|").Replace("\r", "").Replace("\n", " ");
-            sb.AppendLine($"| {safeId} | {status} | {lastUsed:yyyy-MM-dd HH:mm:ss} |");
+            // Escaped for the table: a pipe or newline in an id would otherwise break the row apart.
+            var safeId = session.Id.Replace("\\", "\\\\").Replace("|", "\\|").Replace("\r", "").Replace("\n", " ");
+            sb.AppendLine($"| {safeId} | {session.Status} | {session.LastUsedUtc:yyyy-MM-dd HH:mm:ss} |");
         }
 
         sb.AppendLine();
         sb.AppendLine("TIP: Use `pnp_get_connection_status` with a sessionId to check what a session is connected to.");
-        sb.AppendLine("TIP: Use `pnp_reset_session` to end a session that is no longer needed.");
+        sb.Append("TIP: Use `pnp_reset_session` to end a session that is no longer needed.");
 
         return OutputLimit.Apply(sb.ToString());
     }
