@@ -430,7 +430,7 @@ internal partial class PnPPowerShellTools
 
         // The hint is reserved as a suffix rather than appended after capping, so the response stays
         // inside PNP_MCP_MAX_OUTPUT_CHARS and the "Likely cause" line still survives a truncation.
-        return OutputLimit.Apply(result, suffix: PnPErrorHints.HintFor(result));
+        return OutputLimit.Apply(result, suffix: PnPErrorHints.HintFor(result, command));
     }
 
     [McpServerTool(
