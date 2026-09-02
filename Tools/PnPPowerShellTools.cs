@@ -60,7 +60,7 @@ internal partial class PnPPowerShellTools
         SignInOnlyRegex().IsMatch(LineContinuationRegex().Replace(command.Trim(), " "));
 
     /// <summary>Installing a module changes the machine, so it happens only when the operator opts in.</summary>
-    private static bool SetupAllowed =>
+    internal static bool SetupAllowed =>
         string.Equals(Environment.GetEnvironmentVariable("PNP_MCP_ALLOW_SETUP"), "true", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>A module install reaches PSGallery and can be slow, so it gets a generous limit of its own.</summary>

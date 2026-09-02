@@ -128,7 +128,7 @@ fabricated link that 404s is worse than no link.
 - **PowerShell 7.4 or above** (`pwsh`) must be installed and available on `PATH`. This server runs PnP PowerShell in a `pwsh` session — if it's missing, tools will return an actionable error telling you to install it.
 - **The `PnP.PowerShell` module** must be installed:
   ```powershell
-  Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force
+  Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force -AllowClobber
   ```
   The module is imported once when a session starts, and a clear error with the install command above is returned if it is missing, instead of a raw PowerShell exception.
 - **`pnp_diagnose_connection` checks both of these**, plus what connection the session holds, in one

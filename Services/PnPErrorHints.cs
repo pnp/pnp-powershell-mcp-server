@@ -15,7 +15,7 @@ internal static partial class PnPErrorHints
             "PowerShell 7 is not installed or not on PATH. Install it from https://aka.ms/powershell, then restart your MCP client so it inherits the new PATH. Run pnp_diagnose_connection to confirm."),
 
         ("The PnP.PowerShell module is not installed",
-            "Run: Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force. Then run pnp_diagnose_connection to confirm the module is visible to this server."),
+            $"Run: {Tools.PnPPowerShellTools.InstallModuleCommand(prerelease: false)}. Then run pnp_diagnose_connection to confirm the module is visible to this server."),
 
         ("The PowerShell session ended unexpectedly",
             "The session died and any PnP connection with it. Run pnp_diagnose_connection to check the environment, then reconnect with Connect-PnPOnline."),

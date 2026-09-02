@@ -37,9 +37,9 @@ public class AuthMaterialTests : IDisposable
     private string Advise(string? url)
     {
         var report = new StringBuilder();
-        var next = AuthMaterial.Render(report, AuthMaterial.Gather(_store), url);
+        var steps = AuthMaterial.Render(report, AuthMaterial.Gather(_store), url);
 
-        return report + "\nNEXT: " + next;
+        return report + "\nNEXT: " + string.Join("\n", steps.Select(s => s.Summary));
     }
 
     [Theory]
@@ -169,7 +169,8 @@ public class AuthMaterialTests : IDisposable
         Assert.Contains("NEXT STEP: Ready.", connected);
 
         Assert.Contains("4. Auth material", not);
-        Assert.Contains("NEXT STEP: Run: Connect-PnPOnline -Url https://contoso.sharepoint.com", not);
+        Assert.Contains("NEXT STEP: Ask the user to run this in their own PowerShell 7 terminal", not);
+        Assert.Contains("Connect-PnPOnline -Url https://contoso.sharepoint.com -PersistLogin", not);
     }
 
     private string Render(SessionFacts session) =>
