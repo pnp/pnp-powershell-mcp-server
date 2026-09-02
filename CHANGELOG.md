@@ -28,6 +28,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- Changed `pnp_search_script_samples` and `pnp_suggest_script` to rank samples with the same BM25 scorer as `pnp_search_commands` (title, name, tags, description), replacing substring scoring. Stopwords no longer match: "no owner" now returns owner samples rather than every description containing "no".
 - Changed `pnp_run_command` to decline `Install-Module`, `Update-Module` and `Register-PnPEntraIDApp*`, since those change the user's machine or tenant rather than run against a connection, and to point the user at their own PowerShell 7 terminal instead. [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
 - Changed recorded fixtures to be named for the operation they record — a readable slug plus the key — with lookup falling back to the key, so the readable half can be corrected by hand without orphaning the fixture. [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
 - Changed `TranscriptScrubber` to redact the `app_displayname` an app registration records, so a tenant's app name cannot reach a committed fixture. [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)

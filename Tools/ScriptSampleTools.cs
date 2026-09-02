@@ -20,35 +20,8 @@ internal sealed partial class ScriptSampleTools
     [GeneratedRegex(@"```powershell([\s\S]*?)```", RegexOptions.IgnoreCase)]
     private static partial Regex PowerShellCodeBlockRegex();
 
-    private static int ScoreMatch(ScriptSample sample, string[] queryTerms)
-    {
-        int score = 0;
-        foreach (var term in queryTerms)
-        {
-            if (sample.Title.Contains(term, StringComparison.OrdinalIgnoreCase))       score += 10;
-            if (sample.Name.Contains(term, StringComparison.OrdinalIgnoreCase))        score += 8;
-            if (sample.Description.Contains(term, StringComparison.OrdinalIgnoreCase)) score += 5;
-            foreach (var tag in sample.Tags)
-                if (tag.Contains(term, StringComparison.OrdinalIgnoreCase))            score += 6;
-        }
-        return score;
-    }
-
-    private static List<ScriptSample> Rank(string query, int limit)
-    {
-        var terms = Terms(query);
-
-        return
-        [.. ScriptSampleIndex.Samples
-            .Select(s => (Sample: s, Score: ScoreMatch(s, terms)))
-            .Where(x => x.Score > 0)
-            .OrderByDescending(x => x.Score)
-            .Take(limit)
-            .Select(x => x.Sample)];
-    }
-
-    private static string[] Terms(string query) =>
-        (query ?? string.Empty).Split([' ', ',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    private static List<ScriptSample> Rank(string query, int limit) =>
+        [.. ScriptSampleIndex.Search(query, limit).Select(h => h.Document)];
 
     private static string ExtractPnpScript(string readmeContent)
     {
@@ -143,7 +116,7 @@ internal sealed partial class ScriptSampleTools
             result => RenderSamples(result, matched));
     }
 
-    /// <param name="matched">The full match set, so the rendered facts survive the structured projection.</param>
+    /// <param name="matched">The full match set; the page is its prefix, so the rendered facts survive the projection.</param>
     private static string RenderSamples(SampleSearchResult result, IReadOnlyList<ScriptSample> matched)
     {
         if (result.Count == 0)
@@ -156,7 +129,7 @@ internal sealed partial class ScriptSampleTools
             ? $"Found **{result.Matched}** script sample(s) matching '{result.Query}', showing the first {result.Count}:\n"
             : $"Found **{result.Count}** script sample(s) matching '{result.Query}':\n");
 
-        foreach (var sample in result.Samples.Select(hit => matched.First(m => m.Name == hit.Name)))
+        foreach (var sample in matched.Take(result.Count))
         {
             sb.AppendLine($"## {sample.Title}");
             sb.AppendLine($"- **Name**: `{sample.Name}`");
