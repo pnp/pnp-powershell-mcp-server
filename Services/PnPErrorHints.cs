@@ -87,7 +87,7 @@ internal static class PnPErrorHints
 
         // PnP puts the useful half on the warning stream, so both halves are caught.
         ("Please specify a valid client id",
-            "No app registration was available for that tenant: none passed with -ClientId, none in PnP's persisted-login store, and neither ENTRAID_APP_ID nor ENTRAID_CLIENT_ID set. Run pnp_diagnose_connection with the site URL: it reports which of those this machine has and names the command to fix it. Do not guess a client id or assume an environment variable is set."),
+            "No app registration was available for that tenant: none passed with -ClientId, none in PnP's persisted-login store, and none of ENTRAID_APP_ID, ENTRAID_CLIENT_ID or AZURE_CLIENT_ID set. Run pnp_diagnose_connection with the site URL: it reports which of those this machine has and names the command to fix it. Do not guess a client id or assume an environment variable is set."),
 
         // Qualified: bare "Specified method is not supported" is a .NET message.
         ("Connect-PnPOnline: Specified method is not supported",

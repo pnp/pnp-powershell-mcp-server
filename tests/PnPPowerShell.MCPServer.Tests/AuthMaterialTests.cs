@@ -16,7 +16,7 @@ public class AuthMaterialTests : IDisposable
         Directory.CreateDirectory(_store);
 
         // Cleared so a maintainer with these set gets CI's results.
-        foreach (var name in (string[])["ENTRAID_APP_ID", "ENTRAID_CLIENT_ID", "ENTRAID_APP_CERTIFICATE_PATH", "ENTRAID_CLIENT_CERTIFICATE_PATH"])
+        foreach (var name in (string[])["ENTRAID_APP_ID", "ENTRAID_CLIENT_ID", "AZURE_CLIENT_ID", "ENTRAID_APP_CERTIFICATE_PATH", "ENTRAID_CLIENT_CERTIFICATE_PATH", "AZURE_CLIENT_CERTIFICATE_PATH"])
         {
             _cleared.Add(new EnvVar(name, null));
         }
@@ -98,12 +98,16 @@ public class AuthMaterialTests : IDisposable
         var report = Advise("https://contoso.sharepoint.com/sites/hr");
 
         // Issue #19: the model assumed one of these was set.
-        Assert.Contains("Neither ENTRAID_APP_ID nor ENTRAID_CLIENT_ID is set", report);
+        Assert.Contains("None of ENTRAID_APP_ID, ENTRAID_CLIENT_ID or AZURE_CLIENT_ID is set", report);
 
         Assert.Contains("BLOCKED", report);
         Assert.Contains("Register-PnPEntraIDAppForInteractiveLogin", report);
         Assert.Contains("Register-PnPEntraIDApp -ApplicationName", report);
         Assert.Contains("-Tenant contoso.onmicrosoft.com", report);
+        Assert.Contains("full control of every site", report);
+
+        // Register-PnPEntraIDAppForInteractiveLogin has no -Interactive switch.
+        Assert.DoesNotContain("-Interactive", report);
         Assert.Contains("their own PowerShell 7 terminal", report);
 
         // A sovereign cloud does not map onto .onmicrosoft.com.
@@ -119,6 +123,26 @@ public class AuthMaterialTests : IDisposable
 
         Assert.Contains($"ENTRAID_APP_ID is set to {App}", report);
         Assert.Contains("no -ClientId needed", report);
+    }
+
+    [Fact]
+    public void AZURE_CLIENT_ID_alone_counts_as_a_client_id_from_the_environment()
+    {
+        using var set = new EnvVar("AZURE_CLIENT_ID", App);
+
+        var facts = AuthMaterial.Gather(_store);
+
+        Assert.Equal("AZURE_CLIENT_ID", facts.ClientIdVariable);
+        Assert.Equal(App, facts.ClientId);
+        Assert.Contains($"AZURE_CLIENT_ID is set to {App}", Advise("https://contoso.sharepoint.com/sites/x"));
+    }
+
+    [Fact]
+    public void AZURE_CLIENT_CERTIFICATE_PATH_alone_counts_as_a_certificate()
+    {
+        using var set = new EnvVar("AZURE_CLIENT_CERTIFICATE_PATH", "/certs/pnp.pfx");
+
+        Assert.Equal("/certs/pnp.pfx", AuthMaterial.Gather(_store).CertificatePath);
     }
 
     [Fact]

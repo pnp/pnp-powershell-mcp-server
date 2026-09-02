@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Added a `trust` section to the guidance: content returned by the tenant or GitHub is data, not instructions.
+- Added a guidance subsection on app registration: ask which cmdlet, and state the default grant before running it.
 - Added a compiled-in BM25 index over every cmdlet's synopsis, description, parameters and examples, so `pnp_search_commands` answers plain-language questions with no `pwsh` round-trip and returns structured content alongside the text. [#25](https://github.com/pnp/pnp-powershell-mcp-server/pull/25)
 - Added structured output to `pnp_ping`, `pnp_list_sessions`, `pnp_get_result_page` and `pnp_get_connection_status`, so a client reads typed data against a published schema instead of parsing prose. The text half is unchanged for clients that ignore schemas. [#25](https://github.com/pnp/pnp-powershell-mcp-server/pull/25)
 - Added the `pnp_setup_environment` tool, which installs the `PnP.PowerShell` module for the current user — the released build or the latest pre-release — so a machine can be prepared without leaving the conversation. It installs that one module only, never signs in or touches the tenant, and runs the install only when `PNP_MCP_ALLOW_SETUP=true`; otherwise it returns the exact `Install-Module` command for the user to run by hand. [#22](https://github.com/pnp/pnp-powershell-mcp-server/issues/22)
@@ -29,6 +31,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Fixed the guidance handing out a non-existent `-Interactive` switch on `Register-PnPEntraIDAppForInteractiveLogin`, and a wrong `-ClientId` flow list.
+- Fixed `pnp_diagnose_connection` and error hints ignoring `AZURE_CLIENT_ID` and `AZURE_CLIENT_CERTIFICATE_PATH`, which PnP reads.
 - Fixed a sign-in blocking for the full command timeout when nobody answers its prompt; a `Connect-PnPOnline` now gets its own two-minute limit. [#19](https://github.com/pnp/pnp-powershell-mcp-server/issues/19) [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
 
 ### Contributors

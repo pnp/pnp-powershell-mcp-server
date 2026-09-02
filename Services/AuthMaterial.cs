@@ -51,11 +51,10 @@ internal static class AuthMaterial
 
     private const string UrlPlaceholder = "https://<tenant>.sharepoint.com/sites/<site>";
 
-    // PnP reads either name.
-    private static readonly string[] ClientIdVariables = ["ENTRAID_APP_ID", "ENTRAID_CLIENT_ID"];
+    private static readonly string[] ClientIdVariables = ["ENTRAID_APP_ID", "ENTRAID_CLIENT_ID", "AZURE_CLIENT_ID"];
 
     private static readonly string[] CertificateVariables =
-        ["ENTRAID_APP_CERTIFICATE_PATH", "ENTRAID_CLIENT_CERTIFICATE_PATH"];
+        ["ENTRAID_APP_CERTIFICATE_PATH", "ENTRAID_CLIENT_CERTIFICATE_PATH", "AZURE_CLIENT_CERTIFICATE_PATH"];
 
     /// <summary>Reads the store; <paramref name="storeDirectory"/> is for tests, production passes nothing.</summary>
     public static AuthFacts Gather(string? storeDirectory = null)
@@ -134,7 +133,7 @@ internal static class AuthMaterial
 
         // Named explicitly, or a model assumes one is set.
         report.AppendLine(facts.ClientIdVariable is null
-            ? "   Neither ENTRAID_APP_ID nor ENTRAID_CLIENT_ID is set, so no client id comes from the environment."
+            ? "   None of ENTRAID_APP_ID, ENTRAID_CLIENT_ID or AZURE_CLIENT_ID is set, so no client id comes from the environment."
             : $"   {facts.ClientIdVariable} is set to {facts.ClientId}, and PnP uses it when -ClientId is omitted.");
 
         if (facts.CertificatePath is not null)
@@ -207,12 +206,16 @@ internal static class AuthMaterial
             again.
 
             For a person signing in (the usual case):
-              Register-PnPEntraIDAppForInteractiveLogin -ApplicationName "PnP PowerShell" -Tenant {tenant} -Interactive
+              Register-PnPEntraIDAppForInteractiveLogin -ApplicationName "PnP PowerShell" -Tenant {tenant}
               Connect-PnPOnline -Url {site} -ClientId <app id> -PersistLogin
 
             For unattended use, registering an app with a certificate instead:
               Register-PnPEntraIDApp -ApplicationName "PnP PowerShell" -Tenant {tenant} -OutPath . -DeviceLogin
               Connect-PnPOnline -Url {site} -ClientId <app id> -Tenant {tenant} -CertificatePath <the .pfx it wrote> -CertificatePassword (Read-Host -AsSecureString)
+
+            Ask which of the two the user wants before handing either over, and tell them what it grants: with no
+            permissions named, each registers a default set that includes full control of every site, listed under
+            pnp_get_best_practices section 'auth'.
 
             Either way the app registration needs admin consent first. -PersistLogin records the app id and caches
             the token, which is what lets this server connect afterwards with no prompt.

@@ -23,8 +23,8 @@ internal sealed class PnPResources
         MimeType = "text/markdown")]
     [Description("One named section of the guidance document, for when the whole thing is more than you need.")]
     public static string BestPracticesSection(
-        [Description("Section to return: workflow, docs, sessions, config, readonly, output, destructive, auth, execution, or patterns.")]
-        [AllowedValues("workflow", "docs", "sessions", "config", "readonly", "destructive", "auth", "execution", "output", "patterns")]
+        [Description("Section to return: workflow, docs, sessions, config, readonly, output, destructive, trust, auth, execution, or patterns.")]
+        [AllowedValues("workflow", "docs", "sessions", "config", "readonly", "destructive", "trust", "auth", "execution", "output", "patterns")]
         string section) => PnPPowerShellTools.GetPnpBestPractices(section);
 
     [McpServerResource(
