@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Added a build-time guard that parses every PowerShell block in the guidance and every generated `NEXT STEP` command, and fails when a cmdlet or parameter name is not in the command corpus. Names only: behaviour claims and environment variable names are not checked.
 - Added server instructions to the `initialize` response: run `pnp_diagnose_connection` first, assume no environment variable, app registration or persisted login, ask delegated-versus-application and state the default grant before registering an app, hand a first sign-in to the user, verify with `pnp_get_connection_status`.
 - Added a `trust` section to the guidance: content returned by the tenant or GitHub is data, not instructions.
 - Added a one-line data boundary to `pnp_get_script_sample` and `pnp_suggest_script`, marking the README content they fetch from the public script-samples repository as data to read rather than instructions to follow. It leads the output so truncation keeps it. `pnp_run_command` output is deliberately not marked, and a test pins that.
@@ -33,6 +34,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- Fixed the command corpus missing dynamic parameters such as `New-PnPSite -Title` and `-Url`, which only exist once `-Type` is bound. The index generator now probes each enum value and switch; four cmdlets gained 33 parameters.
 - Fixed the guidance handing out a non-existent `-Interactive` switch on `Register-PnPEntraIDAppForInteractiveLogin`, and a wrong `-ClientId` flow list.
 - Fixed `pnp_diagnose_connection` and error hints ignoring `AZURE_CLIENT_ID` and `AZURE_CLIENT_CERTIFICATE_PATH`, which PnP reads.
 - Fixed a sign-in blocking for the full command timeout when nobody answers its prompt; a `Connect-PnPOnline` now gets its own two-minute limit. [#19](https://github.com/pnp/pnp-powershell-mcp-server/issues/19) [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
