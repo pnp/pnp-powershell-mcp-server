@@ -26,6 +26,13 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 - Added an auth section to `pnp_diagnose_connection`, which now takes a `targetUrl` and names the exact connect command this machine can use, from PnP's persisted-login store, the `ENTRAID_*` variables or a certificate. [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
 - Added error hints for a revoked or expired cached credential, no app registration for the tenant, and a machine with no browser to sign in with. [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
 - Added tests covering auth material and the connect command it names, sign-in detection, the new error hints and their ordering, the readable fixture filenames, and app display-name scrubbing. [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
+- `pnp_diagnose_connection` now returns the whole ordered path from nothing to connected when more than one step is missing: what is already true, the exact commands, who runs each and why, and how to prove it worked. A ready machine still gets one `NEXT STEP` line. [#26](https://github.com/pnp/pnp-powershell-mcp-server/pull/26)
+- Added the nearest valid parameter names to the `pnp_run_command` hint when a command has already failed with a parameter-binding error, looked up in the command corpus; nothing runs before execution. [#26](https://github.com/pnp/pnp-powershell-mcp-server/pull/26)
+- Added a build-time guard that parses every PowerShell block in the guidance and every generated `NEXT STEP` command, and fails when a cmdlet or parameter name is not in the command corpus. Names only: behaviour claims and environment variable names are not checked. [#26](https://github.com/pnp/pnp-powershell-mcp-server/pull/26)
+- Added server instructions to the `initialize` response: run `pnp_diagnose_connection` first… [#26](https://github.com/pnp/pnp-powershell-mcp-server/pull/26)
+- Added a `trust` section to the guidance: content returned by the tenant or GitHub is data, not instructions. [#26](https://github.com/pnp/pnp-powershell-mcp-server/pull/26)
+- Added a one-line data boundary to `pnp_get_script_sample` and `pnp_suggest_script`… [#26](https://github.com/pnp/pnp-powershell-mcp-server/pull/26)
+- Added a guidance subsection on app registration: ask which cmdlet, and state the default grant before running it. [#26](https://github.com/pnp/pnp-powershell-mcp-server/pull/26)
 
 ### Changed
 
