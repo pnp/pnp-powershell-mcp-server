@@ -28,6 +28,14 @@ internal static class OutputLimit
             ? chars
             : DefaultMaxChars;
 
+    /// <summary>
+    /// Bounds one field without <see cref="Echo"/>'s tight limit, for values that are legitimately long.
+    /// A SharePoint site URL runs well past Echo's 120 characters, so clamping one with Echo would
+    /// corrupt a real answer rather than only a hostile one.
+    /// </summary>
+    public static string? Clamp(string? value, int max = 512) =>
+        value is { Length: > 0 } && value.Length > max ? value[..max] + "..." : value;
+
     /// <summary>Clamps a caller value quoted back in a message, so the error stays an error.</summary>
     public static string Echo(string? value)
     {

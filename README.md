@@ -11,7 +11,7 @@ This MCP server allows the use of natural language to run [PnP PowerShell](https
 - The [`PnP.PowerShell`](https://www.powershellgallery.com/packages/PnP.PowerShell) module installed:
 
   ```powershell
-  Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force
+  Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force -AllowClobber
   ```
 
 ## 🚀 Installation & Usage
@@ -176,23 +176,25 @@ Can you check if I have a Power Automate flow called 'HoursReportingReminder' an
 
 | Tool | Description |
 | --- | --- |
-| pnp_search_commands | Finds which cmdlet does a job, by keyword against cmdlet names, verbs and nouns. Each result carries the cmdlet's `HelpUri`. Falls back to a vendored cmdlet index when `pwsh` or the module is unavailable, so it still answers on a machine that is not set up yet. |
+| pnp_search_commands | Finds which cmdlet does a job. Scores a compiled-in index of every cmdlet — name, verb, noun, synopsis, description, parameters and examples — with field-weighted BM25, so a plain-language question like "add a column to a list" finds `Add-PnPField`. Answers entirely in process: no `pwsh`, no session and no network, so it works on a machine that is not set up yet. Returns structured content alongside the text, and states the module version it was indexed from. |
 | pnp_get_command_docs | Gets the reference documentation for one named cmdlet — syntax, parameters, parameter sets and examples — preceded by links to both the raw markdown source of its documentation page and the rendered HTML page. The markdown is the same content for a fraction of the tokens. |
 | pnp_run_command | Runs PnP PowerShell against the connected tenant and returns the result. Runs in a persistent session, so a `Connect-PnPOnline` connection is reused across calls. Destructive commands require confirmation first. A result set too large for the output cap is summarised and paged rather than truncated. |
 | pnp_get_result_page | Returns the next page of a result set `pnp_run_command` summarised. Pages over rows already fetched, so it costs nothing against the tenant and returns exactly the rows the original command saw. |
 | pnp_get_connection_status | Checks whether the session is signed in, to which site, and as which account. |
-| pnp_diagnose_connection | Checks everything that has to be true before a command can run: `pwsh` on `PATH`, the `PnP.PowerShell` module, and what connection the session holds. Every failing check names its cause and the exact next command. The `pwsh` and module checks need no tenant and no network, so it still works on a machine that is not set up yet; once a connection exists it also inspects that connection, which asks PnP for a Graph token and so reaches Entra ID. |
+| pnp_diagnose_connection | Checks everything that has to be true before a command can run: `pwsh` on `PATH`, the `PnP.PowerShell` module, what connection the session holds, and — when it holds none — which app registration, persisted login or certificate this machine can actually sign in with. Every failing check names its cause and the exact next command, with no placeholder left in it where the facts can fill one in. Pass `targetUrl` to get the command for a specific site. The `pwsh`, module and auth-material checks need no tenant and no network, so it still works on a machine that is not set up yet; once a connection exists it also inspects that connection, which asks PnP for a Graph token and so reaches Entra ID. |
 | pnp_reset_session | Ends a session and its PnP connection. Use it to sign out, switch accounts, or recover a session that has stopped responding. |
 | pnp_get_best_practices | Returns best practices for using PnP PowerShell via this MCP server. Takes an optional `section` (`workflow`, `docs`, `sessions`, `config`, `readonly`, `output`, `destructive`, `auth`, `execution`, `patterns`) to retrieve one topic instead of the whole guide, which keeps the response small. |
 | pnp_search_script_samples | Lists community [PnP Script Samples](https://pnp.github.io/script-samples/) matching a keyword — titles, descriptions and links, no code. Answers from an index compiled into the server, so it needs no network. |
 | pnp_get_script_sample | Retrieves the full PnP PowerShell script code for one named script sample. The index entry is local; the script body is fetched from GitHub. |
 | pnp_suggest_script | Finds the most relevant community script samples for a task and returns their full script code plus adaptation guidance, in one call. |
-| pnp_ping | Returns the server version, uptime, read-only mode status, and active session count. Use this as a lightweight health check to confirm the server is responsive. |
+| pnp_ping | Returns the server version, uptime, read-only mode status, and active session count, and — unless `includeReadiness` is `false` — whether `pwsh` and the `PnP.PowerShell` module are present. Use this as a lightweight health check to confirm the server is responsive and the machine is ready. |
 | pnp_list_sessions | Lists all active PowerShell sessions with their status and last activity time. Use this to see what sessions exist before deciding which to connect, reset, or reuse. |
+| pnp_setup_environment | Installs the `PnP.PowerShell` module for the current user so PnP cmdlets can run, choosing the released or the latest pre-release build. It installs that one module only — it never signs in, touches the tenant, or creates an app registration — and only when `PNP_MCP_ALLOW_SETUP=true`; otherwise it returns the exact `Install-Module` command to run by hand. |
 
-Every tool declares its `readOnlyHint`, `idempotentHint` and `openWorldHint` annotations, and the two
-that can change state also declare `destructiveHint`, so a client can decide what to auto-approve
-without guessing.
+Every tool declares its `readOnlyHint`, `idempotentHint` and `openWorldHint` annotations, and the
+tools that are not read-only also declare `destructiveHint` — `true` for the two that can change
+Microsoft 365 (`pnp_run_command`, `pnp_reset_session`) and `false` for the current-user module
+install (`pnp_setup_environment`) — so a client can decide what to auto-approve without guessing.
 
 Tool descriptions are gated on whether they actually select: `ToolSelectionEvaluatorTests` scores every
 prompt in [e2eTestPrompts.md](./tests/PnPPowerShell.MCPServer.Tests/e2eTestPrompts.md) against the
@@ -225,9 +227,10 @@ time**, because a single PnP session can only hold one connection.
 | Connection | one, shared | one per session name |
 | Variables (`$sites`, ...) | shared | isolated per session |
 
-Three tools accept it: `pnp_run_command`, `pnp_get_connection_status` and `pnp_reset_session`. The
-metadata tools (`pnp_search_commands`, `pnp_get_command_docs`) always use `default`, since looking up
-a cmdlet does not depend on which tenant you are connected to.
+Three tools accept it: `pnp_run_command`, `pnp_get_connection_status` and `pnp_reset_session`.
+`pnp_search_commands` uses no session at all — it is answered from the compiled-in index — and
+`pnp_get_command_docs` always uses `default`, since a cmdlet's help does not depend on which tenant
+you are connected to.
 
 #### When to use it
 
@@ -273,6 +276,7 @@ Connect to contoso, find all site collections with no owner, and export them to 
 | `PNP_MCP_COMMAND_TIMEOUT_SECONDS` | `600` | Wall-clock limit for a single `pnp_run_command` call. On timeout the session is terminated and the connection is lost. |
 | `PNP_MCP_CONFIRM_DESTRUCTIVE` | `true` | Set to `false` to run destructive commands (`Remove-*`, `Clear-*`, ...) without asking for confirmation. This is the only way to bypass the gate: there is no tool parameter that lets the model approve its own destructive command, so on a client that cannot show a confirmation prompt, destructive commands are simply blocked. |
 | `PNP_MCP_READONLY` | `false` | Set to `true` to refuse any command that would change Microsoft 365. Allowed verbs: `Get-`, `Export-`, `Test-`, `Convert-`/`ConvertTo-`/`ConvertFrom-`, `Read-`, `Measure-`, `Connect-`/`Disconnect-`, `Find-`, `Format-`, `Resolve-`, `Write-`, `Search-`, `Show-`, `Compare-`, plus pipeline shaping (`Select-`, `Where-`, `Sort-`, `Group-`, `ForEach-`, `Out-`, `Join-`, `Split-`). Refused: `Set-`, `Remove-`, `Add-`, `New-`, `Clear-`, `Invoke-`, `Update-`, `Move-`, `Enable-`/`Disable-`, `Grant-`/`Revoke-`, `Copy-`, `Import-`, `Restore-`, `Reset-`, `Rename-`, `Start-`/`Stop-`, `Register-`/`Unregister-`, and every other change verb — along with indirectly invoked commands, native executables, and state-changing method calls such as `ExecuteQuery`. See [Best Practices](./best-practices.md#read-only-mode) for the full table. Local file output (`Out-File`, `Export-*`) is still permitted. |
+| `PNP_MCP_ALLOW_SETUP` | `false` | Set to `true` to let `pnp_setup_environment` install the `PnP.PowerShell` module for the current user. Left unset, that tool changes nothing and returns the `Install-Module` command for you to run by hand. It never installs anything else, signs in, or touches the tenant. |
 | `PNP_MCP_MAX_OUTPUT_CHARS` | `50000` | Largest tool response returned, in characters. A JSON result set over the cap is summarised — true row count, field names, and as many whole rows as fit, plus a cursor for `pnp_get_result_page` — so the response stays complete and parseable. Anything else is truncated to its first whole lines with a note saying how much was dropped. Values below 2000 are ignored, since the note itself would leave no room for output. |
 | `PNP_MCP_REPLAY_DIR` | _(unset)_ | **Testing only.** Answers every command from recorded fixtures in this directory instead of running it, so the server never reaches Microsoft 365. It announces itself on stderr when set. See [Recorded-playback tests](#recorded-playback-tests). |
 | `PNP_MCP_RECORD_DIR` | _(unset)_ | **Testing only.** Writes a scrubbed fixture for every command the server runs, into this directory. |
@@ -414,21 +418,34 @@ Name it however you like. It's recommended to add it to `workspace` scope for te
 
 ### Vendored data
 
-Two indexes are compiled into the assembly as embedded resources, so the tools that use them work with
+Three indexes are compiled into the assembly as embedded resources, so the tools that use them work with
 no network, no VS Code extension and no tenant:
 
 | File | Contents | Used by |
 | --- | --- | --- |
 | [data/script-samples.json](./data/script-samples.json) | The PnP Script Samples catalogue — name, title, description, tags, authors | `pnp_search_script_samples`, `pnp_get_script_sample`, `pnp_suggest_script` |
-| [data/pnp-commands.json](./data/pnp-commands.json) | Every `PnP.PowerShell` cmdlet name, with the URL templates for its markdown and HTML documentation | `pnp_get_command_docs`, and `pnp_search_commands` when `pwsh` is unavailable |
+| [data/pnp-commands.json](./data/pnp-commands.json) | Every `PnP.PowerShell` cmdlet name, with the URL templates for its markdown and HTML documentation | `pnp_get_command_docs` |
+| [data/pnp-index.json](./data/pnp-index.json) | The search corpus — synopsis, description, parameters, parameter sets and examples per cmdlet, plus the superseded-alias map | `pnp_search_commands` |
 
-Both are generated from [pnp/vscode-pnp-powershell](https://github.com/pnp/vscode-pnp-powershell) and
-record the source commit, which every tool that reads them prints — a stale index is visible rather
-than silent. Refresh them before a release:
+The two whose *content* can go stale print their provenance with every answer, so a stale index is
+visible rather than silent: `pnp_search_script_samples` names the sample catalogue's commit, and
+`pnp_search_commands` names the module version it was indexed from. `pnp-commands.json` supplies only
+documentation URL templates — `pnp_get_command_docs` reads the help itself from the module you have
+installed — so there is no stale content there to warn about. Refresh all three before a release:
 
 ```powershell
+# Sample and cmdlet-name indexes, from pnp/vscode-pnp-powershell.
 pwsh ./build/Update-VendoredData.ps1
+
+# Search corpus, read from the PnP.PowerShell module installed on this machine, whose version it
+# records. Requires PnP.PowerShell; takes a few seconds.
+pwsh ./build/Update-CommandIndex.ps1
 ```
+
+Because the corpus is built from an installed module rather than the caller's, `pnp_search_commands`
+describes the cmdlets that existed when the server was built. It states that version in every answer,
+and `pnp_get_command_docs` reads the module you actually have — use it to confirm syntax before
+running anything.
 
 The script fails rather than guessing if either upstream file stops matching the URL templates.
 
@@ -469,7 +486,10 @@ the servers own build output.
 Tenant-dependent behaviour is recorded once against a dev tenant and replayed offline forever after, so
 CI needs neither `pwsh` nor a tenant. Each fixture is filed under the *operation* it records — `run`
 plus the command, `command-docs` plus the cmdlet — rather than a hash of the generated script, so
-rewording that script does not silently orphan every fixture. Fixtures live in
+rewording that script does not silently orphan every fixture. The filename says so too:
+`run-get-pnplist-select-object-title-itemcount-ca7f2242b91c2383.transcript` is that operation, slugged,
+followed by the key. Only the key identifies the fixture — lookup falls back to matching on it — so the readable
+half can be corrected by hand without breaking playback. Fixtures live in
 [tests/PnPPowerShell.MCPServer.Tests/fixtures](./tests/PnPPowerShell.MCPServer.Tests/fixtures) and are
 scrubbed on the way in by `TranscriptScrubber` — tenant hostnames, UPNs, GUIDs, tokens, secrets,
 thumbprints and certificate blocks, including inside the base64 payload a command is wrapped in.

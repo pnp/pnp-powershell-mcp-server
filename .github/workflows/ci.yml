@@ -39,7 +39,9 @@ jobs:
 
       - name: Test
         shell: bash
-        run: dotnet test tests/PnPPowerShell.MCPServer.Tests --configuration Release --logger "console;verbosity=normal"
+        # --blame-hang: a test that hangs otherwise runs until the job timeout, and an aborted run can
+        # still exit 0 and report green. A non-terminating search loop reached review that way once.
+        run: dotnet test tests/PnPPowerShell.MCPServer.Tests --configuration Release --logger "console;verbosity=normal" --blame-hang --blame-hang-timeout 5m
 
   test-bare:
     # The mirror of the job above: a runner with no pwsh and no PnP.PowerShell, which is the only place
@@ -83,7 +85,9 @@ jobs:
 
       - name: Test
         shell: bash
-        run: dotnet test tests/PnPPowerShell.MCPServer.Tests --configuration Release --logger "console;verbosity=normal"
+        # --blame-hang: a test that hangs otherwise runs until the job timeout, and an aborted run can
+        # still exit 0 and report green. A non-terminating search loop reached review that way once.
+        run: dotnet test tests/PnPPowerShell.MCPServer.Tests --configuration Release --logger "console;verbosity=normal" --blame-hang --blame-hang-timeout 5m
 
   build:
     # Packs the host RID on each OS family. This is the cheap smoke test that the native

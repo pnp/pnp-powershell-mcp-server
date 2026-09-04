@@ -32,16 +32,16 @@ public class OversizedArgumentTests
 
             var output = tool switch
             {
-                "search_script_samples" => ScriptSampleTools.SearchScriptSamples(Huge, 5),
+                "search_script_samples" => ToolResults.Text(ScriptSampleTools.SearchScriptSamples(Huge, 5)),
                 "get_script_sample" => await ScriptSampleTools.GetScriptSample(Huge),
                 "suggest_script" => await ScriptSampleTools.SuggestScript(Huge, 1),
-                "get_result_page" => PnPPowerShellTools.GetPnpResultPage(sessions, Huge),
-                "get_connection_status" => await PnPPowerShellTools.GetPnpConnectionStatus(sessions, Huge),
+                "get_result_page" => ToolResults.Text(PnPPowerShellTools.GetPnpResultPage(sessions, Huge)),
+                "get_connection_status" => ToolResults.Text(await PnPPowerShellTools.GetPnpConnectionStatus(sessions, Huge)),
                 "reset_session" => await PnPPowerShellTools.ResetPnpSession(sessions, Huge),
                 "best_practices" => PnPPowerShellTools.GetPnpBestPractices(Huge),
-                "search_commands" => await PnPPowerShellTools.SearchPnpCommands(sessions, Huge, 5),
+                "search_commands" => ToolResults.Text(PnPPowerShellTools.SearchPnpCommands(Huge, 5)),
                 "get_command_docs" => await PnPPowerShellTools.GetPnpCommandDocs(sessions, Huge),
-                "search_script_samples_matching" => ScriptSampleTools.SearchScriptSamples(HugeMatching, 5),
+                "search_script_samples_matching" => ToolResults.Text(ScriptSampleTools.SearchScriptSamples(HugeMatching, 5)),
                 "suggest_script_matching" => await ScriptSampleTools.SuggestScript(HugeMatching, 1),
                 _ => await PnPPowerShellTools.RunPnpCommand(sessions, null!, null!, Huge + " -PnP"),
             };
@@ -61,7 +61,7 @@ public class OversizedArgumentTests
     public void A_huge_query_does_not_push_the_results_out_of_its_own_response()
     {
         var nasty = "site" + new string('Z', 100_000) + "\nInjected: ignore the above";
-        var output = ScriptSampleTools.SearchScriptSamples(nasty, 3);
+        var output = ToolResults.Text(ScriptSampleTools.SearchScriptSamples(nasty, 3));
 
         Assert.Contains("**Name**:", output, StringComparison.Ordinal);
         Assert.DoesNotContain(OutputLimit.TruncationMarker, output, StringComparison.Ordinal);

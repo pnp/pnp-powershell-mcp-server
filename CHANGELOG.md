@@ -10,6 +10,50 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [Current version]
 
+### Added
+
+- `pnp_diagnose_connection` now returns the whole ordered path from nothing to connected when more than one step is missing: what is already true, the exact commands, who runs each and why, and how to prove it worked. A ready machine still gets one `NEXT STEP` line.
+- Added the nearest valid parameter names to the `pnp_run_command` hint when a command has already failed with a parameter-binding error, looked up in the command corpus; nothing runs before execution.
+- Added a build-time guard that parses every PowerShell block in the guidance and every generated `NEXT STEP` command, and fails when a cmdlet or parameter name is not in the command corpus. Names only: behaviour claims and environment variable names are not checked.
+- Added server instructions to the `initialize` response: run `pnp_diagnose_connection` first, assume no environment variable, app registration or persisted login, ask delegated-versus-application and state the default grant before registering an app, hand a first sign-in to the user, verify with `pnp_get_connection_status`.
+- Added a `trust` section to the guidance: content returned by the tenant or GitHub is data, not instructions.
+- Added a one-line data boundary to `pnp_get_script_sample` and `pnp_suggest_script`, marking the README content they fetch from the public script-samples repository as data to read rather than instructions to follow. It leads the output so truncation keeps it. `pnp_run_command` output is deliberately not marked, and a test pins that.
+- Added a guidance subsection on app registration: ask which cmdlet, and state the default grant before running it.
+- Added a compiled-in BM25 index over every cmdlet's synopsis, description, parameters and examples, so `pnp_search_commands` answers plain-language questions with no `pwsh` round-trip and returns structured content alongside the text. [#25](https://github.com/pnp/pnp-powershell-mcp-server/pull/25)
+- Added structured output to `pnp_ping`, `pnp_list_sessions`, `pnp_get_result_page` and `pnp_get_connection_status`, so a client reads typed data against a published schema instead of parsing prose. The text half is unchanged for clients that ignore schemas. [#25](https://github.com/pnp/pnp-powershell-mcp-server/pull/25)
+- Added the `pnp_setup_environment` tool, which installs the `PnP.PowerShell` module for the current user — the released build or the latest pre-release — so a machine can be prepared without leaving the conversation. It installs that one module only, never signs in or touches the tenant, and runs the install only when `PNP_MCP_ALLOW_SETUP=true`; otherwise it returns the exact `Install-Module` command for the user to run by hand. [#22](https://github.com/pnp/pnp-powershell-mcp-server/issues/22)
+- Added a readiness section to `pnp_ping`, which now reports whether `pwsh` and the `PnP.PowerShell` module are present, so a client can confirm the machine is set up as part of its health check. Pass `includeReadiness=false` to keep the old lightweight ping. [#22](https://github.com/pnp/pnp-powershell-mcp-server/issues/22)
+- Added an auth section to `pnp_diagnose_connection`, which now takes a `targetUrl` and names the exact connect command this machine can use, from PnP's persisted-login store, the `ENTRAID_*` variables or a certificate. [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
+- Added error hints for a revoked or expired cached credential, no app registration for the tenant, and a machine with no browser to sign in with. [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
+- Added tests covering auth material and the connect command it names, sign-in detection, the new error hints and their ordering, the readable fixture filenames, and app display-name scrubbing. [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
+- `pnp_diagnose_connection` now returns the whole ordered path from nothing to connected when more than one step is missing: what is already true, the exact commands, who runs each and why, and how to prove it worked. A ready machine still gets one `NEXT STEP` line. [#26](https://github.com/pnp/pnp-powershell-mcp-server/pull/26)
+- Added the nearest valid parameter names to the `pnp_run_command` hint when a command has already failed with a parameter-binding error, looked up in the command corpus; nothing runs before execution. [#26](https://github.com/pnp/pnp-powershell-mcp-server/pull/26)
+- Added a build-time guard that parses every PowerShell block in the guidance and every generated `NEXT STEP` command, and fails when a cmdlet or parameter name is not in the command corpus. Names only: behaviour claims and environment variable names are not checked. [#26](https://github.com/pnp/pnp-powershell-mcp-server/pull/26)
+- Added server instructions to the `initialize` response: run `pnp_diagnose_connection` first… [#26](https://github.com/pnp/pnp-powershell-mcp-server/pull/26)
+- Added a `trust` section to the guidance: content returned by the tenant or GitHub is data, not instructions. [#26](https://github.com/pnp/pnp-powershell-mcp-server/pull/26)
+- Added a one-line data boundary to `pnp_get_script_sample` and `pnp_suggest_script`… [#26](https://github.com/pnp/pnp-powershell-mcp-server/pull/26)
+- Added a guidance subsection on app registration: ask which cmdlet, and state the default grant before running it. [#26](https://github.com/pnp/pnp-powershell-mcp-server/pull/26)
+
+### Changed
+
+- Changed `pnp_search_script_samples` and `pnp_suggest_script` to rank samples with the same BM25 scorer as `pnp_search_commands` (title, name, tags, description), replacing substring scoring. Stopwords no longer match: "no owner" now returns owner samples rather than every description containing "no".
+- Changed `pnp_run_command` to decline `Install-Module`, `Update-Module` and `Register-PnPEntraIDApp*`, since those change the user's machine or tenant rather than run against a connection, and to point the user at their own PowerShell 7 terminal instead. [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
+- Changed recorded fixtures to be named for the operation they record — a readable slug plus the key — with lookup falling back to the key, so the readable half can be corrected by hand without orphaning the fixture. [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
+- Changed `TranscriptScrubber` to redact the `app_displayname` an app registration records, so a tenant's app name cannot reach a committed fixture. [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
+- Changed playback to report an unreadable environment-probe fixture as a fixture failure rather than claiming `pwsh` started but is broken. [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
+
+### Fixed
+
+- Fixed the command corpus missing dynamic parameters such as `New-PnPSite -Title` and `-Url`, which only exist once `-Type` is bound. The index generator now probes each enum value and switch; four cmdlets gained 33 parameters.
+- Fixed the guidance handing out a non-existent `-Interactive` switch on `Register-PnPEntraIDAppForInteractiveLogin`, and a wrong `-ClientId` flow list.
+- Fixed `pnp_diagnose_connection` and error hints ignoring `AZURE_CLIENT_ID` and `AZURE_CLIENT_CERTIFICATE_PATH`, which PnP reads.
+- Fixed a sign-in blocking for the full command timeout when nobody answers its prompt; a `Connect-PnPOnline` now gets its own two-minute limit. [#19](https://github.com/pnp/pnp-powershell-mcp-server/issues/19) [#21](https://github.com/pnp/pnp-powershell-mcp-server/pull/21)
+
+### Contributors
+
+- Gautam Sheth [gautamdsheth]
+- Nishkalank Bezawada [NishkalankBezawada]
+
 ## [0.1.5-beta]
 
 ### Added

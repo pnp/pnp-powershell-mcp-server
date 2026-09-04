@@ -167,4 +167,23 @@ public class TranscriptScrubberTests
 
         Assert.Contains(none, new TranscriptScrubber().Scrub($$"""{"GroupId":"{{none}}"}"""), StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Redacts_the_app_display_name_the_connection_probe_records()
+    {
+        // Caught in a real recording: an app registration's name in someone's tenant.
+        var scrubbed = new TranscriptScrubber().Scrub("""{"app":"Contoso Migration Tool","clientId":null}""");
+
+        Assert.DoesNotContain("Contoso Migration Tool", scrubbed, StringComparison.Ordinal);
+        Assert.Contains(@"""app"":""[redacted-app-name]""", scrubbed, StringComparison.Ordinal);
+
+        // null means the token carried no app name.
+        Assert.Contains("""{"app":null}""", new TranscriptScrubber().Scrub("""{"app":null}"""), StringComparison.Ordinal);
+
+        // A quote inside the name must not end the match early.
+        var escaped = new TranscriptScrubber().Scrub("""{"app":"My \"Cool\" App","x":1}""");
+
+        Assert.DoesNotContain("Cool", escaped, StringComparison.Ordinal);
+        Assert.Contains(@"""x"":1", escaped, StringComparison.Ordinal);
+    }
 }

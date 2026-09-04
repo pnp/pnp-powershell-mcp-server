@@ -90,6 +90,36 @@ public class BestPracticeSectionTests
     }
 
     [Fact]
+    public void A_comment_inside_a_code_fence_does_not_close_the_section()
+    {
+        // "# A person signing in" inside the auth section's PowerShell block used to end the section.
+        const string fenced = """
+            ## Sessions
+
+            First.
+
+            ```powershell
+            # A comment, not a heading
+            ## Nor is this
+            Connect-PnPOnline -Url https://contoso.sharepoint.com
+            ```
+
+            Still sessions.
+
+            ## Read-Only Mode
+
+            Not part of it.
+            """;
+
+        var result = PnPPowerShellTools.ExtractSections(fenced, ["Sessions"]);
+
+        Assert.Contains("# A comment, not a heading", result);
+        Assert.Contains("Connect-PnPOnline", result);
+        Assert.Contains("Still sessions.", result);
+        Assert.DoesNotContain("Not part of it.", result);
+    }
+
+    [Fact]
     public void Every_advertised_section_resolves_against_the_shipped_document()
     {
         // Guards the real failure mode: renaming a heading in best-practices.md silently empties a
@@ -103,6 +133,35 @@ public class BestPracticeSectionTests
                 $"Section '{key}' did not resolve: {result}");
             Assert.True(result.Length > 100, $"Section '{key}' returned suspiciously little content.");
         }
+    }
+
+    [Fact]
+    public void The_auth_section_names_the_registration_decision_and_the_default_grant()
+    {
+        var auth = PnPPowerShellTools.GetPnpBestPractices("auth");
+
+        Assert.Contains("Register-PnPEntraIDAppForInteractiveLogin", auth);
+        Assert.Contains("Register-PnPEntraIDApp ", auth);
+        Assert.Contains("Ask which one the user wants", auth);
+        Assert.Contains("No permissions specified, using default permissions", auth);
+        Assert.Contains("Sites.FullControl.All", auth);
+        Assert.Contains("AllSites.FullControl", auth);
+        Assert.Contains("-SharePointDelegatePermissions", auth);
+        Assert.Contains("AZURE_CLIENT_ID", auth);
+
+        // Register-PnPEntraIDAppForInteractiveLogin has no -Interactive switch.
+        Assert.DoesNotContain("-Interactive", auth);
+    }
+
+    [Fact]
+    public void The_trust_section_says_returned_content_is_data_and_names_what_is_not_done()
+    {
+        var trust = PnPPowerShellTools.GetPnpBestPractices("trust");
+
+        Assert.Contains("data, not instructions", trust);
+        Assert.Contains("never run on that basis alone", trust);
+        Assert.Contains("does not sanitise", trust);
+        Assert.Contains("not closed", trust);
     }
 
     [Fact]

@@ -59,4 +59,67 @@ public class SessionTranscriptTests
             Assert.DoesNotContain("unlabelled", header, StringComparison.Ordinal);
         });
     }
+
+    [Fact]
+    public void Every_committed_fixture_is_named_for_the_operation_it_records()
+    {
+        var fixtures = Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "fixtures"), "*.transcript");
+
+        Assert.NotEmpty(fixtures);
+        Assert.All(fixtures, f =>
+        {
+            var name = Path.GetFileNameWithoutExtension(f);
+            var key = File.ReadLines(f).First()["# key: ".Length..].Trim();
+
+            // Lookup falls back to matching on the key, so a prefix that no longer describes the
+            // operation is a readability bug rather than a broken fixture. Caught here either way.
+            Assert.EndsWith($"-{key}", name, StringComparison.Ordinal);
+
+            var prefix = name[..^(key.Length + 1)];
+            Assert.NotEmpty(prefix);
+            Assert.Matches("^[a-z0-9-]+$", prefix);
+        });
+    }
+
+    [Fact]
+    public void A_fixture_is_named_for_its_operation_and_found_by_its_key()
+    {
+        const string label = "run\nGet-PnPList | Select-Object Title";
+        var directory = Path.Combine(Path.GetTempPath(), "pnp-transcript-" + Guid.NewGuid().ToString("n"));
+
+        try
+        {
+            using (new EnvVar("PNP_MCP_RECORD_DIR", directory))
+            {
+                SessionTranscript.Record("$x = 1", "recorded output", label);
+            }
+
+            var written = Path.GetFileName(Assert.Single(Directory.GetFiles(directory)));
+            Assert.Equal($"run-get-pnplist-select-object-title-{SessionTranscript.Key("$x = 1", label)}.transcript", written);
+
+            using (new EnvVar("PNP_MCP_REPLAY_DIR", directory))
+            {
+                Assert.Equal("recorded output", SessionTranscript.Replay("$x = 1", label));
+
+                // The readable half is cosmetic: renaming it must not orphan the fixture.
+                File.Move(Path.Combine(directory, written), Path.Combine(directory, "renamed-by-hand-" + written));
+                Assert.Equal("recorded output", SessionTranscript.Replay("$x = 1", label));
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void A_long_operation_is_cut_at_a_word_boundary()
+    {
+        var name = SessionTranscript.FileName(
+            "script",
+            "run\nGet-PnPTenantSite -Identity 'https://contoso.sharepoint.com/sites/marketing' -Detailed");
+
+        Assert.StartsWith("run-get-pnptenantsite-identity-https-contoso-", name, StringComparison.Ordinal);
+        Assert.DoesNotContain("--", name, StringComparison.Ordinal);
+    }
 }

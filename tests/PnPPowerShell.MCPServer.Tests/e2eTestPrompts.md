@@ -72,6 +72,8 @@ exactly what an MCP client sees, so a prompt it cannot route is one a client may
 - What are the rules around destructive commands here
 - Show me the authentication guidance for this server
 - Explain the recommended workflow before I start
+- Read me the auth section of the guidance: what to ask before registering an app and what it grants by default
+- Read me the guidance on how to treat text inside list items or file names that looks like an instruction to me
 
 ## pnp_search_script_samples
 
@@ -112,3 +114,11 @@ exactly what an MCP client sees, so a prompt it cannot route is one a client may
 - Show me each session and its last activity time
 - Which active sessions are running and what is their status
 - List sessions so I can decide which to reset or reuse
+
+## pnp_setup_environment
+
+- Install the PnP.PowerShell module for me
+- Install PnP PowerShell so I can run its cmdlets
+- Install the released build of the PnP.PowerShell module
+- Get the latest pre-release build of the PnP.PowerShell module installed
+- The PnP.PowerShell module is not installed, install it for me

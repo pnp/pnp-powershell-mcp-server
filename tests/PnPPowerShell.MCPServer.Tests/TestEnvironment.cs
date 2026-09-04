@@ -1,3 +1,4 @@
+using ModelContextProtocol.Protocol;
 using System.Diagnostics;
 
 // Several tests set process-wide environment variables, and the integration tests each drive a pwsh
@@ -5,6 +6,13 @@ using System.Diagnostics;
 [assembly: CollectionBehavior(DisableTestParallelization = true)]
 
 namespace PnPPowerShell.MCPServer.Tests;
+
+/// <summary>Reads the text half of a tool result, for tools that also return structured content.</summary>
+internal static class ToolResults
+{
+    public static string Text(CallToolResult result) =>
+        string.Concat(result.Content.OfType<TextContentBlock>().Select(b => b.Text));
+}
 
 /// <summary>Detects once whether pwsh and the PnP.PowerShell module are present.</summary>
 internal static class TestEnvironment

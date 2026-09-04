@@ -7,6 +7,11 @@ namespace PnPPowerShell.MCPServer.Services;
 /// <summary>Records what a session returned; replays it with no pwsh and no tenant.</summary>
 internal static partial class SessionTranscript
 {
+    /// <summary>Enough of the operation to recognise in a directory listing, not enough to be a path risk.</summary>
+    private const int MaxSlugChars = 48;
+
+    private const string UnlabelledSlug = "script";
+
     private const string ScriptMarker = "--- script ---";
     private const string CommandMarker = "--- command ---";
     private const string OutputMarker = "--- output ---";
@@ -47,25 +52,42 @@ internal static partial class SessionTranscript
                 ? new TranscriptScrubber().Scrub(label)
                 : ScrubScript(script, new TranscriptScrubber(), null)))))[..16];
 
+    /// <summary>Names a fixture: a readable prefix, then the key that actually identifies it.</summary>
+    public static string FileName(string script, string? transcriptKey = null) =>
+        $"{Slug(transcriptKey)}-{Key(script, transcriptKey)}.transcript";
+
     /// <summary>The recorded output for this script, or an error naming the fixture that is missing.</summary>
     public static string Replay(string script, string? transcriptKey = null)
     {
         var key = Key(script, transcriptKey);
-        var path = Path.Combine(ReplayDirectory!, key + ".transcript");
+        var name = FileName(script, transcriptKey);
+        var path = Path.Combine(ReplayDirectory!, name);
 
         if (!File.Exists(path))
         {
-            return
-                $"Error: No recorded transcript for this script (fixture {key}.transcript). Playback covers only the " +
-                "scripts that were recorded, and any change to the script this server generates changes the key. " +
-                "Re-record against a dev tenant with PNP_MCP_RECORD_DIR set, review the output, and commit the fixture.";
+            // Only the key identifies a fixture, so renaming the readable half by hand cannot orphan it.
+            var matches = System.IO.Directory.Exists(ReplayDirectory)
+                ? System.IO.Directory.GetFiles(ReplayDirectory!, $"*{key}.transcript")
+                : [];
+
+            if (matches.Length != 1)
+            {
+                return
+                    $"Error: No recorded transcript for this script (expected fixture {name}" +
+                    (matches.Length > 1 ? $", and {matches.Length} files carry key {key}" : string.Empty) +
+                    "). Playback covers only the operations that were recorded, and rewording the command " +
+                    "changes the key. Re-record against a dev tenant with PNP_MCP_RECORD_DIR set, review the " +
+                    "output, and commit the fixture.";
+            }
+
+            path = matches[0];
         }
 
         var content = File.ReadAllText(path);
         var start = content.IndexOf(OutputMarker, StringComparison.Ordinal);
 
         return start < 0
-            ? $"Error: Fixture {key}.transcript has no '{OutputMarker}' section."
+            ? $"Error: Fixture {Path.GetFileName(path)} has no '{OutputMarker}' section."
             : content[(start + OutputMarker.Length)..].TrimStart('\r', '\n').TrimEnd();
     }
 
@@ -99,7 +121,47 @@ internal static partial class SessionTranscript
         fixture.AppendLine(OutputMarker);
         fixture.AppendLine(scrubber.Scrub(output));
 
-        File.WriteAllText(Path.Combine(directory, Key(script, transcriptKey) + ".transcript"), fixture.ToString());
+        File.WriteAllText(Path.Combine(directory, FileName(script, transcriptKey)), fixture.ToString());
+    }
+
+    /// <summary>The readable half of a filename. Cosmetic: the key beside it is the identity.</summary>
+    // Scrubbed before slugging, so a tenant name cannot reach a filename.
+    private static string Slug(string? transcriptKey)
+    {
+        if (transcriptKey is not { Length: > 0 } label)
+        {
+            return UnlabelledSlug;
+        }
+
+        var slug = new StringBuilder();
+
+        foreach (var character in new TranscriptScrubber().Scrub(label))
+        {
+            if (char.IsAsciiLetterOrDigit(character))
+            {
+                slug.Append(char.ToLowerInvariant(character));
+            }
+            else if (slug.Length > 0 && slug[^1] != '-')
+            {
+                slug.Append('-');
+            }
+        }
+
+        if (slug.ToString().Trim('-') is not { Length: > 0 } trimmed)
+        {
+            return UnlabelledSlug;
+        }
+
+        if (trimmed.Length <= MaxSlugChars)
+        {
+            return trimmed;
+        }
+
+        // Cut on a word boundary: a name ending mid-word reads like a corrupted file.
+        var clamped = trimmed[..MaxSlugChars];
+        var boundary = clamped.LastIndexOf('-');
+
+        return boundary > 0 ? clamped[..boundary] : clamped;
     }
 
     /// <summary>Scrubs a script, including inside its base64 payload.</summary>

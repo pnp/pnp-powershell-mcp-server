@@ -36,11 +36,20 @@ internal sealed class ScriptSampleAuthor
     public string Name { get; set; } = string.Empty;
 }
 
+// Commit and SourceDate were dropped with CommandIndex.Provenance, their only reader: the corpus
+// states its own provenance now. The generator still writes them; they are simply not deserialized.
 internal sealed class CommandsRoot
 {
-    public string? Commit { get; set; }
-    public string? SourceDate { get; set; }
+    private List<string> _commands = [];
+
     public string MarkdownUrlTemplate { get; set; } = string.Empty;
+
     public string DocsUrlTemplate { get; set; } = string.Empty;
-    public List<string> Commands { get; set; } = [];
+
+    /// <summary>Guarded like the corpus models: an explicit JSON null would otherwise replace the initializer.</summary>
+    public List<string> Commands
+    {
+        get => _commands;
+        set => _commands = value ?? [];
+    }
 }

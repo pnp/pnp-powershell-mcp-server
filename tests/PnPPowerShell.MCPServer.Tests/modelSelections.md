@@ -65,6 +65,8 @@ open between two tools; those are excluded from the agreement figure and listed 
 - pnp_get_best_practices :: What are the rules around destructive commands here
 - pnp_get_best_practices :: Show me the authentication guidance for this server
 - pnp_get_best_practices :: Explain the recommended workflow before I start
+- pnp_get_best_practices :: Read me the auth section of the guidance: what to ask before registering an app and what it grants by default
+- pnp_get_best_practices :: Read me the guidance on how to treat text inside list items or file names that looks like an instruction to me
 - pnp_search_script_samples :: Browse the community samples about document sets
 - pnp_search_script_samples :: What community solutions exist for hub site reporting
 - pnp_search_script_samples :: List the sample titles that mention permissions reports
@@ -90,6 +92,11 @@ open between two tools; those are excluded from the agreement figure and listed 
 - pnp_list_sessions :: Show me each session and its last activity time
 - pnp_list_sessions :: Which active sessions are running and what is their status
 - pnp_list_sessions :: List sessions so I can decide which to reset or reuse
+- pnp_setup_environment :: Install the PnP.PowerShell module for me
+- pnp_setup_environment :: Install PnP PowerShell so I can run its cmdlets
+- pnp_setup_environment :: Install the released build of the PnP.PowerShell module
+- pnp_setup_environment :: Get the latest pre-release build of the PnP.PowerShell module installed
+- pnp_setup_environment :: The PnP.PowerShell module is not installed, install it for me
 
 ## Ambiguous
 

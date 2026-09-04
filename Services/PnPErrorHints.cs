@@ -1,7 +1,10 @@
+using PnPPowerShell.MCPServer.Models;
+using System.Text.RegularExpressions;
+
 namespace PnPPowerShell.MCPServer.Services;
 
 /// <summary>Turns a raw PnP PowerShell failure into a next action.</summary>
-internal static class PnPErrorHints
+internal static partial class PnPErrorHints
 {
     // First match wins over a substring scan, so this list runs specific to generic: environment,
     // then connection state, then Entra ID codes, then SharePoint messages, then PowerShell binding,
@@ -12,7 +15,7 @@ internal static class PnPErrorHints
             "PowerShell 7 is not installed or not on PATH. Install it from https://aka.ms/powershell, then restart your MCP client so it inherits the new PATH. Run pnp_diagnose_connection to confirm."),
 
         ("The PnP.PowerShell module is not installed",
-            "Run: Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force. Then run pnp_diagnose_connection to confirm the module is visible to this server."),
+            $"Run: {Tools.PnPPowerShellTools.InstallModuleCommand(prerelease: false)}. Then run pnp_diagnose_connection to confirm the module is visible to this server."),
 
         ("The PowerShell session ended unexpectedly",
             "The session died and any PnP connection with it. Run pnp_diagnose_connection to check the environment, then reconnect with Connect-PnPOnline."),
@@ -68,6 +71,31 @@ internal static class PnPErrorHints
         ("Insufficient privileges to complete the operation",
             "The account or app is missing a directory permission. For app-only auth, add the required Graph application permission and grant admin consent; for delegated auth, the signing-in account needs the matching role."),
 
+        // WSL, containers, SSH. PnP fails fast here, so the fix is to move the sign-in.
+        ("Unable to open a web page",
+            "This machine has no browser for an interactive sign-in, so no -Interactive connect can succeed here. Either have the user sign in once on a machine that does have one and use -PersistLogin, which caches the token for this machine too, or switch to auth that never prompts: -CertificatePath with -ClientId and -Tenant, or -ManagedIdentity when hosted in Azure. -DeviceLogin also works if the user can open the code on another device."),
+
+        // Above the generic AADSTS catch-all: none of these is fixed by retrying.
+        ("AADSTS50173",
+            "The cached credential was revoked -- by a password change, an administrator revoking sessions, or a policy reset. Retrying cannot fix it. Clear it and sign in again: Disconnect-PnPOnline -ClearPersistedLogin, then Connect-PnPOnline -Url <site> -ClientId <app id> -PersistLogin in a terminal where a browser can open."),
+
+        ("AADSTS700082",
+            "The cached refresh token expired through inactivity, which is normal after a long gap and means nothing is misconfigured. Sign in once more with -PersistLogin to replace it."),
+
+        ("AADSTS50058",
+            "A silent sign-in found no usable cached credential, so Entra ID wants an interactive one. Run pnp_diagnose_connection to see what this machine has; with no persisted login, the first sign-in has to happen in a terminal where a browser can open."),
+
+        ("invalid_grant",
+            "The cached token can no longer be exchanged, usually revoked or expired. Run Disconnect-PnPOnline -ClearPersistedLogin and sign in again rather than retrying."),
+
+        // PnP puts the useful half on the warning stream, so both halves are caught.
+        ("Please specify a valid client id",
+            "No app registration was available for that tenant: none passed with -ClientId, none in PnP's persisted-login store, and none of ENTRAID_APP_ID, ENTRAID_CLIENT_ID or AZURE_CLIENT_ID set. Run pnp_diagnose_connection with the site URL: it reports which of those this machine has and names the command to fix it. Do not guess a client id or assume an environment variable is set."),
+
+        // Qualified: bare "Specified method is not supported" is a .NET message.
+        ("Connect-PnPOnline: Specified method is not supported",
+            "This is how PnP reports a connect it could not attempt, and the cause is usually a missing client id for that tenant. Run pnp_diagnose_connection with the site URL to see what this machine can sign in with; with nothing available, an administrator has to register an app first."),
+
         ("AADSTS",
             "Entra ID rejected the sign-in. Look the AADSTS code up at https://login.microsoftonline.com/error, and run pnp_diagnose_connection to confirm what this session is currently connected as."),
 
@@ -112,10 +140,13 @@ internal static class PnPErrorHints
     ];
 
     /// <summary>Appends a likely cause when the output is a failure; returns it unchanged otherwise.</summary>
-    public static string Enrich(string output) => output + HintFor(output);
+    public static string Enrich(string output, string? command = null) => output + HintFor(output, command);
 
-    /// <summary>The trailing hint block for a failure, or null when there is nothing to add.</summary>
-    public static string? HintFor(string? output)
+    /// <summary>
+    /// The trailing hint block for a failure, or null when there is nothing to add. Given the command
+    /// text, a parameter-binding failure also names the nearest valid parameters from the corpus.
+    /// </summary>
+    public static string? HintFor(string? output, string? command = null)
     {
         if (string.IsNullOrWhiteSpace(output) || !IsFailure(output))
         {
@@ -126,11 +157,137 @@ internal static class PnPErrorHints
         {
             if (output.Contains(match, StringComparison.OrdinalIgnoreCase))
             {
-                return $"\n\nLikely cause: {hint}";
+                return $"\n\nLikely cause: {hint}{ParameterSuggestion(output, command)}";
             }
         }
 
         return null;
+    }
+
+    [GeneratedRegex(@"A parameter cannot be found that matches parameter name '([^']+)'", RegexOptions.CultureInvariant)]
+    private static partial Regex UnknownParameter();
+
+    [GeneratedRegex(@"Cannot bind argument to parameter '([^']+)'", RegexOptions.CultureInvariant)]
+    private static partial Regex UnboundParameter();
+
+    [GeneratedRegex(@"\b[A-Za-z]+-[A-Za-z]+\b", RegexOptions.CultureInvariant)]
+    private static partial Regex CommandToken();
+
+    [GeneratedRegex(@"[|;(){}&\r\n]", RegexOptions.CultureInvariant)]
+    private static partial Regex SegmentBoundary();
+
+    [GeneratedRegex(@"`[ \t]*\r?\n[ \t]*", RegexOptions.CultureInvariant)]
+    private static partial Regex LineContinuation();
+
+    /// <summary>What the corpus knows about the parameter PowerShell rejected, or null when it cannot say.</summary>
+    internal static string? ParameterSuggestion(string output, string? command)
+    {
+        if (string.IsNullOrWhiteSpace(command))
+        {
+            return null;
+        }
+
+        var unknown = UnknownParameter().Match(output);
+        var unbound = unknown.Success ? Match.Empty : UnboundParameter().Match(output);
+        var parameter = unknown.Success ? unknown.Groups[1].Value : unbound.Success ? unbound.Groups[1].Value : null;
+
+        if (parameter is null || CmdletOwning(command, parameter) is not { } cmdlet)
+        {
+            return null;
+        }
+
+        var exact = cmdlet.Parameters.FirstOrDefault(p => p.Name.Equals(parameter, StringComparison.OrdinalIgnoreCase));
+
+        if (exact is not null)
+        {
+            return unknown.Success
+                ? $" -{exact.Name} exists on {cmdlet.Name} in PnP.PowerShell {CommandCorpus.ModuleVersion}, so the installed module may be older; compare with Get-Module PnP.PowerShell -ListAvailable."
+                : $" -{exact.Name} on {cmdlet.Name} takes {exact.Type}.";
+        }
+
+        var nearest = Nearest(parameter, cmdlet.Parameters);
+
+        return nearest.Count == 0
+            ? $" {cmdlet.Name} has no parameter resembling -{parameter}."
+            : $" {cmdlet.Name} has no -{parameter}; nearest: {string.Join(", ", nearest.Select(n => "-" + n))}.";
+    }
+
+    // PowerShell names Invoke-Expression as the source, so the owner is the first command in the
+    // pipeline segment holding the flag. An unknown owner yields nothing rather than a neighbour.
+    private static IndexedCommand? CmdletOwning(string command, string parameter)
+    {
+        command = LineContinuation().Replace(command, " ");
+        var flag = Regex.Match(command, $@"(?<!\S)-{Regex.Escape(parameter)}(?![\w-])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        if (!flag.Success)
+        {
+            var known = CommandToken().Matches(command)
+                .Select(m => CommandCorpus.Lookup(m.Value))
+                .Where(c => c is not null)
+                .DistinctBy(c => c!.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return known.Count == 1 ? known[0] : null;
+        }
+
+        var start = SegmentBoundary().Matches(command[..flag.Index]).LastOrDefault()?.Index + 1 ?? 0;
+        var first = CommandToken().Match(command[start..flag.Index]);
+
+        return first.Success ? CommandCorpus.Lookup(first.Value) : null;
+    }
+
+    internal static IReadOnlyList<string> Nearest(string parameter, IReadOnlyList<IndexedParameter> candidates)
+    {
+        var threshold = Math.Max(2, parameter.Length / 2);
+
+        return candidates
+            .Select(p => (p.Name, Distance: Distance(parameter, p.Name)))
+            .Where(c => c.Distance <= threshold)
+            .OrderBy(c => c.Distance)
+            .ThenBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+            .Take(3)
+            .Select(c => c.Name)
+            .ToList();
+    }
+
+    // Optimal string alignment distance; containment of three or more characters counts as one step.
+    private static int Distance(string typed, string actual)
+    {
+        var a = typed.ToLowerInvariant();
+        var b = actual.ToLowerInvariant();
+
+        if (a.Length >= 3 && (a.Contains(b, StringComparison.Ordinal) || b.Contains(a, StringComparison.Ordinal)))
+        {
+            return 1;
+        }
+
+        var d = new int[a.Length + 1, b.Length + 1];
+
+        for (var i = 0; i <= a.Length; i++)
+        {
+            d[i, 0] = i;
+        }
+
+        for (var j = 0; j <= b.Length; j++)
+        {
+            d[0, j] = j;
+        }
+
+        for (var i = 1; i <= a.Length; i++)
+        {
+            for (var j = 1; j <= b.Length; j++)
+            {
+                var cost = a[i - 1] == b[j - 1] ? 0 : 1;
+                d[i, j] = Math.Min(Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1), d[i - 1, j - 1] + cost);
+
+                if (i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1])
+                {
+                    d[i, j] = Math.Min(d[i, j], d[i - 2, j - 2] + 1);
+                }
+            }
+        }
+
+        return d[a.Length, b.Length];
     }
 
     private static bool IsFailure(string output) =>

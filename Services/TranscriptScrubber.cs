@@ -35,6 +35,10 @@ internal sealed partial class TranscriptScrubber
     [GeneratedRegex(@"(?i)\b[0-9a-f]{40}\b")]
     private static partial Regex ThumbprintRegex();
 
+    // app_displayname, the one display name recorded on purpose. Matched as a JSON string, escapes included.
+    [GeneratedRegex(@"""app""\s*:\s*""(?:[^""\\]|\\.)*""")]
+    private static partial Regex AppDisplayNameRegex();
+
     [GeneratedRegex(@"(?i)\b([a-z0-9][a-z0-9-]{0,62})\.(sharepoint\.com|onmicrosoft\.com|sharepoint\.us|sharepoint\.de|sharepoint\.cn)\b")]
     private static partial Regex TenantHostRegex();
 
@@ -58,6 +62,7 @@ internal sealed partial class TranscriptScrubber
         scrubbed = BearerRegex().Replace(scrubbed, "Bearer [redacted-token]");
         scrubbed = SecretParameterRegex().Replace(scrubbed, m => $"-{m.Groups[1].Value} '[redacted-secret]'");
         scrubbed = ThumbprintRegex().Replace(scrubbed, "[redacted-thumbprint]");
+        scrubbed = AppDisplayNameRegex().Replace(scrubbed, @"""app"":""[redacted-app-name]""");
         scrubbed = LocalProfileRegex().Replace(scrubbed, m =>
             m.Groups[1].Value + Map(_accounts, m.Groups[2].Value, i => i == 1 ? "localuser" : $"localuser{i}"));
 

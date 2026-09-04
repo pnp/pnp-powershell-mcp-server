@@ -44,17 +44,30 @@ packed **on its own matching OS**, with `--runtime <rid>`.
 
 ## Normal release
 
-1. Bump `<PackageVersion>` in `PnPPowerShell.MCPServer.csproj` and **both** `version`
-   fields in [.mcp/server.json](./.mcp/server.json) — the top-level one and the one under
-   `packages[0]`. All three must match.
-2. Push a tag:
+1. Refresh the vendored indexes, and commit whatever changes:
 
-   ```bash
-   git tag v0.1.5-beta
-   git push origin v0.1.5-beta
+   ```powershell
+   pwsh ./build/Update-VendoredData.ps1    # samples + cmdlet names, from GitHub
+   pwsh ./build/Update-CommandIndex.ps1    # search corpus, from the installed PnP.PowerShell
    ```
 
-3. [`release.yml`](./.github/workflows/release.yml) then packs each RID on its own runner,
+   Skipping this ships a stale index, and it fails *silently*: `pnp-index.json` still loads and still
+   answers, it just describes an older module and says so in a footer nobody reads. Check the printed
+   `moduleVersion` is the release you expect. `Update-CommandIndex.ps1` needs `PnP.PowerShell` installed
+   locally; `Update-VendoredData.ps1` needs network and, for a higher rate limit, `GITHUB_TOKEN`.
+
+2. Bump `<PackageVersion>` in `PnPPowerShell.MCPServer.csproj` and **both** `version`
+   fields in [.mcp/server.json](./.mcp/server.json) — the top-level one and the one under
+   `packages[0]`. All three must match.
+
+3. Push a tag:
+
+   ```bash
+   git tag v0.1.6-beta
+   git push origin v0.1.6-beta
+   ```
+
+4. [`release.yml`](./.github/workflows/release.yml) then packs each RID on its own runner,
    verifies that every RID advertised by the wrapper was actually built, and pushes to
    NuGet.org — **RID packages first, wrapper last**, so there is never a window where the
    wrapper resolves to packages that do not exist yet.
