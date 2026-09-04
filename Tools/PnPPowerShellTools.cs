@@ -60,7 +60,7 @@ internal partial class PnPPowerShellTools
         SignInOnlyRegex().IsMatch(LineContinuationRegex().Replace(command.Trim(), " "));
 
     /// <summary>Installing a module changes the machine, so it happens only when the operator opts in.</summary>
-    private static bool SetupAllowed =>
+    internal static bool SetupAllowed =>
         string.Equals(Environment.GetEnvironmentVariable("PNP_MCP_ALLOW_SETUP"), "true", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>A module install reaches PSGallery and can be slow, so it gets a generous limit of its own.</summary>
@@ -430,7 +430,7 @@ internal partial class PnPPowerShellTools
 
         // The hint is reserved as a suffix rather than appended after capping, so the response stays
         // inside PNP_MCP_MAX_OUTPUT_CHARS and the "Likely cause" line still survives a truncation.
-        return OutputLimit.Apply(result, suffix: PnPErrorHints.HintFor(result));
+        return OutputLimit.Apply(result, suffix: PnPErrorHints.HintFor(result, command));
     }
 
     [McpServerTool(
@@ -759,6 +759,7 @@ internal partial class PnPPowerShellTools
         ["config"] = ["Server Configuration"],
         ["readonly"] = ["Read-Only Mode"],
         ["destructive"] = ["Destructive Commands"],
+        ["trust"] = ["Trusting What Comes Back"],
         ["auth"] = ["Authentication Best Practices"],
         ["execution"] = ["Execution Best Practices", "Working with Complex Data", "Debugging and Verbose Output"],
         ["output"] = ["Output Size"],
@@ -768,7 +769,7 @@ internal partial class PnPPowerShellTools
     [McpServerTool(Name = "pnp_get_best_practices", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description("Returns this server's own guidance and recommended workflow: how to approach a task, the rules it enforces, and the conventions to follow. The full document is long, so pass a section to read one topic.")]
     public static string GetPnpBestPractices(
-        [Description("Optional topic to return instead of the whole document. One of: workflow, docs, sessions, config, readonly, output, destructive, auth, execution, patterns. Omit for everything.")] string? section = null)
+        [Description("Optional topic to return instead of the whole document. One of: workflow, docs, sessions, config, readonly, output, destructive, trust, auth, execution, patterns. Omit for everything.")] string? section = null)
     {
         var document = BestPracticesDocument.Value;
 
@@ -810,22 +811,28 @@ internal partial class PnPPowerShellTools
 
     /// <summary>Returns the named "## " sections of a markdown document, in document order.</summary>
     // Matches on the heading text so the slices keep working as the document is edited, and takes only
-    // level-2 headings so a "###" subheading cannot end a section early.
+    // level-2 headings so a "###" subheading cannot end a section early. Fenced code is skipped, so a
+    // PowerShell comment does not read as a heading.
     internal static string ExtractSections(string document, string[] headings)
     {
         var result = new StringBuilder();
         var keeping = false;
+        var inFence = false;
 
         foreach (var line in document.Split('\n'))
         {
             var trimmed = line.TrimEnd('\r');
 
-            if (trimmed.StartsWith("## ", StringComparison.Ordinal))
+            if (trimmed.TrimStart().StartsWith("```", StringComparison.Ordinal))
+            {
+                inFence = !inFence;
+            }
+            else if (!inFence && trimmed.StartsWith("## ", StringComparison.Ordinal))
             {
                 var title = trimmed[3..].Trim();
                 keeping = headings.Any(h => title.Equals(h, StringComparison.OrdinalIgnoreCase));
             }
-            else if (trimmed.StartsWith("# ", StringComparison.Ordinal))
+            else if (!inFence && trimmed.StartsWith("# ", StringComparison.Ordinal))
             {
                 keeping = false;
             }

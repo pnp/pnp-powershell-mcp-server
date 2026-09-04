@@ -51,6 +51,32 @@ function Get-ExampleLine($Example) {
     @($text -split "`r?`n" | Where-Object { $_.Trim() -and $_ -notmatch '^\s*```' }) | Select-Object -First 1
 }
 
+# Dynamic parameters that depend on a bound value (New-PnPSite -Title needs -Type) are invisible to a
+# bare Get-Command. Probing every enum value and switch one at a time surfaces them; combinations are not probed.
+function Get-DynamicParameters($Command) {
+    $found = [ordered]@{}
+    if (-not ($Command.ImplementingType -and [System.Management.Automation.IDynamicParameters].IsAssignableFrom($Command.ImplementingType))) {
+        return $found
+    }
+
+    $known = @($Command.Parameters.GetEnumerator() | ForEach-Object { $_.Key })
+
+    foreach ($parameter in $Command.Parameters.GetEnumerator()) {
+        $type = $parameter.Value.ParameterType
+        $values = if ($type.IsEnum) { [enum]::GetNames($type) } elseif ($type -eq [switch]) { @($true) } else { @() }
+
+        foreach ($value in $values) {
+            try { $probe = Get-Command $Command.Name -ArgumentList "-$($parameter.Key):$value" -ErrorAction Stop } catch { continue }
+
+            foreach ($entry in $probe.Parameters.GetEnumerator()) {
+                if ($entry.Key -notin $known -and -not $found.Contains($entry.Key)) { $found[$entry.Key] = $entry.Value.ParameterType }
+            }
+        }
+    }
+
+    $found
+}
+
 # Aliases carry no verb or noun and name superseded cmdlets (AzureAD -> EntraID), so they are
 # recorded for resolution but kept out of the corpus rather than offered as search results.
 $aliases = [ordered]@{}
@@ -65,7 +91,8 @@ $indexed = foreach ($command in Get-Command -Module PnP.PowerShell -CommandType 
 
     # GetEnumerator, not .Keys: a cmdlet with a parameter named Keys (Set-PnPIndexedProperties) has it
     # shadow the dictionary's own property, which silently yields metadata objects instead of names.
-    $parameters = @($command.Parameters.GetEnumerator() | ForEach-Object { $_.Key } | Where-Object { $_ -notin $common } | Sort-Object)
+    $dynamic = Get-DynamicParameters $command
+    $parameters = @(@($command.Parameters.GetEnumerator() | ForEach-Object { $_.Key }) + @($dynamic.Keys) | Where-Object { $_ -notin $common } | Sort-Object -Unique)
     $position = @{}
     for ($i = 0; $i -lt $parameters.Count; $i++) { $position[$parameters[$i]] = $i }
 
@@ -99,7 +126,8 @@ $indexed = foreach ($command in Get-Command -Module PnP.PowerShell -CommandType 
         u = [string]$command.Noun
         s = $split.Synopsis
         p = @(foreach ($name in $parameters) {
-            [ordered]@{ n = $name; t = [string]$command.Parameters[$name].ParameterType.Name }
+            $type = if ($dynamic.Contains($name)) { $dynamic[$name] } else { $command.Parameters[$name].ParameterType }
+            [ordered]@{ n = $name; t = [string]$type.Name }
         })
     }
 

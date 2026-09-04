@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
+using PnPPowerShell.MCPServer.Tools;
 
 namespace PnPPowerShell.MCPServer.Services;
 
@@ -144,44 +145,145 @@ internal static class ConnectionPreflight
         report.AppendLine($"PnP PowerShell preflight for session '{facts.SessionId}'.");
         report.AppendLine();
 
-        var pwshNext = RenderPowerShell(report, facts.Environment);
-        var moduleNext = RenderModule(report, facts.Environment, skipped: pwshNext is not null);
-        var blocked = pwshNext ?? moduleNext;
+        var steps = new List<SetupStep>();
+        var fatal = RenderPowerShell(report, facts.Environment, steps);
+        var pwshMissing = steps.Count > 0;
+        RenderModule(report, facts.Environment, steps, skipped: fatal is not null || pwshMissing);
         report.AppendLine();
 
-        string next;
+        var next = fatal;
 
-        if (blocked is not null)
+        if (fatal is null && steps.Count == 0)
         {
-            report.AppendLine("3. Connection");
-            report.AppendLine("   SKIPPED - the two checks above have to pass first.");
-            next = blocked;
+            report.AppendLine($"3. Connection (session '{facts.SessionId}')");
+            next = RenderConnection(report, facts);
         }
         else
         {
-            report.AppendLine($"3. Connection (session '{facts.SessionId}')");
+            report.AppendLine("3. Connection");
+            report.AppendLine("   SKIPPED - the two checks above have to pass first.");
+        }
 
-            var connection = new StringBuilder();
-            var connectionNext = RenderConnection(connection, facts);
-            report.Append(connection);
-
-            // Only when there is no connection to use, which is when RenderConnection declines to answer.
-            if (connectionNext is null)
-            {
-                report.AppendLine();
-                connectionNext = AuthMaterial.Render(report, facts.Auth, facts.TargetUrl);
-            }
-
-            next = connectionNext;
+        // Auth material is read from files, so it is known even before pwsh is; only a fatal probe hides it.
+        if (fatal is null && next is null)
+        {
+            report.AppendLine();
+            steps.AddRange(AuthMaterial.Render(report, facts.Auth, facts.TargetUrl));
         }
 
         report.AppendLine();
-        report.AppendLine($"NEXT STEP: {next}");
+
+        if (next is not null)
+        {
+            report.AppendLine($"NEXT STEP: {next}");
+        }
+        else if (steps.Count == 1)
+        {
+            report.AppendLine($"NEXT STEP: {steps[0].Summary}");
+        }
+        else
+        {
+            RenderPlan(report, facts, steps);
+        }
 
         return report.ToString().TrimEnd();
     }
 
-    private static string? RenderPowerShell(StringBuilder report, EnvironmentFacts environment)
+    /// <summary>The whole path from here to a connection, for when more than one step is missing.</summary>
+    private static void RenderPlan(StringBuilder report, PreflightFacts facts, IReadOnlyList<SetupStep> steps)
+    {
+        report.AppendLine("NEXT STEP: More than one thing is missing, so here is the whole path from this machine to a connection, in order.");
+
+        if (facts.TargetUrl is null && steps.Any(s => s.Command.Contains('<')))
+        {
+            report.AppendLine("   Run this tool again with targetUrl set to the site you want, and the <placeholders> below fill themselves in.");
+        }
+
+        report.AppendLine();
+        report.AppendLine("   Already true:");
+
+        foreach (var fact in AlreadyTrue(facts))
+        {
+            report.AppendLine($"     - {fact}");
+        }
+
+        report.AppendLine();
+        report.AppendLine(steps.Any(s => s.UserRuns)
+            ? "   Ask the user to run the steps marked USER in their own PowerShell 7 terminal, pasting each command as written. " +
+              "This server can run the steps marked SERVER from here; each says which tool."
+            : "   This server can run every step from here; each says which tool.");
+        report.AppendLine();
+
+        for (var i = 0; i < steps.Count; i++)
+        {
+            var step = steps[i];
+            report.AppendLine($"   {i + 1}. {(step.UserRuns ? "USER   " : "SERVER ")}{step.Command}");
+            report.AppendLine($"      Why: {step.Why}.");
+        }
+
+        report.AppendLine();
+        report.AppendLine("   Prove it worked:");
+
+        if (steps.Any(s => s.UserRuns))
+        {
+            report.AppendLine("     - In that same terminal: Get-PnPWeb | Select-Object Title, Url   (prints the site once the sign-in has worked)");
+        }
+
+        report.AppendLine(
+            $"     - Run 'pnp_diagnose_connection' again{(facts.TargetUrl is null ? string.Empty : " with the same targetUrl")}. " +
+            "Every section above should read OK, and it should give one NEXT STEP this server can run, or Ready.");
+        report.AppendLine("     - Then run Get-PnPWeb | Select-Object Title, Url through 'pnp_run_command'; it prints the site this session is connected to.");
+    }
+
+    private static IEnumerable<string> AlreadyTrue(PreflightFacts facts)
+    {
+        var environment = facts.Environment;
+        var auth = facts.Auth;
+        var any = false;
+
+        if (environment.PwshVersion is not null)
+        {
+            any = true;
+            yield return $"pwsh {environment.PwshVersion}{(environment.PwshPath is null ? string.Empty : $" at {environment.PwshPath}")}";
+        }
+
+        if (environment.ModuleVersion is not null)
+        {
+            any = true;
+            yield return $"PnP.PowerShell {environment.ModuleVersion} is installed";
+        }
+
+        foreach (var login in auth.PersistedLogins.Where(l => l.Enabled))
+        {
+            any = true;
+            yield return $"a persisted login for {login.Url} through app {login.ClientId ?? "(none recorded)"}";
+        }
+
+        if (auth.TokenCachePresent)
+        {
+            any = true;
+            yield return "a cached token beside the persisted-login store";
+        }
+
+        if (auth.ClientIdVariable is not null)
+        {
+            any = true;
+            yield return $"{auth.ClientIdVariable} supplies client id {auth.ClientId}";
+        }
+
+        if (auth.CertificatePath is not null)
+        {
+            any = true;
+            yield return $"a certificate at {auth.CertificatePath}";
+        }
+
+        if (!any)
+        {
+            yield return "nothing yet; this machine starts from zero";
+        }
+    }
+
+    private static string? RenderPowerShell(StringBuilder report, EnvironmentFacts environment, List<SetupStep> steps)
     {
         report.AppendLine("1. PowerShell 7 (pwsh)");
 
@@ -200,7 +302,11 @@ internal static class ConnectionPreflight
         if (!environment.PwshLaunched)
         {
             report.AppendLine($"   FAIL - {PwshMissingCause}");
-            return "Install PowerShell 7.4 or later from https://aka.ms/powershell, then restart your MCP client so it picks up the new PATH.";
+            steps.Add(new SetupStep(
+                "Install PowerShell 7.4 or later from https://aka.ms/powershell, then restart your MCP client so it picks up the new PATH",
+                UserRuns: true,
+                "this server never installs software, and it cannot see the new PATH until the client restarts it"));
+            return null;
         }
 
         report.AppendLine(
@@ -210,7 +316,7 @@ internal static class ConnectionPreflight
         return "Run 'pwsh -NoProfile -Command $PSVersionTable.PSVersion' in a terminal and fix whatever it reports before using this server; a working install prints a version immediately.";
     }
 
-    private static string? RenderModule(StringBuilder report, EnvironmentFacts environment, bool skipped)
+    private static void RenderModule(StringBuilder report, EnvironmentFacts environment, List<SetupStep> steps, bool skipped)
     {
         report.AppendLine();
         report.AppendLine("2. PnP.PowerShell module");
@@ -218,18 +324,21 @@ internal static class ConnectionPreflight
         if (skipped)
         {
             report.AppendLine("   SKIPPED - pwsh has to be available before the module can be looked for.");
-            return null;
+
+            // A missing pwsh already made a step; a broken probe made none, and gets no plan.
+            if (steps.Count > 0)
+            {
+                steps.Add(InstallModuleStep(presumed: true));
+            }
+
+            return;
         }
 
         if (environment.ModuleVersion is null)
         {
-            // Says who runs it: this server does not install modules.
-            const string next =
-                "Ask the user to run this in their own PowerShell 7 terminal, then run 'pnp_diagnose_connection' " +
-                "again: Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force";
-
             report.AppendLine($"   FAIL - {ModuleMissingCause}");
-            return next;
+            steps.Add(InstallModuleStep(presumed: false));
+            return;
         }
 
         report.AppendLine($"   OK - PnP.PowerShell {environment.ModuleVersion} is installed.");
@@ -244,9 +353,16 @@ internal static class ConnectionPreflight
         report.AppendLine(
             "   NOTE - This server never reaches the PowerShell Gallery, so it cannot tell you whether that is the newest release. " +
             "Check with: Find-Module -Name PnP.PowerShell | Select-Object Version");
-
-        return null;
     }
+
+    private static SetupStep InstallModuleStep(bool presumed) =>
+        new(
+            PnPPowerShellTools.InstallModuleCommand(prerelease: false),
+            UserRuns: !PnPPowerShellTools.SetupAllowed,
+            (PnPPowerShellTools.SetupAllowed
+                ? "PNP_MCP_ALLOW_SETUP is true, so 'pnp_setup_environment' runs this from here"
+                : "this server installs software only when PNP_MCP_ALLOW_SETUP=true, and it is not set, so 'pnp_setup_environment' would only hand this command back") +
+            (presumed ? ". The module could not be looked for without pwsh, so it is presumed missing" : string.Empty));
 
     /// <summary>The next step, or null when section 4 owns it because there is no connection to describe.</summary>
     private static string? RenderConnection(StringBuilder report, PreflightFacts facts)

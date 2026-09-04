@@ -40,7 +40,16 @@ internal sealed record AuthFacts(
             : null;
 }
 
-/// <summary>Reads the auth material PnP would use, and turns it into the command to run next.</summary>
+/// <summary>One thing to run on the way to a connection, and who has to run it.</summary>
+internal sealed record SetupStep(string Command, bool UserRuns, string Why)
+{
+    /// <summary>The one-line form, for when this is the only step left.</summary>
+    public string Summary => UserRuns
+        ? $"Ask the user to run this in their own PowerShell 7 terminal, then run 'pnp_diagnose_connection' again: {Command}   ({Why})"
+        : $"Run: {Command}   ({Why})";
+}
+
+/// <summary>Reads the auth material PnP would use, and turns it into the commands to run next.</summary>
 internal static class AuthMaterial
 {
     private const string StoreDirectoryName = ".m365pnppowershell";
@@ -51,11 +60,10 @@ internal static class AuthMaterial
 
     private const string UrlPlaceholder = "https://<tenant>.sharepoint.com/sites/<site>";
 
-    // PnP reads either name.
-    private static readonly string[] ClientIdVariables = ["ENTRAID_APP_ID", "ENTRAID_CLIENT_ID"];
+    private static readonly string[] ClientIdVariables = ["ENTRAID_APP_ID", "ENTRAID_CLIENT_ID", "AZURE_CLIENT_ID"];
 
     private static readonly string[] CertificateVariables =
-        ["ENTRAID_APP_CERTIFICATE_PATH", "ENTRAID_CLIENT_CERTIFICATE_PATH"];
+        ["ENTRAID_APP_CERTIFICATE_PATH", "ENTRAID_CLIENT_CERTIFICATE_PATH", "AZURE_CLIENT_CERTIFICATE_PATH"];
 
     /// <summary>Reads the store; <paramref name="storeDirectory"/> is for tests, production passes nothing.</summary>
     public static AuthFacts Gather(string? storeDirectory = null)
@@ -100,8 +108,8 @@ internal static class AuthMaterial
             : label;
     }
 
-    /// <summary>Reports what is available and returns the one command to run.</summary>
-    public static string Render(StringBuilder report, AuthFacts facts, string? targetUrl)
+    /// <summary>Reports what is available and returns the commands to run, in order.</summary>
+    public static IReadOnlyList<SetupStep> Render(StringBuilder report, AuthFacts facts, string? targetUrl)
     {
         report.AppendLine("4. Auth material on this machine");
 
@@ -134,7 +142,7 @@ internal static class AuthMaterial
 
         // Named explicitly, or a model assumes one is set.
         report.AppendLine(facts.ClientIdVariable is null
-            ? "   Neither ENTRAID_APP_ID nor ENTRAID_CLIENT_ID is set, so no client id comes from the environment."
+            ? "   None of ENTRAID_APP_ID, ENTRAID_CLIENT_ID or AZURE_CLIENT_ID is set, so no client id comes from the environment."
             : $"   {facts.ClientIdVariable} is set to {facts.ClientId}, and PnP uses it when -ClientId is omitted.");
 
         if (facts.CertificatePath is not null)
@@ -145,7 +153,7 @@ internal static class AuthMaterial
         return Next(report, facts, targetUrl);
     }
 
-    private static string Next(StringBuilder report, AuthFacts facts, string? targetUrl)
+    private static IReadOnlyList<SetupStep> Next(StringBuilder report, AuthFacts facts, string? targetUrl)
     {
         // One persisted tenant beats a placeholder.
         var url = string.IsNullOrWhiteSpace(targetUrl)
@@ -159,34 +167,54 @@ internal static class AuthMaterial
                 ? $"   READY - {TenantOf(url)} is covered by a persisted login and a cached token."
                 : $"   PARTIAL - {TenantOf(url)} has a persisted app id but no cached token, so this connect signs in once more.");
 
-            return
-                $"Run: Connect-PnPOnline -Url {url}   (no -ClientId needed; app {match.ClientId} is remembered for that tenant" +
-                (facts.TokenCachePresent
-                    ? ")"
-                    : ". There is no cached token, so if this blocks it is waiting on a sign-in prompt you cannot see: have the user run it once in their own terminal with -PersistLogin.)");
+            return facts.TokenCachePresent
+                ?
+                [
+                    new SetupStep(
+                        $"Connect-PnPOnline -Url {url}",
+                        UserRuns: false,
+                        $"no -ClientId needed; app {match.ClientId} is remembered for that tenant, and the cached token means no prompt, so 'pnp_run_command' can run it"),
+                ]
+                :
+                [
+                    new SetupStep(
+                        $"Connect-PnPOnline -Url {url} -PersistLogin",
+                        UserRuns: true,
+                        $"no -ClientId needed; app {match.ClientId} is remembered for that tenant. There is no cached token, so run from here " +
+                        "this would hang waiting on a sign-in prompt you cannot see. -PersistLogin caches the token so later connects need none"),
+                ];
         }
 
         if (facts.ClientIdVariable is not null)
         {
             return
-                $"Run: Connect-PnPOnline -Url {url ?? UrlPlaceholder} -PersistLogin   " +
-                $"(no -ClientId needed; {facts.ClientIdVariable} supplies it. -PersistLogin means later connects need no prompt.)";
+            [
+                new SetupStep(
+                    $"Connect-PnPOnline -Url {url ?? UrlPlaceholder} -PersistLogin",
+                    UserRuns: true,
+                    $"no -ClientId needed; {facts.ClientIdVariable} supplies it. No persisted login covers that tenant, so this first sign-in opens " +
+                    "a browser, which blocks and times out from inside this conversation. -PersistLogin means later connects need no prompt"),
+            ];
         }
 
         if (facts.CertificatePath is { } certificate)
         {
             // -ClientId and -Tenant are mandatory here, and a .pfx usually has a password.
             return
-                $"Run: Connect-PnPOnline -Url {url ?? UrlPlaceholder} -ClientId <app id> -Tenant {TenantOf(url) ?? "<tenant>"}.onmicrosoft.com " +
-                $"-CertificatePath {certificate} -CertificatePassword (Read-Host -AsSecureString)   " +
-                "(unattended, never prompts for a sign-in; omit -CertificatePassword only if the .pfx has none)";
+            [
+                new SetupStep(
+                    $"Connect-PnPOnline -Url {url ?? UrlPlaceholder} -ClientId <app id> -Tenant {TenantOf(url) ?? "<tenant>"}.onmicrosoft.com " +
+                    $"-CertificatePath {certificate} -CertificatePassword (Read-Host -AsSecureString)",
+                    UserRuns: false,
+                    "unattended, never prompts for a sign-in, so 'pnp_run_command' can run it once the user has supplied the app id; omit -CertificatePassword only if the .pfx has none"),
+            ];
         }
 
         return Bootstrap(report, url);
     }
 
     /// <summary>The cold start: no app registration anywhere, so one has to be created first.</summary>
-    private static string Bootstrap(StringBuilder report, string? url)
+    private static IReadOnlyList<SetupStep> Bootstrap(StringBuilder report, string? url)
     {
         // "No usable one here", not "none exists": a cleared login still lists its own app id.
         report.AppendLine("   BLOCKED - Nothing on this machine records a usable app registration for that tenant.");
@@ -198,25 +226,23 @@ internal static class AuthMaterial
             ? label + ".onmicrosoft.com"
             : "<tenant>.onmicrosoft.com";
 
-        return $"""
-            Ask the user whether they already have an app registration for this tenant. If they do, no registration
-            is needed: have them run the Connect-PnPOnline line below once, with that app id.
-
-            If they do not, one has to be created, and that cannot be done from here -- it needs a browser and an
-            administrator's consent. Give them these to run in their own PowerShell 7 terminal, then run this tool
-            again.
-
-            For a person signing in (the usual case):
-              Register-PnPEntraIDAppForInteractiveLogin -ApplicationName "PnP PowerShell" -Tenant {tenant} -Interactive
-              Connect-PnPOnline -Url {site} -ClientId <app id> -PersistLogin
-
-            For unattended use, registering an app with a certificate instead:
-              Register-PnPEntraIDApp -ApplicationName "PnP PowerShell" -Tenant {tenant} -OutPath . -DeviceLogin
-              Connect-PnPOnline -Url {site} -ClientId <app id> -Tenant {tenant} -CertificatePath <the .pfx it wrote> -CertificatePassword (Read-Host -AsSecureString)
-
-            Either way the app registration needs admin consent first. -PersistLogin records the app id and caches
-            the token, which is what lets this server connect afterwards with no prompt.
-            """;
+        return
+        [
+            new SetupStep(
+                $"$app = Register-PnPEntraIDAppForInteractiveLogin -ApplicationName \"PnP PowerShell\" -Tenant {tenant}",
+                UserRuns: true,
+                "it signs in through a browser and needs an administrator's consent, and neither can happen from inside this conversation. " +
+                "Ask the user first whether the tenant already has an app registration for PnP PowerShell: if it does, skip this step and write " +
+                "that app id in place of $app.'AzureAppId/ClientId' in the next one. With no permissions named it registers a default set that includes full control of every site, " +
+                "listed under pnp_get_best_practices section 'auth'. For unattended use instead, register with a certificate: " +
+                $"$app = Register-PnPEntraIDApp -ApplicationName \"PnP PowerShell\" -Tenant {tenant} -OutPath . -DeviceLogin, then connect with " +
+                $"Connect-PnPOnline -Url {site} -ClientId $app.'AzureAppId/ClientId' -Tenant {tenant} -CertificatePath $app.'Pfx file'"),
+            new SetupStep(
+                $"Connect-PnPOnline -Url {site} -ClientId $app.'AzureAppId/ClientId' -PersistLogin",
+                UserRuns: true,
+                "the first sign-in opens a browser and PnP waits for it, so from here it would block and time out. -PersistLogin records the " +
+                "app id and caches the token, which is what lets this server connect afterwards with no prompt"),
+        ];
     }
 
     private static bool IsSet(string variable) =>

@@ -8,10 +8,24 @@ internal static class ScriptSampleIndex
 {
     private static readonly Lazy<(List<ScriptSample> Samples, string Provenance)> Loaded = new(Load);
 
+    private static readonly Lazy<Bm25Index<ScriptSample>> Index = new(() =>
+        new Bm25Index<ScriptSample>(
+            Loaded.Value.Samples,
+            [
+                (s => s.Title, 4),
+                (s => s.Name, 3),
+                (s => string.Join(' ', s.Tags), 3),
+                (s => s.Description, 2),
+            ]));
+
     public static IReadOnlyList<ScriptSample> Samples => Loaded.Value.Samples;
 
     /// <summary>One line naming where the index came from, so a stale index is visible rather than silent.</summary>
     public static string Provenance => Loaded.Value.Provenance;
+
+    /// <summary>Relevance-ranked samples for a free-text query, best first.</summary>
+    public static IReadOnlyList<Bm25Hit<ScriptSample>> Search(string? query, int limit) =>
+        limit <= 0 ? [] : Index.Value.Search(query, limit, s => s.Name);
 
     private static (List<ScriptSample>, string) Load()
     {

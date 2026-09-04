@@ -23,6 +23,19 @@ public sealed class StdioProtocolTests : IDisposable
     }
 
     [Fact]
+    public void The_server_publishes_instructions_naming_both_non_assumptions()
+    {
+        var instructions = _client.Initialize().GetProperty("instructions").GetString();
+
+        Assert.NotNull(instructions);
+        Assert.Contains("never assume an environment variable, an app registration or a persisted login exists", instructions, StringComparison.Ordinal);
+        Assert.Contains("before handing out either", instructions, StringComparison.Ordinal);
+        Assert.Contains("say what the default grant is", instructions, StringComparison.Ordinal);
+        Assert.Contains("hand the commands to the user instead of running them", instructions, StringComparison.Ordinal);
+        Assert.InRange(instructions.Length, 1, 1500);
+    }
+
+    [Fact]
     public void Every_tool_is_published_with_a_description_and_annotations()
     {
         _client.Initialize();

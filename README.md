@@ -11,7 +11,7 @@ This MCP server allows the use of natural language to run [PnP PowerShell](https
 - The [`PnP.PowerShell`](https://www.powershellgallery.com/packages/PnP.PowerShell) module installed:
 
   ```powershell
-  Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force
+  Install-Module -Name PnP.PowerShell -Scope CurrentUser -Force -AllowClobber
   ```
 
 ## 🚀 Installation & Usage
