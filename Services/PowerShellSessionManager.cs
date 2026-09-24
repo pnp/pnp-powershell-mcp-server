@@ -1,3 +1,4 @@
+using ModelContextProtocol;
 using System.Collections.Concurrent;
 
 namespace PnPPowerShell.MCPServer.Services;
@@ -11,13 +12,26 @@ internal sealed class PowerShellSessionManager : IAsyncDisposable
 
     private static readonly TimeSpan IdleTimeout = TimeSpan.FromMinutes(30);
 
+    private const int MaxSessions = 10;
+
     private readonly ConcurrentDictionary<string, PowerShellSession> _sessions =
         new(StringComparer.OrdinalIgnoreCase);
 
     public PowerShellSession Get(string? sessionId)
     {
         EvictIdleSessions();
-        return _sessions.GetOrAdd(Normalize(sessionId), static id => new PowerShellSession(id));
+
+        // Each session is a pwsh process with PnP loaded, so a caller cannot open them without limit. The
+        // default is exempt: docs lookups and diagnosis run there and must not fail on a count of others.
+        var id = Normalize(sessionId);
+        if (!_sessions.ContainsKey(id) && _sessions.Count >= MaxSessions &&
+            !string.Equals(id, DefaultSessionId, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new McpException(
+                $"Too many sessions: {MaxSessions} are open. End one with 'pnp_reset_session', or reuse an existing sessionId.");
+        }
+
+        return _sessions.GetOrAdd(id, static key => new PowerShellSession(key));
     }
 
     public async Task<bool> ResetAsync(string? sessionId)

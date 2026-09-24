@@ -18,6 +18,12 @@ internal sealed class ScriptCommand
 
     /// <summary>True when the command cannot be identified before it runs.</summary>
     public bool IsDynamic { get; set; }
+
+    /// <summary>The literal -Method argument; <c>&lt;dynamic&gt;</c> when computed or splatted; null when absent.</summary>
+    public string? Method { get; set; }
+
+    /// <summary>Named, but neither defined in the session nor by a function statement in the script.</summary>
+    public bool Unresolved { get; set; }
 }
 
 /// <summary>What a script was found to contain.</summary>
@@ -66,8 +72,14 @@ internal static class ScriptAnalyzer
             $__pnpFound = @()
             $__pnpMethods = @()
             if ($__pnpAst) {
-              $__pnpNodes = $__pnpAst.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] }, $true)
-              $__pnpFound = @(foreach ($__pnpNode in $__pnpNodes) {
+              # A session-defined function's body runs too, however it was defined, so it is analysed as if inline.
+              $__pnpInline = @($__pnpAst.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true) | ForEach-Object { $_.Name })
+              $__pnpRoots = [System.Collections.Generic.List[object]]::new()
+              $__pnpRoots.Add($__pnpAst)
+              $__pnpNodes = [System.Collections.Generic.List[object]]::new()
+              $__pnpNodes.AddRange(@($__pnpAst.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] }, $true)))
+              $__pnpFound = @(for ($__pnpN = 0; $__pnpN -lt $__pnpNodes.Count; $__pnpN++) {
+                $__pnpNode = $__pnpNodes[$__pnpN]
                 $__pnpName = $__pnpNode.GetCommandName()
                 if ([string]::IsNullOrWhiteSpace($__pnpName)) {
                   [PSCustomObject]@{ name = '<dynamic>'; verb = $null; supportsWhatIf = $false; isDynamic = $true }
@@ -94,11 +106,27 @@ internal static class ScriptAnalyzer
                   elseif (-not $__pnpStillAlias -and $__pnpEffective -match '^([A-Za-z]+)-') { $__pnpVerb = $Matches[1] }
                   $__pnpWhatIf = $false
                   if ($__pnpCmdInfo -and $__pnpCmdInfo.Parameters -and $__pnpCmdInfo.Parameters.ContainsKey('WhatIf')) { $__pnpWhatIf = $true }
-                  [PSCustomObject]@{ name = $__pnpEffective; verb = $__pnpVerb; supportsWhatIf = $__pnpWhatIf; isDynamic = [bool]$__pnpStillAlias }
+                  # -Method may be abbreviated; a splat may carry it, so a splat counts as unknown.
+                  $__pnpMethod = $null
+                  $__pnpEls = $__pnpNode.CommandElements
+                  for ($__pnpI = 1; $__pnpI -lt $__pnpEls.Count; $__pnpI++) {
+                    $__pnpE = $__pnpEls[$__pnpI]
+                    if ($__pnpE -is [System.Management.Automation.Language.VariableExpressionAst] -and $__pnpE.Splatted) { $__pnpMethod = '<dynamic>' }
+                    elseif ($__pnpE -is [System.Management.Automation.Language.CommandParameterAst] -and $__pnpE.ParameterName -and 'Method'.StartsWith($__pnpE.ParameterName, [System.StringComparison]::OrdinalIgnoreCase)) {
+                      $__pnpArg = if ($__pnpE.Argument) { $__pnpE.Argument } elseif ($__pnpI + 1 -lt $__pnpEls.Count) { $__pnpEls[$__pnpI + 1] } else { $null }
+                      $__pnpMethod = if ($__pnpArg -is [System.Management.Automation.Language.StringConstantExpressionAst]) { $__pnpArg.Value } else { '<dynamic>' }
+                    }
+                  }
+                  # Module functions are the module's; only ones defined in this session are opened. Capped against a runaway chain.
+                  if ($__pnpCmdInfo -and -not $__pnpStillAlias -and -not $__pnpCmdInfo.Module -and @('Function', 'Filter') -contains [string]$__pnpCmdInfo.CommandType -and $__pnpCmdInfo.ScriptBlock -and $__pnpRoots.Count -lt 50 -and -not $__pnpRoots.Contains($__pnpCmdInfo.ScriptBlock.Ast)) {
+                    $__pnpRoots.Add($__pnpCmdInfo.ScriptBlock.Ast)
+                    $__pnpNodes.AddRange(@($__pnpCmdInfo.ScriptBlock.Ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] }, $true)))
+                  }
+                  [PSCustomObject]@{ name = $__pnpEffective; verb = $__pnpVerb; supportsWhatIf = $__pnpWhatIf; isDynamic = [bool]$__pnpStillAlias; method = $__pnpMethod; unresolved = -not $__pnpCmdInfo -and $__pnpInline -notcontains $__pnpName }
                 }
               })
               # Method calls are collected separately because CSOM mutations are not CommandAst nodes.
-              $__pnpMembers = $__pnpAst.FindAll({ param($node) $node -is [System.Management.Automation.Language.InvokeMemberExpressionAst] }, $true)
+              $__pnpMembers = @(foreach ($__pnpRoot in $__pnpRoots) { $__pnpRoot.FindAll({ param($node) $node -is [System.Management.Automation.Language.InvokeMemberExpressionAst] }, $true) })
               $__pnpMethods = @(foreach ($__pnpM in $__pnpMembers) {
                 if ($__pnpM.Member -and $__pnpM.Member.Value) { [string]$__pnpM.Member.Value } else { '<dynamic>' }
               })
@@ -106,7 +134,7 @@ internal static class ScriptAnalyzer
             $__pnpParseMessage = $null
             if ($__pnpParseErrors -and @($__pnpParseErrors).Count -gt 0) { $__pnpParseMessage = @($__pnpParseErrors)[0].Message }
             [PSCustomObject]@{ parseError = $__pnpParseMessage; commands = $__pnpFound; methodCalls = $__pnpMethods } | ConvertTo-Json -Depth 6 -Compress
-            Remove-Variable -Name __pnpSrc,__pnpParseErrors,__pnpAst,__pnpFound,__pnpMethods,__pnpNodes,__pnpNode,__pnpName,__pnpCmdInfo,__pnpGuard,__pnpNext,__pnpStillAlias,__pnpEffective,__pnpVerb,__pnpWhatIf,__pnpMembers,__pnpM,__pnpParseMessage -ErrorAction SilentlyContinue
+            Remove-Variable -Name __pnpSrc,__pnpParseErrors,__pnpAst,__pnpFound,__pnpMethods,__pnpNodes,__pnpNode,__pnpName,__pnpCmdInfo,__pnpGuard,__pnpNext,__pnpStillAlias,__pnpEffective,__pnpVerb,__pnpWhatIf,__pnpMethod,__pnpEls,__pnpI,__pnpE,__pnpArg,__pnpInline,__pnpRoots,__pnpN,__pnpRoot,__pnpMembers,__pnpM,__pnpParseMessage -ErrorAction SilentlyContinue
             """;
 
         var raw = (await session.ExecuteAsync(script, timeout, cancellationToken, $"analyse\n{command}")).Trim();

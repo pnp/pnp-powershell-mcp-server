@@ -20,6 +20,9 @@ internal sealed class PowerShellSession : IAsyncDisposable
     private const string SessionEndedMessage =
         "Error: The PowerShell session ended unexpectedly. Retry the command; the PnP connection will need to be re-established.";
 
+    /// <summary>Four times what ResultSummary holds, so a paged total is still counted, and memory stays bounded.</summary>
+    private const int MaxReadChars = 32_000_000;
+
     /// <summary>How a timed-out command reports itself. Callers match on this to recognise one.</summary>
     internal const string TerminatedMarker = "the PowerShell session was terminated";
 
@@ -81,15 +84,25 @@ internal sealed class PowerShellSession : IAsyncDisposable
         try
         {
             LastUsedUtc = DateTimeOffset.UtcNow;
-            Held = null;
+
+            // Only a captured run replaces the hold: a docs or status lookup between pages must not drop the cursor.
+            if (capture)
+            {
+                Held = null;
+            }
 
             // Playback answers from a fixture without starting pwsh, which is what lets CI test this at all.
             var output = SessionTranscript.IsReplaying
                 ? SessionTranscript.Replay(script, transcriptKey)
                 : await EnsureStartedAsync(cancellationToken) ?? await ExecuteAndRecordAsync(script, timeout, transcriptKey, cancellationToken);
 
+            if (!capture)
+            {
+                return (output, null);
+            }
+
             // Captured under the gate, so a concurrent command cannot clear the hold after it is set.
-            Held = capture && output.Length > OutputLimit.MaxChars ? ResultSummary.TryCapture(output) : null;
+            Held = output.Length > OutputLimit.MaxChars ? ResultSummary.TryCapture(output) : null;
 
             return (output, Held);
         }
@@ -183,6 +196,7 @@ internal sealed class PowerShellSession : IAsyncDisposable
         const string initScript = """
             $global:ErrorActionPreference = 'Stop'
             $global:ProgressPreference = 'SilentlyContinue'
+            if ($PSStyle) { $PSStyle.OutputRendering = 'PlainText' }
             if (-not (Get-Module -ListAvailable -Name PnP.PowerShell)) {
               Write-Output '__PNP_MODULE_MISSING__'
             } else {
@@ -261,6 +275,8 @@ internal sealed class PowerShellSession : IAsyncDisposable
         }
 
         var output = new StringBuilder();
+        var unread = 0L;
+        var failing = false;
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(timeout);
 
@@ -274,7 +290,16 @@ internal sealed class PowerShellSession : IAsyncDisposable
                     break;
                 }
 
-                output.AppendLine(line);
+                // Drained past the ceiling, not kept: the end marker still has to be reached. The failure is
+                // always kept; it is small, and dropping it would report a failed command as a success.
+                failing |= string.Equals(line, ErrorMarker, StringComparison.Ordinal);
+                var room = failing ? line.Length : MaxReadChars - output.Length;
+                if (room > 0)
+                {
+                    output.AppendLine(line.Length <= room ? line : line[..room]);
+                }
+
+                unread += Math.Max(0, line.Length - Math.Max(room, 0));
             }
         }
         catch (ChannelClosedException)
@@ -317,6 +342,12 @@ internal sealed class PowerShellSession : IAsyncDisposable
         }
 
         var text = output.ToString().Trim();
+
+        // Led with, not appended: the output cap keeps the head.
+        if (unread > 0)
+        {
+            text = $"NOTE: The output ran past {MaxReadChars:N0} characters and the remaining {unread:N0} were discarded unread. Narrow the query to see all of it.\n{text}";
+        }
 
         var markerIndex = text.IndexOf(ErrorMarker, StringComparison.Ordinal);
         if (markerIndex >= 0)

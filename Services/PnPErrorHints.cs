@@ -45,7 +45,7 @@ internal static partial class PnPErrorHints
             "The client secret is wrong or expired. Issue a new secret in the app registration, or switch to certificate authentication for unattended runs."),
 
         ("AADSTS50076",
-            "MFA is required. Use Connect-PnPOnline -Interactive, or certificate/managed-identity auth for unattended runs."),
+            "MFA is required, so the sign-in needs a person and would block from here. Hand the connect command to the user to run in their own PowerShell 7 terminal with -PersistLogin, or use certificate/managed-identity auth for unattended runs."),
 
         ("AADSTS50011",
             "The redirect URI does not match the app registration. Interactive login needs http://localhost registered as a Mobile and desktop / public client redirect URI. Register-PnPEntraIDAppForInteractiveLogin sets this up correctly."),

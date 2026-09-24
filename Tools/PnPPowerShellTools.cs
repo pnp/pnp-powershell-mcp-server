@@ -2,6 +2,7 @@ using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using PnPPowerShell.MCPServer.Models;
 using PnPPowerShell.MCPServer.Services;
+using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -19,7 +20,7 @@ internal partial class PnPPowerShellTools
     /// <summary>Textual destructive-verb check, run alongside the parsed check in <see cref="CommandPolicy"/>.</summary>
     // Not limited to -PnP cmdlets: reaching this tool only needs -PnP somewhere in the script, so a
     // destructive non-PnP command riding along ("Remove-Item -Recurse -Force ...; Get-PnPWeb") counts too.
-    [GeneratedRegex(@"\b(Remove|Clear|Reset|Uninstall|Revoke|Deny|Restore|Move|Rename|Disable)-[A-Za-z]\w*",
+    [GeneratedRegex(@"\b(Remove|Clear|Reset|Uninstall|Revoke|Deny|Restore|Move|Rename|Disable|Unregister|Unpublish|Merge)-[A-Za-z]\w*",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex DestructiveCommandRegex();
 
@@ -264,13 +265,18 @@ internal partial class PnPPowerShellTools
             return "Error: No command name provided. Use 'pnp_search_commands' to find one, then pass its full name (e.g., \"Get-PnPWeb\").";
         }
 
-        var safeCommandName = EscapeSingleQuotedPowerShell(commandName.Trim());
+        // Spliced into a single-quoted literal, and PowerShell also closes one on U+2018-U+201B, so only cmdlet-shaped names get that far.
+        var name = commandName.Trim();
+        if (!CmdletNameRegex().IsMatch(name))
+        {
+            return $"Error: '{OutputLimit.Echo(name)}' is not a cmdlet name. Pass a full name such as \"Get-PnPWeb\", or use 'pnp_search_commands' to find one.";
+        }
 
         // Markdown first, and before the help: a trailing link is what the cap drops.
-        var links = CommandIndex.MarkdownUrl(commandName) is { } markdown
+        var links = CommandIndex.MarkdownUrl(name) is { } markdown
             ? $"""
               MARKDOWN DOCUMENTATION (prefer this — the same page in source form, at a fraction of the tokens): {markdown}
-              HTML DOCUMENTATION: {CommandIndex.DocsUrl(commandName)}
+              HTML DOCUMENTATION: {CommandIndex.DocsUrl(name)}
               TIP: If the syntax or examples below look incomplete, fetch the markdown -- it is generated from the current source and usually carries more parameter detail and examples than the shipped help. If you cannot fetch pages, give the user the link instead.
 
               """
@@ -278,7 +284,7 @@ internal partial class PnPPowerShellTools
 
         // The session's own HelpUri is consulted only for a cmdlet newer than this build.
         var script = $$"""
-            $__pnpName = '{{safeCommandName}}'
+            $__pnpName = '{{name}}'
             $__pnpHelpText = Get-Help $__pnpName -Full | Out-String
             if ([string]::IsNullOrWhiteSpace($__pnpHelpText)) {
               Write-Output "No documentation found for '$__pnpName'. Verify the command name using 'pnp_search_commands'."
@@ -300,7 +306,7 @@ internal partial class PnPPowerShellTools
             Remove-Variable -Name __pnpName, __pnpHelpText, __pnpHelpUri -ErrorAction SilentlyContinue
             """;
 
-        var help = await sessions.Get(null).ExecuteAsync(script, MetadataTimeout, cancellationToken, $"command-docs\n{commandName.Trim()}");
+        var help = await sessions.Get(null).ExecuteAsync(script, MetadataTimeout, cancellationToken, $"command-docs\n{name}");
 
         // Capped: a session error carries unbounded prior output.
         if (help.StartsWith("Error:", StringComparison.OrdinalIgnoreCase) && links.Length > 0)
@@ -379,7 +385,7 @@ internal partial class PnPPowerShellTools
         var flagged = DetermineConfirmationTarget(analysis, command);
         if (flagged is not null && !ConfirmationDisabled)
         {
-            var refusal = await ConfirmDestructiveAsync(server, context, command, flagged);
+            var refusal = await ConfirmDestructiveAsync(server, context, session.Id, command, flagged);
             if (refusal is not null)
             {
                 return refusal;
@@ -524,17 +530,25 @@ internal partial class PnPPowerShellTools
     private static async Task<string?> ConfirmDestructiveAsync(
         McpServer server,
         RequestContext<CallToolRequestParams> context,
+        string sessionId,
         string command,
         string matchedCmdlet)
     {
+        // Bound to the session too, so an approval given for one tenant's session cannot run in another.
+        var bound = $"{sessionId}\n{command}";
+
         // A retry carries the answer to the prompt raised by the previous attempt.
         if (context.Params?.InputResponses?.TryGetValue("confirmDestructive", out var response) is true)
         {
-            return EvaluateApproval(
-                context.Params.RequestState,
-                command,
-                response.Deserialize(InputResponse.ElicitResultJsonTypeInfo),
-                matchedCmdlet);
+            var state = context.Params.RequestState;
+            if (state is null || !IssuedApprovals.TryRemove(state, out var issued) || DateTimeOffset.UtcNow - issued > ApprovalLifetime)
+            {
+                return
+                    "Cancelled: this approval has expired or was already used, so nothing was run. " +
+                    "Re-run 'pnp_run_command' and confirm the command you are shown.";
+            }
+
+            return EvaluateApproval(state, bound, response.Deserialize(InputResponse.ElicitResultJsonTypeInfo), matchedCmdlet);
         }
 
         // IsMrtrSupported only says the round-trip can be represented; on the legacy bridge the client
@@ -542,6 +556,18 @@ internal partial class PnPPowerShellTools
         // of letting us fall back.
         if (server.IsMrtrSupported && server.ClientCapabilities?.Elicitation is not null)
         {
+            var now = DateTimeOffset.UtcNow;
+            foreach (var (key, issued) in IssuedApprovals)
+            {
+                if (now - issued > ApprovalLifetime)
+                {
+                    IssuedApprovals.TryRemove(key, out _);
+                }
+            }
+
+            var state = Fingerprint(bound);
+            IssuedApprovals[state] = now;
+
             throw new InputRequiredException(
                 inputRequests: new Dictionary<string, InputRequest>
                 {
@@ -564,7 +590,7 @@ internal partial class PnPPowerShellTools
                         },
                     }),
                 },
-                requestState: Fingerprint(command));
+                requestState: state);
         }
 
         return $"""
@@ -594,6 +620,14 @@ internal partial class PnPPowerShellTools
         [Description("The SharePoint site the caller wants to work against, e.g. \"https://contoso.sharepoint.com/sites/marketing\". Given one, the report names the exact connect command for that host instead of a template.")] string? targetUrl = null,
         CancellationToken cancellationToken = default)
     {
+        // Spliced into commands the report tells the model to run, so nothing PowerShell would parse gets through.
+        if (!string.IsNullOrWhiteSpace(targetUrl) && !SiteUrlRegex().IsMatch(targetUrl.Trim()))
+        {
+            return StructuredResult.Text(
+                $"Error: targetUrl '{OutputLimit.Echo(targetUrl)}' is not a site URL. Pass one such as https://contoso.sharepoint.com/sites/marketing.",
+                isError: true);
+        }
+
         var facts = await ConnectionPreflight.GatherAsync(sessions, sessionId, targetUrl, cancellationToken);
 
         // The checks a client can branch on. The prose half keeps the causes, the next commands and the
@@ -775,11 +809,9 @@ internal partial class PnPPowerShellTools
 
         if (string.IsNullOrWhiteSpace(section))
         {
-            return $"""
-                {document}
+            var tip = $"TIP: This is the full guide. To pull a single topic next time, call 'pnp_get_best_practices' with section set to one of: {string.Join(", ", BestPracticeSections.Keys)}.";
 
-                TIP: This is the full guide. To pull a single topic next time, call 'pnp_get_best_practices' with section set to one of: {string.Join(", ", BestPracticeSections.Keys)}.
-                """;
+            return OutputLimit.Apply(document, "Pass a section to read one topic.", "\n\n" + tip);
         }
 
         var key = section.Trim();
@@ -794,7 +826,7 @@ internal partial class PnPPowerShellTools
 
         return string.IsNullOrWhiteSpace(extracted)
             ? $"Error: Section '{key}' is not present in this build of the guidance. Omit the section to get the whole document."
-            : extracted.TrimEnd();
+            : OutputLimit.Apply(extracted.TrimEnd());
     }
 
     // best-practices.md is compiled into the assembly, so there is exactly one copy of the guidance.
@@ -872,6 +904,11 @@ internal partial class PnPPowerShellTools
     /// <summary>Per-process key, so an approval cannot be minted anywhere but here.</summary>
     private static readonly byte[] ApprovalKey = RandomNumberGenerator.GetBytes(32);
 
+    /// <summary>Approvals prompted for and not yet used, so each is single-use and short-lived.</summary>
+    private static readonly ConcurrentDictionary<string, DateTimeOffset> IssuedApprovals = new();
+
+    private static readonly TimeSpan ApprovalLifetime = TimeSpan.FromMinutes(10);
+
     /// <summary>Identifies the exact command an approval covers, keyed so a caller cannot forge one.</summary>
     internal static string Fingerprint(string command) =>
         Convert.ToHexStringLower(HMACSHA256.HashData(ApprovalKey, Encoding.UTF8.GetBytes(command)));
@@ -888,10 +925,12 @@ internal partial class PnPPowerShellTools
         return command.Contains("-PnP", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string EscapeSingleQuotedPowerShell(string value)
-    {
-        return value.Replace("'", "''");
-    }
+    [GeneratedRegex(@"^[A-Za-z]+-[A-Za-z0-9]+$", RegexOptions.CultureInvariant)]
+    private static partial Regex CmdletNameRegex();
+
+    // Scheme optional: bare hosts are what users type.
+    [GeneratedRegex(@"^(https://)?[A-Za-z0-9.-]+(/[A-Za-z0-9._~%/-]*)?$", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase)]
+    private static partial Regex SiteUrlRegex();
 
     private static DateTimeOffset ServerStartedUtc =>
         System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime();
@@ -954,6 +993,7 @@ internal partial class PnPPowerShellTools
             """;
 
         var result = await sessions.Get(sessionId).ExecuteAsync(script, SetupTimeout, cancellationToken, "setup-environment");
+        ConnectionPreflight.ForgetProbe();
 
         // Read back from what the install reported, not from the fact that it ran: the script itself
         // treats "command succeeded but the module is still invisible" as a failure.

@@ -10,6 +10,17 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [Current version]
 
+### Fixed
+
+- Fixed code injection through `pnp_get_command_docs` and `pnp://cmdlet/{name}`, which now accept only `Verb-Noun` names. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
+- Fixed ways past the destructive-command prompt: `Invoke-Expression` and similar, script blocks built from strings, native programs and script files, functions defined at runtime, REST `-Method Delete`, and the `Unregister`, `Unpublish` and `Merge` verbs. Approvals are now tied to the session, single-use and expire after 10 minutes. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
+- Fixed paging: docs and status lookups no longer drop the cursor, and a warning no longer disables it. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
+- Fixed guidance that still recommended `-Interactive` from inside the server. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
+
+### Changed
+
+- Updated the script-samples index to 324 samples, capped sessions at 10 and output reads at 32M characters, and pinned the CI actions and `mcp-publisher`, with Dependabot keeping the actions current. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
+
 ## [0.1.7-beta]
 
 ### Added

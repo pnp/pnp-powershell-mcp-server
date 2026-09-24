@@ -66,7 +66,7 @@ jobs:
     outputs:
       version: ${{ steps.resolve.outputs.version }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - id: resolve
         shell: bash
@@ -111,9 +111,9 @@ jobs:
           - rid: linux-arm64
             os: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
@@ -132,7 +132,7 @@ jobs:
             -p:PackageVersion=${{ needs.version.outputs.version }} \
             --output artifacts
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: nupkg-${{ matrix.rid }}
           path: artifacts/*.nupkg
@@ -146,7 +146,7 @@ jobs:
     needs: version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Pack linux-musl-x64 in an Alpine container
         env:
@@ -162,7 +162,7 @@ jobs:
             mcr.microsoft.com/dotnet/sdk:10.0-alpine-aot \
             sh -ec 'dotnet pack "$PROJECT" --configuration Release --runtime linux-musl-x64 -p:PackageVersion="$VERSION" --output artifacts'
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: nupkg-linux-musl-x64
           path: artifacts/*.nupkg
@@ -175,9 +175,9 @@ jobs:
     needs: version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
@@ -189,7 +189,7 @@ jobs:
             -p:PackageVersion=${{ needs.version.outputs.version }} \
             --output artifacts
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: nupkg-wrapper
           path: artifacts/*.nupkg
@@ -202,7 +202,7 @@ jobs:
     needs: [version, pack-rid, pack-musl, pack-wrapper]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           path: staging
           pattern: nupkg-*
@@ -281,18 +281,18 @@ jobs:
     # Optional: if you want the release to require a GitHub environment approval, enable this:
     # environment: nuget
     steps:
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           path: staging
           pattern: nupkg-*
           merge-multiple: true
 
       - name: NuGet login (OIDC → temporary API key)
-        uses: NuGet/login@v1
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
         id: login
         with:
           user: ${{ secrets.NUGET_USER }}
@@ -334,7 +334,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Stamp the release version into server.json
         shell: bash
@@ -374,9 +374,14 @@ jobs:
           fi
           echo "ok: $url declares mcp-name: $name"
 
+      # Pinned and checksummed: this job can mint an OIDC token, so it runs no unverified binary.
       - name: Install mcp-publisher
         shell: bash
-        run: curl -fsSL https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz | tar xz mcp-publisher
+        run: |
+          set -euo pipefail
+          curl -fsSLo mcp-publisher.tar.gz https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz
+          echo "a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc  mcp-publisher.tar.gz" | sha256sum -c -
+          tar xzf mcp-publisher.tar.gz mcp-publisher
 
       # OIDC grants the repository owner's namespace, io.github.pnp/*, with no secret.
       - name: Log in to the MCP Registry

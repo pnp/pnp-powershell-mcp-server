@@ -19,6 +19,9 @@ internal sealed class HeldResultSet
     public required IReadOnlyList<string> Fields { get; init; }
     public required int RawLength { get; init; }
 
+    /// <summary>Whatever printed around the array, such as warnings; clamped.</summary>
+    public string? Notes { get; init; }
+
     /// <summary>True when the result was too large to hold whole and only a prefix is pageable.</summary>
     public bool Partial => TotalRows > Rows.Count;
 }
@@ -43,18 +46,28 @@ internal static class ResultSummary
 
     private const int MaxSessionIdChars = 40;
 
+    // Small enough that the header, fields and footer still fit inside Overhead.
+    private const int MaxNoteChars = 400;
+
     /// <summary>Captures a JSON array of two or more elements; null for anything else.</summary>
     public static HeldResultSet? TryCapture(string? output)
     {
         var text = output?.TrimStart() ?? string.Empty;
-        if (!text.StartsWith('['))
+
+        // Warnings print ahead of the array and stderr lands after it, so the array is found by line.
+        var start = text.StartsWith('[') ? 0 : text.IndexOf("\n[", StringComparison.Ordinal);
+        if (start < 0)
         {
             return null;
         }
 
         try
         {
-            using var document = JsonDocument.Parse(text);
+            var bytes = Encoding.UTF8.GetBytes(text, start, text.Length - start);
+            var reader = new Utf8JsonReader(bytes);
+            using var document = JsonDocument.ParseValue(ref reader);
+            var notes = $"{text[..start]}\n{Encoding.UTF8.GetString(bytes.AsSpan((int)reader.BytesConsumed))}".Trim();
+
             if (document.RootElement.ValueKind != JsonValueKind.Array)
             {
                 return null;
@@ -102,6 +115,7 @@ internal static class ResultSummary
                     TotalRows = total,
                     Fields = fields,
                     RawLength = text.Length,
+                    Notes = notes.Length > 0 ? OutputLimit.Clamp(notes, MaxNoteChars) : null,
                 };
         }
         catch (JsonException)
@@ -164,6 +178,11 @@ internal static class ResultSummary
             }
 
             sb.AppendLine($"Fields: {listed}{(overflow > 0 ? $", and {N(overflow)} more" : string.Empty)}");
+        }
+
+        if (held.Notes is not null)
+        {
+            sb.AppendLine($"Also printed: {held.Notes}");
         }
 
         if (oversized)

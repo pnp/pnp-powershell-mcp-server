@@ -159,9 +159,9 @@ internal sealed partial class ScriptSampleTools
             return "Error: Please provide a sample name. Use 'pnp_search_script_samples' to discover available sample names.";
 
         var wanted = sampleName.Trim();
-        var sample = ScriptSampleIndex.Samples.FirstOrDefault(s =>
-            s.Name.Equals(wanted, StringComparison.OrdinalIgnoreCase) ||
-            (s.Url.Length > 0 && s.Url.Contains(wanted, StringComparison.OrdinalIgnoreCase)));
+        // Exact matches only: a partial name silently returned whichever sample came first.
+        var sample = ScriptSampleIndex.Samples.FirstOrDefault(s => s.Name.Equals(wanted, StringComparison.OrdinalIgnoreCase))
+            ?? ScriptSampleIndex.Samples.FirstOrDefault(s => s.Url.Equals(wanted, StringComparison.OrdinalIgnoreCase));
 
         if (sample is null)
             return $"Sample '{OutputLimit.Echo(wanted)}' was not found in the index.\n" +
