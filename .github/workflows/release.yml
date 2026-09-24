@@ -43,6 +43,11 @@ on:
         required: false
         default: false
         type: boolean
+      publish_registry:
+        description: 'Publish .mcp/server.json to the Official MCP Registry (the version must be on NuGet.org, or pushed by this run)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -242,6 +247,18 @@ jobs:
           done
           exit "$missing"
 
+      # NuGet versions are immutable, so a README the registry rejects costs a version bump.
+      - name: Check the wrapper README carries the MCP Registry name
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="$(jq -r .name wrapper/.mcp/server.json)"
+          if ! grep -qF "mcp-name: $name" wrapper/README.md; then
+            echo "::error::The packed README.md has no 'mcp-name: $name' line, so the MCP Registry would reject this version"
+            exit 1
+          fi
+          echo "ok: README.md declares mcp-name: $name"
+
       - name: Summarise
         shell: bash
         run: |
@@ -306,3 +323,64 @@ jobs:
             push "$f"
           done
           push "$wrapper"
+
+  publish-mcp-registry:
+    name: Publish to the MCP Registry
+    needs: [version, publish]
+    # Also runs when 'publish' was skipped, to list a version already on NuGet.org.
+    if: ${{ !cancelled() && !failure() && (github.event_name == 'push' || inputs.publish_registry) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Stamp the release version into server.json
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          jq --arg v "$VERSION" '.version = $v | .packages |= map(.version = $v)' .mcp/server.json > server.tmp
+          mv server.tmp .mcp/server.json
+          cat .mcp/server.json
+
+      # The registry fetches this same README to verify ownership, and NuGet.org serves it only after validation.
+      - name: Wait for the package README on NuGet.org
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          name="$(jq -r .name .mcp/server.json)"
+          id="$(jq -r '.packages[0].identifier' .mcp/server.json | tr '[:upper:]' '[:lower:]')"
+          version="$(echo "$VERSION" | tr '[:upper:]' '[:lower:]')"
+          url="https://api.nuget.org/v3-flatcontainer/$id/$version/readme"
+
+          deadline=$((SECONDS + 1800))
+          until readme="$(curl -fsSL "$url" 2>/dev/null)"; do
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::$url was still unavailable after 30 minutes"
+              exit 1
+            fi
+            echo "Not available yet: $url"
+            sleep 30
+          done
+
+          if ! grep -qF "mcp-name: $name" <<<"$readme"; then
+            echo "::error::The README of $id $version on NuGet.org has no 'mcp-name: $name' line; the registry would reject it"
+            exit 1
+          fi
+          echo "ok: $url declares mcp-name: $name"
+
+      - name: Install mcp-publisher
+        shell: bash
+        run: curl -fsSL https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz | tar xz mcp-publisher
+
+      # OIDC grants the repository owner's namespace, io.github.pnp/*, with no secret.
+      - name: Log in to the MCP Registry
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish server.json
+        run: ./mcp-publisher publish .mcp/server.json

@@ -182,3 +182,37 @@ jobs:
             fi
           done
           exit "$missing"
+
+  mcp-registry-manifest:
+    # A bad server.json only fails at release, after NuGet.org already holds the version.
+    name: MCP Registry manifest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check server.json against the csproj and README
+        shell: bash
+        run: |
+          set -euo pipefail
+          csproj="$(sed -n 's:.*<PackageVersion>\(.*\)</PackageVersion>.*:\1:p' "$PROJECT" | head -n1)"
+          name="$(jq -r .name .mcp/server.json)"
+          failed=0
+
+          for v in "$(jq -r .version .mcp/server.json)" $(jq -r '.packages[].version' .mcp/server.json); do
+            if [ "$v" != "$csproj" ]; then
+              echo "::error file=.mcp/server.json::version '$v' does not match <PackageVersion> '$csproj'"
+              failed=1
+            fi
+          done
+
+          if ! grep -qF "mcp-name: $name" README.md; then
+            echo "::error file=README.md::no 'mcp-name: $name' line; the MCP Registry would reject the package"
+            failed=1
+          fi
+          exit "$failed"
+
+      - name: Validate server.json with mcp-publisher
+        shell: bash
+        run: |
+          curl -fsSL https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz | tar xz mcp-publisher
+          ./mcp-publisher validate .mcp/server.json

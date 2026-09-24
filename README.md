@@ -1,5 +1,7 @@
 # PnP PowerShell MCP Server
 
+<!-- mcp-name: io.github.pnp/pnp-powershell-mcp-server -->
+
 ## 💡 Description
 
 This MCP server allows the use of natural language to run [PnP PowerShell](https://pnp.github.io/powershell/) commands and to author complex PnP PowerShell scripts. It may handle complex prompts that are executed as a chain of PnP PowerShell cmdlets that try to fulfill the user's request, and it can search the community's [PnP Script Samples](https://pnp.github.io/script-samples/) library for ready-to-adapt scripts. This way you can manage many different areas of Microsoft 365 — SharePoint Online, Microsoft Teams, Entra ID, OneDrive, Planner, Power Platform, Microsoft 365 Groups, taxonomy, search, and tenant administration — straight from your MCP client, and use it as a jump-start for writing your own automation scripts.
@@ -285,6 +287,10 @@ Connect to contoso, find all site collections with no owner, and export them to 
 The client passes the environment in when it launches the server process, so where you set them decides
 both who they apply to and that a **server restart** is needed for a change to take effect.
 
+Installing from the [MCP Registry](https://registry.modelcontextprotocol.io/) or the NuGet.org MCP tab asks for
+`PNP_MCP_READONLY` and `PNP_MCP_ALLOW_SETUP` only, both defaulting to `false`. Add any other variable to the
+`env` block the client writes.
+
 #### Where to set them
 
 **In your MCP client config** — the usual choice. This is the only place that applies to the server no
@@ -528,7 +534,7 @@ Native AOT needs a platform toolchain: the "Desktop development with C++" worklo
 
 ### Releasing to NuGet
 
-A release is **eight** packages — a small wrapper plus one per platform — and a plain `dotnet pack` builds only the wrapper. Do not publish by hand; see [RELEASING.md](./RELEASING.md) and use the [Release workflow](./.github/workflows/release.yml).
+A release is **eight** packages — a small wrapper plus one per platform — and a plain `dotnet pack` builds only the wrapper. Do not publish by hand; see [RELEASING.md](./RELEASING.md) and use the [Release workflow](./.github/workflows/release.yml). The same workflow then lists the release on the [Official MCP Registry](https://registry.modelcontextprotocol.io/) from [`.mcp/server.json`](./.mcp/server.json).
 
 ## Contributing to PnP PowerShell MCP Server
 
