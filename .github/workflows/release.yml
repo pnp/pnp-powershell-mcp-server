@@ -123,6 +123,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang zlib1g-dev
 
+      # Packed as the version being built, so a tag or back-fill cannot ship the checked-in manifest's version.
+      - name: Stamp the release version into server.json
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: jq --arg v "$VERSION" '.version = $v | .packages |= map(.version = $v)' .mcp/server.json > server.tmp && mv server.tmp .mcp/server.json
+
       - name: Pack ${{ matrix.rid }}
         shell: bash
         run: |
@@ -147,6 +154,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # Packed as the version being built, so a tag or back-fill cannot ship the checked-in manifest's version.
+      - name: Stamp the release version into server.json
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: jq --arg v "$VERSION" '.version = $v | .packages |= map(.version = $v)' .mcp/server.json > server.tmp && mv server.tmp .mcp/server.json
 
       - name: Pack linux-musl-x64 in an Alpine container
         env:
@@ -180,6 +194,13 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # Packed as the version being built, so a tag or back-fill cannot ship the checked-in manifest's version.
+      - name: Stamp the release version into server.json
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: jq --arg v "$VERSION" '.version = $v | .packages |= map(.version = $v)' .mcp/server.json > server.tmp && mv server.tmp .mcp/server.json
 
       - name: Pack wrapper
         shell: bash

@@ -542,15 +542,14 @@ internal partial class PnPPowerShellTools
         // A retry carries the answer to the prompt raised by the previous attempt.
         if (context.Params?.InputResponses?.TryGetValue("confirmDestructive", out var response) is true)
         {
-            var state = context.Params.RequestState;
-            if (state is null || !IssuedApprovals.TryRemove(state, out var issued) || DateTimeOffset.UtcNow - issued > ApprovalLifetime)
+            if (RedeemApproval(context.Params.RequestState) is not { } issuedFor)
             {
                 return
                     "Cancelled: this approval has expired or was already used, so nothing was run. " +
                     "Re-run 'pnp_run_command' and confirm the command you are shown.";
             }
 
-            return EvaluateApproval(state, bound, response.Deserialize(InputResponse.ElicitResultJsonTypeInfo), matchedCmdlet);
+            return EvaluateApproval(issuedFor, bound, response.Deserialize(InputResponse.ElicitResultJsonTypeInfo), matchedCmdlet);
         }
 
         // IsMrtrSupported only says the round-trip can be represented; on the legacy bridge the client
@@ -558,17 +557,7 @@ internal partial class PnPPowerShellTools
         // of letting us fall back.
         if (server.IsMrtrSupported && server.ClientCapabilities?.Elicitation is not null)
         {
-            var now = DateTimeOffset.UtcNow;
-            foreach (var (key, issued) in IssuedApprovals)
-            {
-                if (now - issued > ApprovalLifetime)
-                {
-                    IssuedApprovals.TryRemove(key, out _);
-                }
-            }
-
-            var state = Fingerprint(bound);
-            IssuedApprovals[state] = now;
+            var state = IssueApproval(bound);
 
             throw new InputRequiredException(
                 inputRequests: new Dictionary<string, InputRequest>
@@ -881,9 +870,9 @@ internal partial class PnPPowerShellTools
     }
 
     /// <summary>Null when the retry is genuinely approved, otherwise the refusal to return.</summary>
-    internal static string? EvaluateApproval(string? requestState, string command, ElicitResult? elicited, string matchedCmdlet)
+    internal static string? EvaluateApproval(string? issuedFor, string command, ElicitResult? elicited, string matchedCmdlet)
     {
-        if (!IsApprovalBoundTo(requestState, command))
+        if (!IsApprovalBoundTo(issuedFor, command))
         {
             return
                 "Cancelled: this approval was not issued for this exact command, so nothing was run. " +
@@ -906,20 +895,43 @@ internal partial class PnPPowerShellTools
     /// <summary>Per-process key, so an approval cannot be minted anywhere but here.</summary>
     private static readonly byte[] ApprovalKey = RandomNumberGenerator.GetBytes(32);
 
-    /// <summary>Approvals prompted for and not yet used, so each is single-use and short-lived.</summary>
-    private static readonly ConcurrentDictionary<string, DateTimeOffset> IssuedApprovals = new();
+    /// <summary>Unanswered prompts, keyed by a random nonce each, so an answer redeems only its own prompt, once.</summary>
+    private static readonly ConcurrentDictionary<string, (string Fingerprint, DateTimeOffset Issued)> IssuedApprovals = new();
 
     private static readonly TimeSpan ApprovalLifetime = TimeSpan.FromMinutes(10);
+
+    /// <summary>Records a prompt for <paramref name="bound"/> and returns the nonce its answer must carry.</summary>
+    internal static string IssueApproval(string bound)
+    {
+        var now = DateTimeOffset.UtcNow;
+        foreach (var (key, entry) in IssuedApprovals)
+        {
+            if (now - entry.Issued > ApprovalLifetime)
+            {
+                IssuedApprovals.TryRemove(key, out _);
+            }
+        }
+
+        var nonce = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(16));
+        IssuedApprovals[nonce] = (Fingerprint(bound), now);
+        return nonce;
+    }
+
+    /// <summary>The fingerprint a prompt was issued for; null when unknown, used or expired. Consumes it either way.</summary>
+    internal static string? RedeemApproval(string? nonce) =>
+        nonce is not null && IssuedApprovals.TryRemove(nonce, out var entry) && DateTimeOffset.UtcNow - entry.Issued <= ApprovalLifetime
+            ? entry.Fingerprint
+            : null;
 
     /// <summary>Identifies the exact command an approval covers, keyed so a caller cannot forge one.</summary>
     internal static string Fingerprint(string command) =>
         Convert.ToHexStringLower(HMACSHA256.HashData(ApprovalKey, Encoding.UTF8.GetBytes(command)));
 
-    /// <summary>True only when the echoed request state was minted by this process for this command.</summary>
-    internal static bool IsApprovalBoundTo(string? requestState, string command) =>
-        requestState is not null &&
+    /// <summary>True only when the fingerprint an approval was issued for is this command's.</summary>
+    internal static bool IsApprovalBoundTo(string? issuedFor, string command) =>
+        issuedFor is not null &&
         CryptographicOperations.FixedTimeEquals(
-            Encoding.UTF8.GetBytes(requestState),
+            Encoding.UTF8.GetBytes(issuedFor),
             Encoding.UTF8.GetBytes(Fingerprint(command)));
 
     private static bool LooksLikePnpCommand(string command)

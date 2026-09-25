@@ -16,6 +16,9 @@ internal sealed class PowerShellSessionManager : IAsyncDisposable
 
     private readonly Lock _admission = new();
 
+    // Named sessions removed but whose process may still be alive.
+    private int _retiring;
+
     private readonly ConcurrentDictionary<string, PowerShellSession> _sessions =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -38,12 +41,12 @@ internal sealed class PowerShellSessionManager : IAsyncDisposable
                 return existing;
             }
 
-            var isDefault = string.Equals(id, DefaultSessionId, StringComparison.OrdinalIgnoreCase);
-            var named = _sessions.Count - (_sessions.ContainsKey(DefaultSessionId) ? 1 : 0);
+            var isDefault = IsDefault(id);
+            var named = _sessions.Count - (_sessions.ContainsKey(DefaultSessionId) ? 1 : 0) + Volatile.Read(ref _retiring);
             if (!isDefault && named >= MaxSessions)
             {
                 throw new McpException(
-                    $"Too many sessions: {MaxSessions} named sessions are open. End one with 'pnp_reset_session', or reuse an existing sessionId.");
+                    $"Too many sessions: {MaxSessions} named sessions are open or still ending. End one with 'pnp_reset_session', or reuse an existing sessionId.");
             }
 
             var created = new PowerShellSession(id);
@@ -54,15 +57,55 @@ internal sealed class PowerShellSessionManager : IAsyncDisposable
 
     public async Task<bool> ResetAsync(string? sessionId)
     {
-        // Removed, not just terminated, so a reset frees its slot under the cap.
-        if (!_sessions.TryRemove(Normalize(sessionId), out var session))
+        // Removed, not just terminated, so a reset frees its slot under the cap once the process is gone.
+        if (Retire(Normalize(sessionId)) is not { } retiring)
         {
             return false;
         }
 
-        await session.ResetAsync();
+        await retiring;
         return true;
     }
+
+    /// <summary>Removes a session, counting it against the cap until its process is gone; null when there was none.</summary>
+    // Under the admission lock, so no replacement is admitted between the removal and the count.
+    private Task? Retire(string id)
+    {
+        PowerShellSession? session;
+        var counted = !IsDefault(id);
+
+        lock (_admission)
+        {
+            if (!_sessions.TryRemove(id, out session))
+            {
+                return null;
+            }
+
+            if (counted)
+            {
+                Interlocked.Increment(ref _retiring);
+            }
+        }
+
+        return Finish();
+
+        async Task Finish()
+        {
+            try
+            {
+                await session.RetireAsync();
+            }
+            finally
+            {
+                if (counted)
+                {
+                    Interlocked.Decrement(ref _retiring);
+                }
+            }
+        }
+    }
+
+    private static bool IsDefault(string id) => string.Equals(id, DefaultSessionId, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The session holding a paged result set under this cursor, or null when none does.</summary>
     public PowerShellSession? FindHolder(string? cursor) =>
@@ -91,12 +134,12 @@ internal sealed class PowerShellSessionManager : IAsyncDisposable
         {
             // A command that runs longer than the idle window is still working, not abandoned:
             // LastUsedUtc only advances when it finishes, so busy sessions must be skipped explicitly.
-            if (session.IsBusy || session.LastUsedUtc >= cutoff || !_sessions.TryRemove(session.Id, out var removed))
+            if (session.IsBusy || session.LastUsedUtc >= cutoff)
             {
                 continue;
             }
 
-            _ = removed.DisposeAsync().AsTask();
+            _ = Retire(session.Id);
         }
     }
 

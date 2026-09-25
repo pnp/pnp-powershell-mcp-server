@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 - Fixed ways past the destructive-command prompt: `Invoke-Expression` and similar, `Start-Process`, `Import-Module`, script blocks built from strings, native programs and script files, functions defined at runtime, `-Method Delete` on PnP REST and generic HTTP cmdlets, command names the session cannot resolve, and the `Unregister`, `Unpublish` and `Merge` verbs. Approvals are now single-use, expire after 10 minutes, and are void once the session is reset, restarted or runs another `pnp_run_command`. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
 - Fixed paging: docs and status lookups no longer drop the cursor, and a warning no longer disables it. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
 - Fixed guidance that still recommended `-Interactive` from inside the server. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
+- Fixed release packages carrying the checked-in `.mcp/server.json` version when a tag or back-fill builds a different one. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
 
 ### Changed
 

@@ -25,6 +25,10 @@ internal sealed class PowerShellSession : IAsyncDisposable
 
     private const int MaxFailureChars = 64_000;
 
+    private const string RetiredMessage =
+        "Error: This session was ended, by a reset or for being idle, while this command waited, so nothing was run. " +
+        "Run it again to use a fresh session.";
+
     private const string SessionChangedMessage =
         "Cancelled: this session was reset, restarted or ran another command after the approval, so nothing was run. " +
         "Re-run 'pnp_run_command' and confirm again.";
@@ -49,6 +53,8 @@ internal sealed class PowerShellSession : IAsyncDisposable
     private static long s_generations;
 
     private long _generation = Interlocked.Increment(ref s_generations);
+
+    private volatile bool _retired;
 
     public PowerShellSession(string id) => Id = id;
 
@@ -151,6 +157,13 @@ internal sealed class PowerShellSession : IAsyncDisposable
     }
 
     /// <summary>Terminates the process; the next call starts a fresh one and discards the PnP connection.</summary>
+    /// <summary>Ends the session for good: terminated as a reset is, and never started again.</summary>
+    public Task RetireAsync()
+    {
+        _retired = true;
+        return ResetAsync();
+    }
+
     public async Task ResetAsync()
     {
         // Only a bounded wait for the gate. The usual reason to reset is a command that has wedged
@@ -172,6 +185,12 @@ internal sealed class PowerShellSession : IAsyncDisposable
 
     private async Task<string?> EnsureStartedAsync(CancellationToken cancellationToken)
     {
+        // A command that queued before a reset must not start a process nothing tracks any more.
+        if (_retired)
+        {
+            return RetiredMessage;
+        }
+
         if (IsAlive)
         {
             return null;

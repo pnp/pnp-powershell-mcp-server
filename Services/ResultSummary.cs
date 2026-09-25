@@ -19,8 +19,10 @@ internal sealed class HeldResultSet
     public required IReadOnlyList<string> Fields { get; init; }
     public required int RawLength { get; init; }
 
-    /// <summary>Whatever printed around the array, such as warnings; clamped.</summary>
+    /// <summary>Whatever printed around the array, such as warnings; clamped, with its full length kept.</summary>
     public string? Notes { get; init; }
+
+    public int NotesLength { get; init; }
 
     /// <summary>True when the result was too large to hold whole and only a prefix is pageable.</summary>
     public bool Partial => TotalRows > Rows.Count;
@@ -116,6 +118,7 @@ internal static class ResultSummary
                     Fields = fields,
                     RawLength = text.Length,
                     Notes = notes.Length > 0 ? OutputLimit.Clamp(notes, MaxNoteChars) : null,
+                    NotesLength = notes.Length,
                 };
         }
         catch (JsonException)
@@ -231,7 +234,7 @@ internal static class ResultSummary
             var full = $"Also printed: {notes}";
             var note = sb.Length + full.Length + 2 <= OutputLimit.MaxChars
                 ? full
-                : $"Also printed: {N(notes.Length)} characters of other output, omitted to fit the output cap.";
+                : $"Also printed: {N(held.NotesLength)} characters of other output, omitted to fit the output cap.";
 
             if (sb.Length + note.Length + 2 <= OutputLimit.MaxChars)
             {
