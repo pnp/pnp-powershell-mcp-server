@@ -168,7 +168,6 @@ internal sealed class PowerShellSession : IAsyncDisposable
         return output;
     }
 
-    /// <summary>Terminates the process; the next call starts a fresh one and discards the PnP connection.</summary>
     /// <summary>Ends the session for good: terminated as a reset is, and never started again.</summary>
     public Task RetireAsync()
     {
@@ -176,6 +175,7 @@ internal sealed class PowerShellSession : IAsyncDisposable
         return ResetAsync();
     }
 
+    /// <summary>Terminates the process; the next call starts a fresh one and discards the PnP connection.</summary>
     public async Task ResetAsync()
     {
         // Only a bounded wait for the gate. The usual reason to reset is a command that has wedged
@@ -486,9 +486,9 @@ internal sealed class PowerShellSession : IAsyncDisposable
         {
             await ReadChunksAsync(reader, chunk => target.Writer.WriteAsync(chunk));
         }
-        catch (Exception ex) when (ex is IOException or ObjectDisposedException)
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException or ChannelClosedException)
         {
-            // The process ended; completing the channel surfaces that to any pending read.
+            // The process ended, or Terminate closed the queue; completing the channel surfaces that to any pending read.
         }
         finally
         {
@@ -534,12 +534,17 @@ internal sealed class PowerShellSession : IAsyncDisposable
         Advance();
 
         Process? process;
+        Channel<Chunk> stdout;
         lock (_processLock)
         {
             process = _process;
+            stdout = _stdout;
             _process = null;
             _stdin = null;
         }
+
+        // Closed, so a pump blocked on a full queue that nothing reads any more exits instead of holding it.
+        stdout.Writer.TryComplete();
 
         if (process is null)
         {

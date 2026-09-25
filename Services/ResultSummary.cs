@@ -127,7 +127,6 @@ internal static class ResultSummary
         }
     }
 
-    /// <summary>Renders one page: what the whole result set is, then as many rows from <paramref name="offset"/> as fit.</summary>
     /// <summary>
     /// Which held rows one page covers. Shared so the rendered page and the offsets reported alongside it
     /// cannot disagree. <c>Oversized</c> means the row at <c>Start</c> is wider than a whole page.
@@ -154,6 +153,7 @@ internal static class ResultSummary
         return (start, start + (oversized ? 1 : taken), pageable, oversized);
     }
 
+    /// <summary>Renders one page: what the whole result set is, then as many rows from <paramref name="offset"/> as fit.</summary>
     public static string Render(HeldResultSet held, int offset, string sessionId)
     {
         var (start, end, pageable, oversized) = Paging(held, offset);

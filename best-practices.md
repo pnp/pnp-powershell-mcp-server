@@ -299,8 +299,9 @@ Commands using a destructive verb — `Remove-*`, `Clear-*`, `Reset-*`, `Uninsta
 (`Invoke-Expression`, `Invoke-Command`, `Start-Job`, `Add-Type`, `Start-Process`, `Invoke-Item`, `Import-Module`),
 or one with no verb at all (a native program
 such as `pwsh`, or a script file), since it cannot be identified in advance. A function defined in this session
-is judged by what its body runs, and one the same script defines as it runs (`Set-Item function:…`, `Set-Alias`,
-`Import-Module`) is confirmed first. A name the session cannot resolve at all is refused before anything runs.
+is judged by what its body runs. A name the session cannot resolve is refused before anything runs, including
+one the same script would define as it runs (`Set-Item function:…`, `Set-Alias`): write a helper as
+`function Name { … }` in the script, or define it in one call and use it in the next.
 Nor is `Invoke-PnPSPRestMethod`, `Invoke-PnPGraphMethod`, `Invoke-RestMethod` or `Invoke-WebRequest` with
 `-Method Delete` or a `-Method` that cannot be read before it runs. A `POST` that deletes through a header or a
 `recycle()` endpoint is not caught, nor is a request made through .NET classes such as `HttpClient`.

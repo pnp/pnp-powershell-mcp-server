@@ -29,12 +29,6 @@ internal static class CommandPolicy
         "Start-Process", "Invoke-Item", "Import-Module",
     };
 
-    // Each can define a command from data, which is then called before any analysis could see its body.
-    private static readonly HashSet<string> Definers = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "New-Item", "Set-Item", "Set-Content", "Add-Content", "Copy-Item", "New-Alias", "Set-Alias", "Import-Alias", "Import-Module", "New-Module",
-    };
-
     // HTTP clients: a delete through these carries no destructive verb, and a PnP token makes one reach the tenant.
     private static readonly HashSet<string> RestCommands = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -61,12 +55,12 @@ internal static class CommandPolicy
             return $"Error: The command is not valid PowerShell and was not run.\n{analysis.ParseError}";
         }
 
-        // Unknown to the session, so unverifiable. Refused before any of the script runs; confirmed instead when the script defines it.
-        if (!Defines(analysis) && analysis.Commands.FirstOrDefault(c => c.Unresolved) is { } unknown)
+        // Unknown to the session, so unverifiable, whatever else the script does: refused before any of it runs.
+        if (analysis.Commands.FirstOrDefault(c => c.Unresolved) is { } unknown)
         {
             return
                 $"Error: '{OutputLimit.Echo(unknown.Name)}' is not a command in this session, so nothing was run. Check the name with " +
-                "'pnp_search_commands'. A helper must be defined in the same script with 'function Name { ... }'.";
+                "'pnp_search_commands'. Define a helper with 'function Name { ... }' in the same script, or define it in one call and use it in the next.";
         }
 
         if (!ReadOnlyMode)
@@ -111,18 +105,11 @@ internal static class CommandPolicy
     {
         // Indirect invocation counts: "& (Get-Command Remove-PnPTenantSite)" parses to a dynamic node
         // plus a harmless Get-Command, so keying only on verbs would let it through unconfirmed.
-        var defines = Defines(analysis);
-
         foreach (var command in analysis.Commands)
         {
             if (command.IsDynamic)
             {
                 return "an indirectly invoked command, which cannot be identified before it runs";
-            }
-
-            if (defines && command.Unresolved)
-            {
-                return $"{command.Name}, which this script defines as it runs, so what it runs cannot be checked";
             }
 
             // A native program, a script file or an unresolvable name: nothing to classify, as read-only mode already concludes.
@@ -153,8 +140,6 @@ internal static class CommandPolicy
         var method = FindMutatingMethods(analysis).FirstOrDefault();
         return method is null ? null : $"a method call that can change state ({method})";
     }
-
-    private static bool Defines(ScriptAnalysis analysis) => analysis.Commands.Any(c => Definers.Contains(c.Name));
 
     private static List<string> FindMutatingMethods(ScriptAnalysis analysis) =>
         [.. analysis.MethodCalls

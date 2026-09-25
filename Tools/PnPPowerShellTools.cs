@@ -902,26 +902,34 @@ internal partial class PnPPowerShellTools
 
     private const int MaxOutstandingApprovals = 256;
 
+    private static readonly Lock IssueLock = new();
+
     /// <summary>Records a prompt for <paramref name="bound"/> and returns the nonce its answer must carry.</summary>
     internal static string IssueApproval(string bound)
     {
-        var now = DateTimeOffset.UtcNow;
-        foreach (var (key, entry) in IssuedApprovals)
-        {
-            if (now - entry.Issued > ApprovalLifetime)
-            {
-                IssuedApprovals.TryRemove(key, out _);
-            }
-        }
-
-        // Bounded as well as expiring: expiry runs only on issue, so without it the last burst would stay forever.
-        if (IssuedApprovals.Count >= MaxOutstandingApprovals && IssuedApprovals.MinBy(e => e.Value.Issued) is { Key: { } oldest })
-        {
-            IssuedApprovals.TryRemove(oldest, out _);
-        }
-
         var nonce = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(16));
-        IssuedApprovals[nonce] = (Fingerprint(bound), now);
+
+        // Serialized, so concurrent prompts cannot all see room and overshoot the cap. Redeeming only removes.
+        lock (IssueLock)
+        {
+            var now = DateTimeOffset.UtcNow;
+            foreach (var (key, entry) in IssuedApprovals)
+            {
+                if (now - entry.Issued > ApprovalLifetime)
+                {
+                    IssuedApprovals.TryRemove(key, out _);
+                }
+            }
+
+            // Bounded as well as expiring: expiry runs only on issue, so without it the last burst would stay forever.
+            if (IssuedApprovals.Count >= MaxOutstandingApprovals && IssuedApprovals.MinBy(e => e.Value.Issued) is { Key: { } oldest })
+            {
+                IssuedApprovals.TryRemove(oldest, out _);
+            }
+
+            IssuedApprovals[nonce] = (Fingerprint(bound), now);
+        }
+
         return nonce;
     }
 
