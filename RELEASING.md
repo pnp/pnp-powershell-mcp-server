@@ -63,8 +63,8 @@ packed **on its own matching OS**, with `--runtime <rid>`.
 3. Push a tag:
 
    ```bash
-   git tag v0.1.6-beta
-   git push origin v0.1.6-beta
+   git tag v0.1.7-beta
+   git push origin v0.1.7-beta
    ```
 
 4. [`release.yml`](./.github/workflows/release.yml) then packs each RID on its own runner,
@@ -72,18 +72,121 @@ packed **on its own matching OS**, with `--runtime <rid>`.
    NuGet.org — **RID packages first, wrapper last**, so there is never a window where the
    wrapper resolves to packages that do not exist yet.
 
+5. Finally it publishes [.mcp/server.json](./.mcp/server.json) to the
+   [Official MCP Registry](https://registry.modelcontextprotocol.io/). See
+   [MCP Registry](#mcp-registry) below.
+
 To do a dry run, use **Actions → Release → Run workflow** with `publish` unchecked: it
 builds all eight and uploads them as workflow artifacts without pushing anything.
 
-### Required repository secret
+### Credentials: NuGet trusted publishing
 
-| Secret | Purpose |
+The workflow stores no NuGet API key. The `publish` job uses
+[trusted publishing](https://learn.microsoft.com/nuget/nuget-org/trusted-publishing):
+`NuGet/login` exchanges the job's GitHub OIDC token for a NuGet API key that is valid for one
+hour. Two things must be in place:
+
+| Where | What |
 | --- | --- |
-| `NUGET_API_KEY` | NuGet.org API key with push rights on `PnP.PowerShell.MCPServer*`. Use a glob-scoped key so it also covers the RID package IDs. |
+| Repository secret `NUGET_USER` | The nuget.org **username** (profile name, not email address) of the account that created the policy below. |
+| nuget.org → your username → **Trusted Publishing** | A policy with Repository Owner `pnp`, Repository `pnp-powershell-mcp-server`, Workflow File `release.yml` (file name only) and Environment left empty. Its owner must be the user or organisation that owns `PnP.PowerShell.MCPServer` and the seven RID packages. |
 
-The key's package glob **must** cover the RID ids. A key scoped only to the exact id
-`PnP.PowerShell.MCPServer` will push the wrapper and reject all seven RID packages —
-reproducing the original bug.
+- **Glob scope.** If you narrow the policy with a package glob, it **must** cover the RID ids
+  (`PnP.PowerShell.MCPServer*`). A policy scoped only to the exact id
+  `PnP.PowerShell.MCPServer` pushes the wrapper and rejects all seven RID packages, which
+  reproduces the original bug.
+- **Renaming `release.yml`** breaks the policy.
+- **Environment.** Enabling the commented-out `environment:` on the `publish` job needs the
+  same environment name in the policy.
+
+The `publish-mcp-registry` job also authenticates with GitHub OIDC, and needs no secret.
+
+## MCP Registry
+
+The server is listed on the [Official MCP Registry](https://registry.modelcontextprotocol.io/)
+as `io.github.pnp/pnp-powershell-mcp-server`. It is an upstream source for other catalogues,
+such as the [GitHub MCP Registry](https://github.com/mcp). The listing is [.mcp/server.json](./.mcp/server.json). It points at the `PnP.PowerShell.MCPServer`
+wrapper package on NuGet.org and does not copy the package, so NuGet.org stays the source of
+the binaries.
+
+The `publish-mcp-registry` job in `release.yml` runs after the NuGet push on every tag. It:
+
+1. Stamps the release version into both `version` fields of `server.json`.
+2. Waits until NuGet.org has validated the wrapper and serves its README. The registry fetches
+   that README itself, so publishing any earlier fails.
+3. Logs in with `mcp-publisher login github-oidc`. The GitHub OIDC token grants the
+   repository owner's namespace, `io.github.pnp/*`, so this needs no secret, only
+   `id-token: write`.
+4. Runs `mcp-publisher publish .mcp/server.json`.
+
+### Rules the registry enforces
+
+- **The package README must contain `mcp-name: io.github.pnp/pnp-powershell-mcp-server`.**
+  This is how the registry verifies that we own the NuGet package. The line sits as an HTML
+  comment near the top of [README.md](./README.md), which is the README packed into the
+  wrapper. Do not remove or reword it. NuGet versions are immutable, so a version packed
+  without it can never be listed, and the fix is a new version. The `verify` job in
+  `release.yml` checks the packed README before anything is pushed, and the
+  `mcp-registry-manifest` CI job checks the source README on every PR.
+- **`description` is at most 100 characters.** This limit applies to `server.json` only. The
+  csproj `<Description>` can be longer.
+- **`registryBaseUrl` must be `https://api.nuget.org/v3/index.json`**, or be omitted. The
+  `https://api.nuget.org` value that the `mcpserver` template generates is rejected at
+  publish time.
+- **`$schema` should be the registry's current schema version.** The CI job runs
+  `mcp-publisher validate`, which asks the registry to check the file and flags an outdated
+  schema.
+- **A published version cannot be republished.** To change the listing, release a new
+  version.
+
+### Why only two environment variables are declared
+
+VS Code, when it installs from the registry, and the NuGet.org MCP tab both turn every
+`environmentVariables` entry that has a `description`, `default` or `choices` into an
+install-time prompt. Both ignore `isRequired`. An entry with none of those is written into
+the client config as an empty string. Declaring every setting in the README would therefore
+ask each new user a series of questions.
+
+`server.json` declares only the two install-time decisions, each as a `false`/`true` pick
+that defaults to `false`:
+
+- `PNP_MCP_READONLY`: whether the server may change the tenant.
+- `PNP_MCP_ALLOW_SETUP`: whether it may install `PnP.PowerShell` on a machine that lacks it.
+
+The others stay out:
+
+- `PNP_MCP_CONFIRM_DESTRUCTIVE` has only one non-default value, which turns a safety gate
+  off. It should not be offered at install.
+- The timeout and output cap are tuning settings.
+- `PNP_SCRIPT_SAMPLES_PATH` and the record/replay variables are for contributors.
+
+Keep the README configuration table as the full reference.
+
+### Listing a version without a tag push
+
+If the registry step failed after the NuGet push succeeded, use **Re-run failed jobs** on
+that workflow run. Otherwise, use **Actions → Release → Run workflow** with `version` set,
+`publish` unchecked and `publish_registry` checked. Backfill runs that set only `publish`
+never touch the registry.
+
+### Manual fallback
+
+```powershell
+# Windows x64; see the registry's latest release for other platforms
+curl.exe -L -o mcp-publisher.tar.gz https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_windows_amd64.tar.gz
+tar xf mcp-publisher.tar.gz
+.\mcp-publisher.exe validate .mcp\server.json
+.\mcp-publisher.exe login github
+.\mcp-publisher.exe publish .mcp\server.json
+```
+
+`login github` grants `io.github.pnp/*` only to an **Owner** of the `pnp` GitHub
+organisation. Ordinary membership is not enough. With `--token`, the PAT also needs
+`read:org`, or Members read-only for a fine-grained token. Anyone else gets only their
+personal namespace, and the publish is refused. This is why the workflow uses OIDC.
+
+Check the result at
+`https://registry.modelcontextprotocol.io/v0/servers?search=io.github.pnp/pnp-powershell-mcp-server`.
 
 ## The broken 0.1.0-beta / 0.1.1-beta releases
 
@@ -128,7 +231,9 @@ docker run --rm -v "$PWD":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0-alpine-
 dotnet pack PnPPowerShell.MCPServer.csproj -c Release -o artifacts
 ```
 
-Then push the RID packages **before** the wrapper:
+Then push the RID packages **before** the wrapper. Trusted publishing works only inside the
+workflow, so this needs a personal NuGet.org API key in `NUGET_API_KEY`, with push rights on
+`PnP.PowerShell.MCPServer*`. The glob must cover the RID ids, for the same reason as above:
 
 ```bash
 dotnet nuget push "artifacts/PnP.PowerShell.MCPServer.*-*.nupkg" \

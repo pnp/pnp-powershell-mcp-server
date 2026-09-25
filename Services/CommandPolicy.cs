@@ -19,13 +19,30 @@ internal static class CommandPolicy
     private static readonly HashSet<string> DestructiveVerbs = new(StringComparer.OrdinalIgnoreCase)
     {
         "Remove", "Clear", "Reset", "Uninstall", "Revoke", "Deny", "Restore", "Move", "Rename", "Disable",
+        "Unregister", "Unpublish", "Merge",
+    };
+
+    // Each runs code the parse cannot see into: code passed as data, a module's own code, or another process.
+    private static readonly HashSet<string> CodeRunners = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Invoke-Expression", "Invoke-Command", "Start-Job", "Start-ThreadJob", "Add-Type",
+        "Start-Process", "Invoke-Item", "Import-Module",
+    };
+
+    // HTTP clients: a delete through these carries no destructive verb, and a PnP token makes one reach the tenant.
+    private static readonly HashSet<string> RestCommands = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Invoke-PnPSPRestMethod", "Invoke-PnPGraphMethod", "Invoke-RestMethod", "Invoke-WebRequest",
     };
 
     // Deliberately narrow. "Execute" covers ExecuteQuery, the commit point for every CSOM mutation, so
     // a change made through the object model is caught whether or not the mutating call is recognised.
     // Broader prefixes such as Add or Set would flag $results.Add($row) on a local collection, which is
-    // an ordinary reporting pattern and changes nothing in Microsoft 365.
-    private static readonly string[] MutatingMethodPrefixes = ["Execute", "Delete", "Recycle"];
+    // an ordinary reporting pattern and changes nothing in Microsoft 365. "Invoke" runs a script block.
+    private static readonly string[] MutatingMethodPrefixes = ["Execute", "Delete", "Recycle", "Invoke"];
+
+    // Script blocks built from strings, and Process.Start; exact, so CreateDirectory and StartNew stay allowed.
+    private static readonly HashSet<string> ExactMethods = new(StringComparer.OrdinalIgnoreCase) { "Create", "NewScriptBlock", "Start" };
 
     public static bool ReadOnlyMode =>
         string.Equals(Environment.GetEnvironmentVariable("PNP_MCP_READONLY"), "true", StringComparison.OrdinalIgnoreCase);
@@ -36,6 +53,14 @@ internal static class CommandPolicy
         if (!string.IsNullOrWhiteSpace(analysis.ParseError))
         {
             return $"Error: The command is not valid PowerShell and was not run.\n{analysis.ParseError}";
+        }
+
+        // Unknown to the session, so unverifiable, whatever else the script does: refused before any of it runs.
+        if (analysis.Commands.FirstOrDefault(c => c.Unresolved) is { } unknown)
+        {
+            return
+                $"Error: '{OutputLimit.Echo(unknown.Name)}' is not a command in this session, so nothing was run. Check the name with " +
+                "'pnp_search_commands'. Define a helper with 'function Name { ... }' in the same script, or define it in one call and use it in the next.";
         }
 
         if (!ReadOnlyMode)
@@ -80,12 +105,35 @@ internal static class CommandPolicy
     {
         // Indirect invocation counts: "& (Get-Command Remove-PnPTenantSite)" parses to a dynamic node
         // plus a harmless Get-Command, so keying only on verbs would let it through unconfirmed.
-        var command = analysis.Commands.FirstOrDefault(c => c.IsDynamic || (c.Verb is not null && DestructiveVerbs.Contains(c.Verb)));
-        if (command is not null)
+        foreach (var command in analysis.Commands)
         {
-            return command.IsDynamic
-                ? "an indirectly invoked command, which cannot be identified before it runs"
-                : command.Name;
+            if (command.IsDynamic)
+            {
+                return "an indirectly invoked command, which cannot be identified before it runs";
+            }
+
+            // A native program, a script file or an unresolvable name: nothing to classify, as read-only mode already concludes.
+            if (command.Verb is null)
+            {
+                return $"{command.Name}, which has no verb, so what it does cannot be judged before it runs";
+            }
+
+            if (DestructiveVerbs.Contains(command.Verb))
+            {
+                return command.Name;
+            }
+
+            if (CodeRunners.Contains(command.Name))
+            {
+                return $"{command.Name}, which runs code that cannot be identified before it runs";
+            }
+
+            if (RestCommands.Contains(command.Name) &&
+                command.Method is { } httpMethod &&
+                (httpMethod == "<dynamic>" || httpMethod.Equals("Delete", StringComparison.OrdinalIgnoreCase)))
+            {
+                return $"{command.Name} -Method {httpMethod}";
+            }
         }
 
         // CSOM mutations are method calls, not commands, so they are invisible to the verb check.
@@ -95,6 +143,6 @@ internal static class CommandPolicy
 
     private static List<string> FindMutatingMethods(ScriptAnalysis analysis) =>
         [.. analysis.MethodCalls
-            .Where(m => m == "<dynamic>" || MutatingMethodPrefixes.Any(p => m.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
+            .Where(m => m == "<dynamic>" || ExactMethods.Contains(m) || MutatingMethodPrefixes.Any(p => m.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
             .Distinct(StringComparer.OrdinalIgnoreCase)];
 }

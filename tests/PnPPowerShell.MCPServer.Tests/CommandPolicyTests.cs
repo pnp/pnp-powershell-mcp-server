@@ -182,6 +182,20 @@ public class CommandPolicyTests
         Assert.Contains("not read-only", result);
     }
 
+    [Theory]
+    [InlineData("Invoke-PnPSPRestMethod", "Delete", true)]
+    [InlineData("Invoke-PnPGraphMethod", "<dynamic>", true)]
+    [InlineData("Invoke-RestMethod", "delete", true)]
+    [InlineData("Invoke-WebRequest", "Delete", true)]
+    [InlineData("Invoke-RestMethod", "Get", false)]
+    [InlineData("Invoke-RestMethod", null, false)]
+    public void An_http_delete_or_unreadable_method_needs_confirmation(string name, string? method, bool prompts)
+    {
+        var analysis = new ScriptAnalysis { Commands = [new ScriptCommand { Name = name, Verb = "Invoke", Method = method }] };
+
+        Assert.Equal(prompts, CommandPolicy.FindNeedingConfirmation(analysis) is not null);
+    }
+
     [Fact]
     public void Enforce_refuses_a_verbless_command_in_read_only_mode()
     {
