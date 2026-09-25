@@ -25,6 +25,10 @@ internal sealed class PowerShellSession : IAsyncDisposable
 
     private const int MaxFailureChars = 64_000;
 
+    private const string SessionChangedMessage =
+        "Cancelled: this session was reset, restarted or ran another command after the approval, so nothing was run. " +
+        "Re-run 'pnp_run_command' and confirm again.";
+
     /// <summary>How a timed-out command reports itself. Callers match on this to recognise one.</summary>
     internal const string TerminatedMarker = "the PowerShell session was terminated";
 
@@ -50,7 +54,7 @@ internal sealed class PowerShellSession : IAsyncDisposable
 
     public string Id { get; }
 
-    /// <summary>Changes on every restart, reset and command run, so an approval can tell the session moved on.</summary>
+    /// <summary>Changes on every restart, reset and pnp_run_command; the server's own lookups cannot change the connection.</summary>
     public long Generation => Interlocked.Read(ref _generation);
 
     public DateTimeOffset LastUsedUtc { get; private set; } = DateTimeOffset.UtcNow;
@@ -98,9 +102,7 @@ internal sealed class PowerShellSession : IAsyncDisposable
 
             if (expectedGeneration is { } expected && expected != Generation)
             {
-                return (
-                    "Cancelled: this session was reset, reconnected or ran another command after the approval, so nothing was run. " +
-                    "Re-run 'pnp_run_command' and confirm again.", null);
+                return (SessionChangedMessage, null);
             }
 
             // Only a captured run replaces the hold: a docs or status lookup between pages must not drop the cursor.
@@ -110,10 +112,15 @@ internal sealed class PowerShellSession : IAsyncDisposable
                 Advance();
             }
 
+            var current = Generation;
+
             // Playback answers from a fixture without starting pwsh, which is what lets CI test this at all.
+            // Re-checked once started: a reset that terminated without the gate would otherwise run this in a fresh process.
             var output = SessionTranscript.IsReplaying
                 ? SessionTranscript.Replay(script, transcriptKey)
-                : await EnsureStartedAsync(cancellationToken) ?? await ExecuteAndRecordAsync(script, timeout, transcriptKey, cancellationToken);
+                : await EnsureStartedAsync(cancellationToken)
+                  ?? (expectedGeneration is not null && Generation != current ? SessionChangedMessage : null)
+                  ?? await ExecuteAndRecordAsync(script, timeout, transcriptKey, cancellationToken);
 
             if (!capture)
             {

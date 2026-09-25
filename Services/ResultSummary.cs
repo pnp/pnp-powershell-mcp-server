@@ -180,11 +180,6 @@ internal static class ResultSummary
             sb.AppendLine($"Fields: {listed}{(overflow > 0 ? $", and {N(overflow)} more" : string.Empty)}");
         }
 
-        if (held.Notes is not null)
-        {
-            sb.AppendLine($"Also printed: {held.Notes}");
-        }
-
         if (oversized)
         {
             sb.AppendLine(
@@ -229,6 +224,20 @@ internal static class ResultSummary
         sb.AppendLine(
             $"The result set is held in session '{Name(sessionId)}' and is replaced by the next command that runs there, " +
             "so page through it before running anything else. Re-running the command is the only way to get fresher rows.");
+
+        // Last, and only what fits: Paging reserves no room for it, and a page cut by the cap is no longer valid JSON.
+        if (held.Notes is { } notes)
+        {
+            var full = $"Also printed: {notes}";
+            var note = sb.Length + full.Length + 2 <= OutputLimit.MaxChars
+                ? full
+                : $"Also printed: {N(notes.Length)} characters of other output, omitted to fit the output cap.";
+
+            if (sb.Length + note.Length + 2 <= OutputLimit.MaxChars)
+            {
+                sb.AppendLine(note);
+            }
+        }
 
         return sb.ToString();
     }

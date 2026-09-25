@@ -35,10 +35,10 @@ internal static class CommandPolicy
         "New-Item", "Set-Item", "Set-Content", "Add-Content", "Copy-Item", "New-Alias", "Set-Alias", "Import-Alias", "Import-Module", "New-Module",
     };
 
-    // Generic REST: a delete through these carries no destructive verb.
+    // HTTP clients: a delete through these carries no destructive verb, and a PnP token makes one reach the tenant.
     private static readonly HashSet<string> RestCommands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Invoke-PnPSPRestMethod", "Invoke-PnPGraphMethod",
+        "Invoke-PnPSPRestMethod", "Invoke-PnPGraphMethod", "Invoke-RestMethod", "Invoke-WebRequest",
     };
 
     // Deliberately narrow. "Execute" covers ExecuteQuery, the commit point for every CSOM mutation, so
@@ -59,6 +59,14 @@ internal static class CommandPolicy
         if (!string.IsNullOrWhiteSpace(analysis.ParseError))
         {
             return $"Error: The command is not valid PowerShell and was not run.\n{analysis.ParseError}";
+        }
+
+        // Unknown to the session, so unverifiable. Refused before any of the script runs; confirmed instead when the script defines it.
+        if (!Defines(analysis) && analysis.Commands.FirstOrDefault(c => c.Unresolved) is { } unknown)
+        {
+            return
+                $"Error: '{OutputLimit.Echo(unknown.Name)}' is not a command in this session, so nothing was run. Check the name with " +
+                "'pnp_search_commands'. A helper must be defined in the same script with 'function Name { ... }'.";
         }
 
         if (!ReadOnlyMode)
@@ -103,8 +111,7 @@ internal static class CommandPolicy
     {
         // Indirect invocation counts: "& (Get-Command Remove-PnPTenantSite)" parses to a dynamic node
         // plus a harmless Get-Command, so keying only on verbs would let it through unconfirmed.
-        // Only alongside a definer, so a mistyped cmdlet name still fails fast instead of prompting.
-        var defines = analysis.Commands.Any(c => Definers.Contains(c.Name));
+        var defines = Defines(analysis);
 
         foreach (var command in analysis.Commands)
         {
@@ -146,6 +153,8 @@ internal static class CommandPolicy
         var method = FindMutatingMethods(analysis).FirstOrDefault();
         return method is null ? null : $"a method call that can change state ({method})";
     }
+
+    private static bool Defines(ScriptAnalysis analysis) => analysis.Commands.Any(c => Definers.Contains(c.Name));
 
     private static List<string> FindMutatingMethods(ScriptAnalysis analysis) =>
         [.. analysis.MethodCalls

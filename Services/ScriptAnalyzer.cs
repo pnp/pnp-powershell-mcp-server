@@ -103,16 +103,16 @@ internal static class ScriptAnalyzer
                   $__pnpEffective = if ($__pnpCmdInfo -and -not $__pnpStillAlias) { [string]$__pnpCmdInfo.Name } else { [string]$__pnpName }
                   $__pnpVerb = $null
                   if ($__pnpCmdInfo -and -not $__pnpStillAlias -and $__pnpCmdInfo.Verb) { $__pnpVerb = [string]$__pnpCmdInfo.Verb }
-                  elseif (-not $__pnpStillAlias -and $__pnpEffective -match '^([A-Za-z]+)-') { $__pnpVerb = $Matches[1] }
+                  elseif (-not $__pnpCmdInfo -and $__pnpEffective -match '^([A-Za-z]+)-') { $__pnpVerb = $Matches[1] }
                   $__pnpWhatIf = $false
                   if ($__pnpCmdInfo -and $__pnpCmdInfo.Parameters -and $__pnpCmdInfo.Parameters.ContainsKey('WhatIf')) { $__pnpWhatIf = $true }
-                  # -Method may be abbreviated; a splat may carry it, so a splat counts as unknown.
+                  # -Method or -CustomMethod, possibly abbreviated; a splat may carry either, so a splat counts as unknown.
                   $__pnpMethod = $null
                   $__pnpEls = $__pnpNode.CommandElements
                   for ($__pnpI = 1; $__pnpI -lt $__pnpEls.Count; $__pnpI++) {
                     $__pnpE = $__pnpEls[$__pnpI]
                     if ($__pnpE -is [System.Management.Automation.Language.VariableExpressionAst] -and $__pnpE.Splatted) { $__pnpMethod = '<dynamic>' }
-                    elseif ($__pnpE -is [System.Management.Automation.Language.CommandParameterAst] -and $__pnpE.ParameterName -and 'Method'.StartsWith($__pnpE.ParameterName, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    elseif ($__pnpE -is [System.Management.Automation.Language.CommandParameterAst] -and $__pnpE.ParameterName -and ('Method', 'CustomMethod' | Where-Object { $_.StartsWith($__pnpE.ParameterName, [System.StringComparison]::OrdinalIgnoreCase) })) {
                       $__pnpArg = if ($__pnpE.Argument) { $__pnpE.Argument } elseif ($__pnpI + 1 -lt $__pnpEls.Count) { $__pnpEls[$__pnpI + 1] } else { $null }
                       $__pnpMethod = if ($__pnpArg -is [System.Management.Automation.Language.StringConstantExpressionAst]) { $__pnpArg.Value } else { '<dynamic>' }
                     }

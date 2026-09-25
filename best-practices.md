@@ -300,8 +300,10 @@ Commands using a destructive verb — `Remove-*`, `Clear-*`, `Reset-*`, `Uninsta
 or one with no verb at all (a native program
 such as `pwsh`, or a script file), since it cannot be identified in advance. A function defined in this session
 is judged by what its body runs, and one the same script defines as it runs (`Set-Item function:…`, `Set-Alias`,
-`Import-Module`) is confirmed first. Nor is `Invoke-PnPSPRestMethod` or `Invoke-PnPGraphMethod` with
-`-Method Delete` or a `-Method` that cannot be read before it runs. A `POST` that deletes through a header or a `recycle()` endpoint is not caught.
+`Import-Module`) is confirmed first. A name the session cannot resolve at all is refused before anything runs.
+Nor is `Invoke-PnPSPRestMethod`, `Invoke-PnPGraphMethod`, `Invoke-RestMethod` or `Invoke-WebRequest` with
+`-Method Delete` or a `-Method` that cannot be read before it runs. A `POST` that deletes through a header or a
+`recycle()` endpoint is not caught, nor is a request made through .NET classes such as `HttpClient`.
 
 This check favours asking too often over missing something: it also matches a destructive name that
 appears only as text (for example inside a string), so you may occasionally be asked to confirm a
