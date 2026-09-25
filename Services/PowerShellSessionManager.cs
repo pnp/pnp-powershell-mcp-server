@@ -68,15 +68,20 @@ internal sealed class PowerShellSessionManager : IAsyncDisposable
     }
 
     /// <summary>Removes a session, counting it against the cap until its process is gone; null when there was none.</summary>
-    // Under the admission lock, so no replacement is admitted between the removal and the count.
-    private Task? Retire(string id)
+    // Under the admission lock, so no replacement is admitted between the removal and the count. Given an
+    // expected instance, only that one is removed, so eviction cannot retire a replacement created since.
+    private Task? Retire(string id, PowerShellSession? expected = null)
     {
-        PowerShellSession? session;
+        var session = expected;
         var counted = !IsDefault(id);
 
         lock (_admission)
         {
-            if (!_sessions.TryRemove(id, out session))
+            var removed = session is null
+                ? _sessions.TryRemove(id, out session)
+                : _sessions.TryRemove(KeyValuePair.Create(id, session));
+
+            if (!removed || session is null)
             {
                 return null;
             }
@@ -139,7 +144,7 @@ internal sealed class PowerShellSessionManager : IAsyncDisposable
                 continue;
             }
 
-            _ = Retire(session.Id);
+            _ = Retire(session.Id, session);
         }
     }
 

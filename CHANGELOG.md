@@ -10,18 +10,6 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [Current version]
 
-### Fixed
-
-- Fixed code injection through `pnp_get_command_docs` and `pnp://cmdlet/{name}`, which now accept only `Verb-Noun` names. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
-- Fixed ways past the destructive-command prompt: `Invoke-Expression` and similar, `Start-Process`, `Import-Module`, script blocks built from strings, native programs and script files, functions defined at runtime, `-Method Delete` on PnP REST and generic HTTP cmdlets, command names the session cannot resolve, and the `Unregister`, `Unpublish` and `Merge` verbs. Approvals are now single-use, expire after 10 minutes, and are void once the session is reset, restarted or runs another `pnp_run_command`. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
-- Fixed paging: docs and status lookups no longer drop the cursor, and a warning no longer disables it. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
-- Fixed guidance that still recommended `-Interactive` from inside the server. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
-- Fixed release packages carrying the checked-in `.mcp/server.json` version when a tag or back-fill builds a different one. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
-
-### Changed
-
-- Updated the script-samples index to 324 samples, capped sessions at 10 and output reads at 32M characters, and pinned the CI actions and `mcp-publisher`, with Dependabot keeping the actions current. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
-
 ## [0.1.7-beta]
 
 ### Added
@@ -38,12 +26,18 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 - Changed the version to `0.1.7-beta` across the project file, the MCP server manifest and the documentation.
 - Changed `.mcp/server.json` to the registry's current schema (`2025-12-11`), shortened its `description` to the registry's 100-character limit, and added `title` and `websiteUrl`.
 - Changed RELEASING.md to document MCP Registry publishing, the ownership check, the environment variables the manifest declares, and the manual fallback.
+- Updated the script-samples index to 324 samples, capped sessions at 10 and output reads at 32M characters, and pinned the CI actions and `mcp-publisher`, with Dependabot keeping the actions current. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
 
 ### Fixed
 
 - Fixed `pnp_ping` and the `initialize` response reporting the server as version `1.0.0` on every release. The assembly version is now derived from `<PackageVersion>`, including when the Release workflow overrides it.
 - Fixed `.mcp/server.json` declaring `registryBaseUrl` as `https://api.nuget.org`, which the MCP Registry rejects at publish time. It is now `https://api.nuget.org/v3/index.json`.
 - Fixed RELEASING.md naming a `NUGET_API_KEY` repository secret that the Release workflow never reads. It now documents the trusted publishing setup the workflow actually uses: a `NUGET_USER` secret and a nuget.org policy for `release.yml`.
+- Fixed code injection through `pnp_get_command_docs` and `pnp://cmdlet/{name}`, which now accept only `Verb-Noun` names. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
+- Fixed ways past the destructive-command prompt: `Invoke-Expression` and similar, `Start-Process`, `Import-Module`, script blocks built from strings, native programs and script files, functions defined at runtime, `-Method Delete` on PnP REST and generic HTTP cmdlets, command names the session cannot resolve, and the `Unregister`, `Unpublish` and `Merge` verbs. Approvals are now single-use, expire after 10 minutes, and are void once the session is reset, restarted or runs another `pnp_run_command`. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
+- Fixed paging: docs and status lookups no longer drop the cursor, and a warning no longer disables it. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
+- Fixed guidance that still recommended `-Interactive` from inside the server. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
+- Fixed release packages carrying the checked-in `.mcp/server.json` version when a tag or back-fill builds a different one. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
 
 ### Contributors
 

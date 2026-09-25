@@ -900,6 +900,8 @@ internal partial class PnPPowerShellTools
 
     private static readonly TimeSpan ApprovalLifetime = TimeSpan.FromMinutes(10);
 
+    private const int MaxOutstandingApprovals = 256;
+
     /// <summary>Records a prompt for <paramref name="bound"/> and returns the nonce its answer must carry.</summary>
     internal static string IssueApproval(string bound)
     {
@@ -910,6 +912,12 @@ internal partial class PnPPowerShellTools
             {
                 IssuedApprovals.TryRemove(key, out _);
             }
+        }
+
+        // Bounded as well as expiring: expiry runs only on issue, so without it the last burst would stay forever.
+        if (IssuedApprovals.Count >= MaxOutstandingApprovals && IssuedApprovals.MinBy(e => e.Value.Issued) is { Key: { } oldest })
+        {
+            IssuedApprovals.TryRemove(oldest, out _);
         }
 
         var nonce = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(16));

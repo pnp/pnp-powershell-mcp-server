@@ -348,8 +348,9 @@ jobs:
   publish-mcp-registry:
     name: Publish to the MCP Registry
     needs: [version, publish]
-    # Also runs when 'publish' was skipped, to list a version already on NuGet.org.
-    if: ${{ !cancelled() && !failure() && (github.event_name == 'push' || inputs.publish_registry) }}
+    # Also runs when 'publish' was skipped, to list a version already on NuGet.org. always() is implied by the
+    # status checks beside it; it is stated so the skip rule cannot be misread. !failure() still stops it after a failed verify.
+    if: ${{ always() && !cancelled() && !failure() && (github.event_name == 'push' || inputs.publish_registry) }}
     runs-on: ubuntu-latest
     permissions:
       contents: read

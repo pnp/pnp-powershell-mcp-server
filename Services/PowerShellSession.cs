@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.Text;
 using System.Threading.Channels;
 
@@ -25,6 +26,14 @@ internal sealed class PowerShellSession : IAsyncDisposable
 
     private const int MaxFailureChars = 64_000;
 
+    private const int MaxStderrChars = 64_000;
+
+    // Output is read in pieces of at most twice this, and at most QueuedChunks wait for a reader, so memory is
+    // bounded even for one enormous line or output printed between commands; a full queue pauses pwsh.
+    private const int ChunkChars = 16_384;
+
+    private const int QueuedChunks = 256;
+
     private const string RetiredMessage =
         "Error: This session was ended, by a reset or for being idle, while this command waited, so nothing was run. " +
         "Run it again to use a fresh session.";
@@ -45,7 +54,10 @@ internal sealed class PowerShellSession : IAsyncDisposable
     private readonly Lock _processLock = new();
     private readonly StringBuilder _stderr = new();
 
-    private Channel<string> _stdout = Channel.CreateUnbounded<string>();
+    private Channel<Chunk> _stdout = NewOutputChannel();
+
+    /// <summary>A piece of output; <c>EndsLine</c> is false when a longer line continues in the next piece.</summary>
+    private readonly record struct Chunk(string Text, bool EndsLine);
     private Process? _process;
     private StreamWriter? _stdin;
 
@@ -197,7 +209,7 @@ internal sealed class PowerShellSession : IAsyncDisposable
         }
 
         Terminate();
-        _stdout = Channel.CreateUnbounded<string>();
+        _stdout = NewOutputChannel();
 
         var startInfo = new ProcessStartInfo
         {
@@ -322,6 +334,7 @@ internal sealed class PowerShellSession : IAsyncDisposable
         var output = new StringBuilder();
         var unread = 0L;
         var failing = false;
+        var atLineStart = true;
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(timeout);
 
@@ -329,22 +342,32 @@ internal sealed class PowerShellSession : IAsyncDisposable
         {
             while (true)
             {
-                var line = await _stdout.Reader.ReadAsync(timeoutCts.Token);
-                if (string.Equals(line, EndMarker, StringComparison.Ordinal))
+                var chunk = await _stdout.Reader.ReadAsync(timeoutCts.Token);
+
+                // A marker is a whole line of its own, never a piece of a longer one.
+                var wholeLine = atLineStart && chunk.EndsLine;
+                atLineStart = chunk.EndsLine;
+
+                if (wholeLine && string.Equals(chunk.Text, EndMarker, StringComparison.Ordinal))
                 {
                     break;
                 }
 
                 // Drained past the ceiling, not kept: the end marker still has to be reached. The failure gets
                 // its own bounded allowance, since dropping it would report a failed command as a success.
-                failing |= string.Equals(line, ErrorMarker, StringComparison.Ordinal);
+                failing |= wholeLine && string.Equals(chunk.Text, ErrorMarker, StringComparison.Ordinal);
                 var room = (failing ? MaxReadChars + MaxFailureChars : MaxReadChars) - output.Length;
                 if (room > 0)
                 {
-                    output.AppendLine(line.Length <= room ? line : line[..room]);
+                    output.Append(chunk.Text.Length <= room ? chunk.Text : chunk.Text[..room]);
+
+                    if (chunk.EndsLine)
+                    {
+                        output.AppendLine();
+                    }
                 }
 
-                unread += Math.Max(0, line.Length - Math.Max(room, 0));
+                unread += Math.Max(0, chunk.Text.Length - Math.Max(room, 0));
             }
         }
         catch (ChannelClosedException)
@@ -391,7 +414,9 @@ internal sealed class PowerShellSession : IAsyncDisposable
         // Led with, not appended: the output cap keeps the head.
         if (unread > 0)
         {
-            text = $"NOTE: The output ran past {MaxReadChars:N0} characters and the remaining {unread:N0} were discarded unread. Narrow the query to see all of it.\n{text}";
+            text = string.Create(
+                CultureInfo.InvariantCulture,
+                $"NOTE: The output ran past {MaxReadChars:N0} characters and the remaining {unread:N0} were discarded unread. Narrow the query to see all of it.\n{text}");
         }
 
         var markerIndex = text.IndexOf(ErrorMarker, StringComparison.Ordinal);
@@ -417,14 +442,49 @@ internal sealed class PowerShellSession : IAsyncDisposable
         return text.Length == 0 ? "Command completed successfully (no output)." : text;
     }
 
-    private static async Task PumpStdoutAsync(StreamReader reader, Channel<string> target)
+    private static Channel<Chunk> NewOutputChannel() =>
+        Channel.CreateBounded<Chunk>(new BoundedChannelOptions(QueuedChunks) { SingleReader = true, SingleWriter = true });
+
+    /// <summary>Hands <paramref name="reader"/>'s text to <paramref name="sink"/> a line at a time, splitting any line longer than a chunk.</summary>
+    private static async Task ReadChunksAsync(StreamReader reader, Func<Chunk, ValueTask> sink)
+    {
+        var buffer = new char[ChunkChars];
+        var line = new StringBuilder();
+        int read;
+
+        while ((read = await reader.ReadAsync(buffer)) > 0)
+        {
+            var start = 0;
+            int newline;
+
+            while ((newline = Array.IndexOf(buffer, '\n', start, read - start)) >= 0)
+            {
+                line.Append(buffer, start, newline - start);
+                await sink(new Chunk(line.ToString().TrimEnd('\r'), EndsLine: true));
+                line.Clear();
+                start = newline + 1;
+            }
+
+            line.Append(buffer, start, read - start);
+
+            if (line.Length >= ChunkChars)
+            {
+                await sink(new Chunk(line.ToString(), EndsLine: false));
+                line.Clear();
+            }
+        }
+
+        if (line.Length > 0)
+        {
+            await sink(new Chunk(line.ToString().TrimEnd('\r'), EndsLine: true));
+        }
+    }
+
+    private static async Task PumpStdoutAsync(StreamReader reader, Channel<Chunk> target)
     {
         try
         {
-            while (await reader.ReadLineAsync() is { } line)
-            {
-                await target.Writer.WriteAsync(line);
-            }
+            await ReadChunksAsync(reader, chunk => target.Writer.WriteAsync(chunk));
         }
         catch (Exception ex) when (ex is IOException or ObjectDisposedException)
         {
@@ -440,13 +500,25 @@ internal sealed class PowerShellSession : IAsyncDisposable
     {
         try
         {
-            while (await reader.ReadLineAsync() is { } line)
+            await ReadChunksAsync(reader, chunk =>
             {
+                // Capped too: stderr is read between commands, when nothing clears it.
                 lock (_stderrLock)
                 {
-                    _stderr.AppendLine(line);
+                    var room = MaxStderrChars - _stderr.Length;
+                    if (room > 0)
+                    {
+                        _stderr.Append(chunk.Text.Length <= room ? chunk.Text : chunk.Text[..room]);
+
+                        if (chunk.EndsLine)
+                        {
+                            _stderr.AppendLine();
+                        }
+                    }
                 }
-            }
+
+                return ValueTask.CompletedTask;
+            });
         }
         catch (Exception ex) when (ex is IOException or ObjectDisposedException)
         {
@@ -479,6 +551,9 @@ internal sealed class PowerShellSession : IAsyncDisposable
             if (!process.HasExited)
             {
                 process.Kill(entireProcessTree: true);
+
+                // Kill only signals, so wait, bounded: a retired session's slot must not free while pwsh lives.
+                process.WaitForExit(TimeSpan.FromSeconds(5));
             }
         }
         catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException or SystemException)
