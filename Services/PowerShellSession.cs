@@ -23,6 +23,8 @@ internal sealed class PowerShellSession : IAsyncDisposable
     /// <summary>Four times what ResultSummary holds, so a paged total is still counted, and memory stays bounded.</summary>
     private const int MaxReadChars = 32_000_000;
 
+    private const int MaxFailureChars = 64_000;
+
     /// <summary>How a timed-out command reports itself. Callers match on this to recognise one.</summary>
     internal const string TerminatedMarker = "the PowerShell session was terminated";
 
@@ -39,9 +41,17 @@ internal sealed class PowerShellSession : IAsyncDisposable
     private Process? _process;
     private StreamWriter? _stdin;
 
+    // Process-wide, so a recreated session never reuses a value.
+    private static long s_generations;
+
+    private long _generation = Interlocked.Increment(ref s_generations);
+
     public PowerShellSession(string id) => Id = id;
 
     public string Id { get; }
+
+    /// <summary>Changes on every restart, reset and command run, so an approval can tell the session moved on.</summary>
+    public long Generation => Interlocked.Read(ref _generation);
 
     public DateTimeOffset LastUsedUtc { get; private set; } = DateTimeOffset.UtcNow;
 
@@ -65,12 +75,13 @@ internal sealed class PowerShellSession : IAsyncDisposable
 
     /// <summary>Runs a script and holds an oversized JSON array for paging.</summary>
     // Also returned: a concurrent command can replace the hold.
+    // expectedGeneration: runs only if the session has not moved on since then; checked under the gate.
     public Task<(string Output, HeldResultSet? Held)> ExecuteAndCaptureAsync(
-        string script, TimeSpan timeout, CancellationToken cancellationToken = default, string? transcriptKey = null) =>
-        RunAsync(script, timeout, capture: true, transcriptKey, cancellationToken);
+        string script, TimeSpan timeout, CancellationToken cancellationToken = default, string? transcriptKey = null, long? expectedGeneration = null) =>
+        RunAsync(script, timeout, capture: true, transcriptKey, cancellationToken, expectedGeneration);
 
     private async Task<(string Output, HeldResultSet? Held)> RunAsync(
-        string script, TimeSpan timeout, bool capture, string? transcriptKey, CancellationToken cancellationToken)
+        string script, TimeSpan timeout, bool capture, string? transcriptKey, CancellationToken cancellationToken, long? expectedGeneration = null)
     {
         // The wait for the session is bounded by the same timeout as the command. Without this, a
         // quick metadata lookup queues behind a long-running command with no limit of its own.
@@ -85,10 +96,18 @@ internal sealed class PowerShellSession : IAsyncDisposable
         {
             LastUsedUtc = DateTimeOffset.UtcNow;
 
+            if (expectedGeneration is { } expected && expected != Generation)
+            {
+                return (
+                    "Cancelled: this session was reset, reconnected or ran another command after the approval, so nothing was run. " +
+                    "Re-run 'pnp_run_command' and confirm again.", null);
+            }
+
             // Only a captured run replaces the hold: a docs or status lookup between pages must not drop the cursor.
             if (capture)
             {
                 Held = null;
+                Advance();
             }
 
             // Playback answers from a fixture without starting pwsh, which is what lets CI test this at all.
@@ -290,10 +309,10 @@ internal sealed class PowerShellSession : IAsyncDisposable
                     break;
                 }
 
-                // Drained past the ceiling, not kept: the end marker still has to be reached. The failure is
-                // always kept; it is small, and dropping it would report a failed command as a success.
+                // Drained past the ceiling, not kept: the end marker still has to be reached. The failure gets
+                // its own bounded allowance, since dropping it would report a failed command as a success.
                 failing |= string.Equals(line, ErrorMarker, StringComparison.Ordinal);
-                var room = failing ? line.Length : MaxReadChars - output.Length;
+                var room = (failing ? MaxReadChars + MaxFailureChars : MaxReadChars) - output.Length;
                 if (room > 0)
                 {
                     output.AppendLine(line.Length <= room ? line : line[..room]);
@@ -414,6 +433,7 @@ internal sealed class PowerShellSession : IAsyncDisposable
         // Guarded because ResetAsync may terminate without holding the gate, concurrently with a
         // command that is mid-read.
         Held = null;
+        Advance();
 
         Process? process;
         lock (_processLock)
@@ -444,6 +464,8 @@ internal sealed class PowerShellSession : IAsyncDisposable
             process.Dispose();
         }
     }
+
+    private void Advance() => Interlocked.Exchange(ref _generation, Interlocked.Increment(ref s_generations));
 
     public async ValueTask DisposeAsync()
     {

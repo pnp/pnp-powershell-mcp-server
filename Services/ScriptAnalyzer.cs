@@ -117,10 +117,14 @@ internal static class ScriptAnalyzer
                       $__pnpMethod = if ($__pnpArg -is [System.Management.Automation.Language.StringConstantExpressionAst]) { $__pnpArg.Value } else { '<dynamic>' }
                     }
                   }
-                  # Module functions are the module's; only ones defined in this session are opened. Capped against a runaway chain.
-                  if ($__pnpCmdInfo -and -not $__pnpStillAlias -and -not $__pnpCmdInfo.Module -and @('Function', 'Filter') -contains [string]$__pnpCmdInfo.CommandType -and $__pnpCmdInfo.ScriptBlock -and $__pnpRoots.Count -lt 50 -and -not $__pnpRoots.Contains($__pnpCmdInfo.ScriptBlock.Ast)) {
-                    $__pnpRoots.Add($__pnpCmdInfo.ScriptBlock.Ast)
-                    $__pnpNodes.AddRange(@($__pnpCmdInfo.ScriptBlock.Ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] }, $true)))
+                  # Module functions are the module's; only ones defined in this session are opened. Past 50, the rest counts as dynamic.
+                  if ($__pnpCmdInfo -and -not $__pnpStillAlias -and -not $__pnpCmdInfo.Module -and @('Function', 'Filter') -contains [string]$__pnpCmdInfo.CommandType -and $__pnpCmdInfo.ScriptBlock -and -not $__pnpRoots.Contains($__pnpCmdInfo.ScriptBlock.Ast)) {
+                    if ($__pnpRoots.Count -ge 50) {
+                      [PSCustomObject]@{ name = '<dynamic>'; verb = $null; supportsWhatIf = $false; isDynamic = $true }
+                    } else {
+                      $__pnpRoots.Add($__pnpCmdInfo.ScriptBlock.Ast)
+                      $__pnpNodes.AddRange(@($__pnpCmdInfo.ScriptBlock.Ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] }, $true)))
+                    }
                   }
                   [PSCustomObject]@{ name = $__pnpEffective; verb = $__pnpVerb; supportsWhatIf = $__pnpWhatIf; isDynamic = [bool]$__pnpStillAlias; method = $__pnpMethod; unresolved = -not $__pnpCmdInfo -and $__pnpInline -notcontains $__pnpName }
                 }

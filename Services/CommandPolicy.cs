@@ -22,10 +22,11 @@ internal static class CommandPolicy
         "Unregister", "Unpublish", "Merge",
     };
 
-    // Each runs code it receives as data, which the parse cannot see into.
+    // Each runs code the parse cannot see into: code passed as data, a module's own code, or another process.
     private static readonly HashSet<string> CodeRunners = new(StringComparer.OrdinalIgnoreCase)
     {
         "Invoke-Expression", "Invoke-Command", "Start-Job", "Start-ThreadJob", "Add-Type",
+        "Start-Process", "Invoke-Item", "Import-Module",
     };
 
     // Each can define a command from data, which is then called before any analysis could see its body.
@@ -46,8 +47,8 @@ internal static class CommandPolicy
     // an ordinary reporting pattern and changes nothing in Microsoft 365. "Invoke" runs a script block.
     private static readonly string[] MutatingMethodPrefixes = ["Execute", "Delete", "Recycle", "Invoke"];
 
-    // Script blocks built from strings, matched exactly so CreateDirectory and friends stay allowed.
-    private static readonly HashSet<string> ScriptBlockFactories = new(StringComparer.OrdinalIgnoreCase) { "Create", "NewScriptBlock" };
+    // Script blocks built from strings, and Process.Start; exact, so CreateDirectory and StartNew stay allowed.
+    private static readonly HashSet<string> ExactMethods = new(StringComparer.OrdinalIgnoreCase) { "Create", "NewScriptBlock", "Start" };
 
     public static bool ReadOnlyMode =>
         string.Equals(Environment.GetEnvironmentVariable("PNP_MCP_READONLY"), "true", StringComparison.OrdinalIgnoreCase);
@@ -148,6 +149,6 @@ internal static class CommandPolicy
 
     private static List<string> FindMutatingMethods(ScriptAnalysis analysis) =>
         [.. analysis.MethodCalls
-            .Where(m => m == "<dynamic>" || ScriptBlockFactories.Contains(m) || MutatingMethodPrefixes.Any(p => m.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
+            .Where(m => m == "<dynamic>" || ExactMethods.Contains(m) || MutatingMethodPrefixes.Any(p => m.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
             .Distinct(StringComparer.OrdinalIgnoreCase)];
 }

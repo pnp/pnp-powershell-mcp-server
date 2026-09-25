@@ -383,9 +383,11 @@ internal partial class PnPPowerShellTools
         }
 
         var flagged = DetermineConfirmationTarget(analysis, command);
+        long? approvedGeneration = null;
         if (flagged is not null && !ConfirmationDisabled)
         {
-            var refusal = await ConfirmDestructiveAsync(server, context, session.Id, command, flagged);
+            approvedGeneration = session.Generation;
+            var refusal = await ConfirmDestructiveAsync(server, context, $"{session.Id}\n{approvedGeneration}", command, flagged);
             if (refusal is not null)
             {
                 return refusal;
@@ -420,7 +422,7 @@ internal partial class PnPPowerShellTools
             remaining = executionFloor;
         }
 
-        var (result, held) = await session.ExecuteAndCaptureAsync(script, remaining, cancellationToken, $"run\n{command}");
+        var (result, held) = await session.ExecuteAndCaptureAsync(script, remaining, cancellationToken, $"run\n{command}", approvedGeneration);
 
         // The generic timeout advice is meaningless for a sign-in.
         if (signIn && result.Contains(PowerShellSession.TerminatedMarker, StringComparison.Ordinal))
@@ -530,12 +532,12 @@ internal partial class PnPPowerShellTools
     private static async Task<string?> ConfirmDestructiveAsync(
         McpServer server,
         RequestContext<CallToolRequestParams> context,
-        string sessionId,
+        string session,
         string command,
         string matchedCmdlet)
     {
-        // Bound to the session too, so an approval given for one tenant's session cannot run in another.
-        var bound = $"{sessionId}\n{command}";
+        // Bound to the session as it is now, so a reset, reconnect or other command in it voids the approval.
+        var bound = $"{session}\n{command}";
 
         // A retry carries the answer to the prompt raised by the previous attempt.
         if (context.Params?.InputResponses?.TryGetValue("confirmDestructive", out var response) is true)

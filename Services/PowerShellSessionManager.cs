@@ -14,6 +14,8 @@ internal sealed class PowerShellSessionManager : IAsyncDisposable
 
     private const int MaxSessions = 10;
 
+    private readonly Lock _admission = new();
+
     private readonly ConcurrentDictionary<string, PowerShellSession> _sessions =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -21,22 +23,39 @@ internal sealed class PowerShellSessionManager : IAsyncDisposable
     {
         EvictIdleSessions();
 
-        // Each session is a pwsh process with PnP loaded, so a caller cannot open them without limit. The
-        // default is exempt: docs lookups and diagnosis run there and must not fail on a count of others.
         var id = Normalize(sessionId);
-        if (!_sessions.ContainsKey(id) && _sessions.Count >= MaxSessions &&
-            !string.Equals(id, DefaultSessionId, StringComparison.OrdinalIgnoreCase))
+        if (_sessions.TryGetValue(id, out var existing))
         {
-            throw new McpException(
-                $"Too many sessions: {MaxSessions} are open. End one with 'pnp_reset_session', or reuse an existing sessionId.");
+            return existing;
         }
 
-        return _sessions.GetOrAdd(id, static key => new PowerShellSession(key));
+        // Each session is a pwsh process with PnP loaded, so named ones are capped, and admitted under a lock
+        // so concurrent calls cannot overshoot. The default neither counts nor is refused: docs and diagnosis run there.
+        lock (_admission)
+        {
+            if (_sessions.TryGetValue(id, out existing))
+            {
+                return existing;
+            }
+
+            var isDefault = string.Equals(id, DefaultSessionId, StringComparison.OrdinalIgnoreCase);
+            var named = _sessions.Count - (_sessions.ContainsKey(DefaultSessionId) ? 1 : 0);
+            if (!isDefault && named >= MaxSessions)
+            {
+                throw new McpException(
+                    $"Too many sessions: {MaxSessions} named sessions are open. End one with 'pnp_reset_session', or reuse an existing sessionId.");
+            }
+
+            var created = new PowerShellSession(id);
+            _sessions[id] = created;
+            return created;
+        }
     }
 
     public async Task<bool> ResetAsync(string? sessionId)
     {
-        if (!_sessions.TryGetValue(Normalize(sessionId), out var session))
+        // Removed, not just terminated, so a reset frees its slot under the cap.
+        if (!_sessions.TryRemove(Normalize(sessionId), out var session))
         {
             return false;
         }

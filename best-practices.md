@@ -278,7 +278,8 @@ Pipeline shaping is allowed too, since these appear in the parsed script as comm
   `Add-Type`), because what they would run cannot be established before they run.
 - **Native executables** (`pwsh`, `git`, ...), which have no verb to classify.
 - **Method calls that can change state** — anything named `Delete*`, `Recycle*`, `Execute*`
-  and `Invoke*`, plus `Create` and `NewScriptBlock`, which build script blocks from strings. `ExecuteQuery` is the commit point for every CSOM change, so
+  and `Invoke*`, plus `Create` and `NewScriptBlock`, which build script blocks from strings, and `Start`,
+  which launches a process. `ExecuteQuery` is the commit point for every CSOM change, so
   `$list.DeleteObject(); $ctx.ExecuteQuery()` is refused even though neither is a cmdlet. Read-only
   helpers such as `ToString()` and `Trim()` are unaffected.
 
@@ -295,7 +296,8 @@ Pipeline shaping is allowed too, since these appear in the parsed script as comm
 Commands using a destructive verb — `Remove-*`, `Clear-*`, `Reset-*`, `Uninstall-*`, `Revoke-*`,
 `Deny-*`, `Restore-*`, `Move-*`, `Rename-*`, `Disable-*`, `Unregister-*`, `Unpublish-*`, `Merge-*` — are
 **not run without confirmation**. Neither is a command invoked indirectly or through a code runner
-(`Invoke-Expression`, `Invoke-Command`, `Start-Job`, `Add-Type`), or one with no verb at all (a native program
+(`Invoke-Expression`, `Invoke-Command`, `Start-Job`, `Add-Type`, `Start-Process`, `Invoke-Item`, `Import-Module`),
+or one with no verb at all (a native program
 such as `pwsh`, or a script file), since it cannot be identified in advance. A function defined in this session
 is judged by what its body runs, and one the same script defines as it runs (`Set-Item function:…`, `Set-Alias`,
 `Import-Module`) is confirmed first. Nor is `Invoke-PnPSPRestMethod` or `Invoke-PnPGraphMethod` with
