@@ -34,7 +34,7 @@ internal sealed class ScriptSample
     [JsonIgnore]
     public string LocalPath { get; set; } = string.Empty;
 
-    /// <summary>The listed folder <see cref="LocalPath"/> was found in.</summary>
+    /// <summary>The listed folder a local or clone sample was found in, and the only place its body is read from.</summary>
     [JsonIgnore]
     public string LocalRoot { get; set; } = string.Empty;
 }

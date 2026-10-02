@@ -14,8 +14,6 @@ internal sealed partial class ScriptSampleTools
     // Shared HttpClient — safe for the lifetime of a stdio MCP server process
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30) };
 
-    private static readonly Lock SaveLock = new();
-
     [GeneratedRegex(@"#\s*\[PnP PowerShell\][^\n]*\n[\s\S]*?```powershell([\s\S]*?)```", RegexOptions.IgnoreCase)]
     private static partial Regex PnpPsTabRegex();
 
@@ -47,10 +45,11 @@ internal sealed partial class ScriptSampleTools
                     ? (await File.ReadAllTextAsync(sample.LocalPath, cancellationToken)).Trim()
                     : string.Empty;
 
-            foreach (var folder in ScriptSampleIndex.Folders())
+            // Only from the sample's own clone, so another folder cannot put its code under this sample's name.
+            if (sample.LocalRoot.Length > 0)
             {
-                var readme = Path.Combine(folder, "scripts", sample.Name, "README.md");
-                if (File.Exists(readme) && ScriptSampleIndex.IsLinkFree(folder, readme))
+                var readme = Path.Combine(sample.LocalRoot, "scripts", sample.Name, "README.md");
+                if (File.Exists(readme) && ScriptSampleIndex.IsLinkFree(sample.LocalRoot, readme))
                     return ExtractPnpScript(await File.ReadAllTextAsync(readme, cancellationToken));
             }
         }
@@ -290,33 +289,31 @@ internal sealed partial class ScriptSampleTools
         if (ScriptSampleIndex.SaveFolder() is not { } folder)
             return "Error: No sample folder is set up, so nothing was saved. Ask the user to add a folder to PNP_SCRIPT_SAMPLES_PATH and restart the server.";
 
-        var slug = ScriptSampleIndex.Slug(name);
+        // Lower case, so CreateNew itself rejects a case variant, even from another server process.
+        var slug = ScriptSampleIndex.Slug(name).ToLowerInvariant();
         if (!ScriptSampleIndex.IsSafeName(slug))
             return $"Error: '{OutputLimit.Echo(name)}' cannot be used as a file name. Use letters, digits and dashes.";
 
         var path = Path.Combine(folder, slug + ".ps1");
+
+        // The index keeps the first of two names differing only in case, so a match anywhere would hide the save.
+        if (File.Exists(path) || ScriptSampleIndex.Samples.Any(s => s.Name.Equals(slug, StringComparison.OrdinalIgnoreCase)))
+            return $"Error: a sample named '{slug}' already exists, so nothing was saved. Choose another name.";
+
         var summary = string.Join(' ', synopsis.Replace("#>", "# >").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
-        // Check, write and reload as one step, so two saves differing only in case cannot both pass.
-        lock (SaveLock)
+        try
         {
-            // The index keeps the first of two names differing only in case, so a match anywhere would hide the save.
-            if (File.Exists(path) || ScriptSampleIndex.Samples.Any(s => s.Name.Equals(slug, StringComparison.OrdinalIgnoreCase)))
-                return $"Error: a sample named '{slug}' already exists, so nothing was saved. Choose another name.";
-
-            try
-            {
-                Directory.CreateDirectory(folder);
-                using var writer = new StreamWriter(new FileStream(path, FileMode.CreateNew, FileAccess.Write));
-                writer.Write($"<#\n.SYNOPSIS\n{summary}\n#>\n\n{script.Trim()}\n");
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                return OutputLimit.Apply($"Error: {path} could not be saved. {ex.Message}");
-            }
-
-            ScriptSampleIndex.Reload();
+            Directory.CreateDirectory(folder);
+            using var writer = new StreamWriter(new FileStream(path, FileMode.CreateNew, FileAccess.Write));
+            writer.Write($"<#\n.SYNOPSIS\n{summary}\n#>\n\n{script.Trim()}\n");
         }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return OutputLimit.Apply($"Error: {path} could not be saved. {ex.Message}");
+        }
+
+        ScriptSampleIndex.Reload();
 
         return $"Saved as '{slug}' to {path}. Searches and suggestions include it from now on.";
     }

@@ -45,13 +45,10 @@ internal static partial class ScriptSampleIndex
             .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(e => SampleRepository.IsUrl(e) || Path.IsPathFullyQualified(e))];
 
-    /// <summary>Each entry as a local folder, a Git URL as its copy.</summary>
-    internal static string[] Folders() =>
-        [.. Entries().Select(e => SampleRepository.IsUrl(e) ? SampleRepository.Folder(e) : e)];
-
     /// <summary>Where new samples go: the first listed folder that is neither a Git copy nor a pnp/script-samples clone.</summary>
+    // A folder that cannot be read now is skipped, since it may yet turn out to be a clone.
     internal static string? SaveFolder() =>
-        Entries().FirstOrDefault(e => !SampleRepository.IsUrl(e) && Safely(() => ReadClone(e)) is not { Count: > 0 });
+        Entries().FirstOrDefault(e => !SampleRepository.IsUrl(e) && Safely(() => ReadClone(e)) is { Count: 0 });
 
     /// <summary>Every sample in those entries, syncing Git copies first. An unreadable entry skips only itself.</summary>
     internal static List<ScriptSample> ReadLocal() =>
@@ -217,7 +214,7 @@ internal static partial class ScriptSampleIndex
         foreach (var dir in Directory.EnumerateDirectories(scripts))
         {
             var manifest = Path.Combine(dir, "assets", "sample.json");
-            if (!File.Exists(manifest))
+            if (!File.Exists(manifest) || !IsLinkFree(root, manifest))
             {
                 continue;
             }
@@ -246,6 +243,7 @@ internal static partial class ScriptSampleIndex
                         Tags = element.TryGetProperty("tags", out var tags) && tags.ValueKind == JsonValueKind.Array
                             ? [.. tags.EnumerateArray().Select(t => t.GetString() ?? string.Empty)]
                             : [],
+                        LocalRoot = root,
                     });
                 }
             }

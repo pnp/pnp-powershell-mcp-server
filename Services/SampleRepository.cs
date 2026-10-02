@@ -20,21 +20,51 @@ internal static class SampleRepository
             "samples",
             Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(url)))[..16]);
 
-    /// <summary>Clones or updates the copy. When Git fails, the last good copy is used.</summary>
+    /// <summary>Updates the copy, or replaces it with a fresh clone. When both fail, the last good copy is used.</summary>
+    // A clone or fetch killed by the timeout leaves lock files that fail every later fetch, hence the replacement.
     public static string Sync(string url)
     {
         var folder = Folder(url);
 
-        if (Directory.Exists(Path.Combine(folder, ".git")))
+        var updated = Directory.Exists(Path.Combine(folder, ".git")) &&
+            Git("-C", folder, "fetch", "--depth", "1", "origin") &&
+            Git("-C", folder, "reset", "--hard", "FETCH_HEAD");
+
+        if (!updated)
         {
-            _ = Git("-C", folder, "fetch", "--depth", "1", "origin") && Git("-C", folder, "reset", "--hard", "FETCH_HEAD");
-        }
-        else
-        {
-            Git("clone", "--depth", "1", "--", url, folder);
+            var fresh = folder + ".new";
+            Delete(fresh);
+
+            if (Git("clone", "--depth", "1", "--", url, fresh))
+            {
+                Delete(folder);
+                Directory.Move(fresh, folder);
+            }
+            else
+            {
+                Delete(fresh);
+            }
         }
 
         return folder;
+    }
+
+    /// <summary>Clears the read-only flag Git puts on its objects, which Directory.Delete refuses on Windows.</summary>
+    private static void Delete(string folder)
+    {
+        if (!Directory.Exists(folder))
+        {
+            return;
+        }
+
+        // Links are skipped, so a cloned link cannot reach files outside the copy.
+        var options = new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint };
+        foreach (var file in Directory.EnumerateFiles(folder, "*", options))
+        {
+            File.SetAttributes(file, FileAttributes.Normal);
+        }
+
+        Directory.Delete(folder, recursive: true);
     }
 
     private static readonly Lazy<string?> SshCommand = new(() => BatchSsh(

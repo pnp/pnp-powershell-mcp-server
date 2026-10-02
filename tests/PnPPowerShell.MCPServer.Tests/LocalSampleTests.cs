@@ -176,6 +176,44 @@ public sealed class LocalSampleTests : IDisposable
         }
     }
 
+    [Fact]
+    public void A_clone_manifest_reached_through_a_link_is_not_read()
+    {
+        Write(Path.Combine("clone", "scripts", "spo-good", "assets", "sample.json"), """[{"title":"Good"}]""");
+        Write(Path.Combine("elsewhere", "assets", "sample.json"), """[{"title":"Outside"}]""");
+        var link = Path.Combine(_folder.FullName, "clone", "scripts", "spo-linked");
+
+        try
+        {
+            LinkFolder(link, Path.Combine(_folder.FullName, "elsewhere"));
+            using var env = new EnvVar("PNP_SCRIPT_SAMPLES_PATH", Path.Combine(_folder.FullName, "clone"));
+
+            Assert.Equal(["spo-good"], ScriptSampleIndex.ReadLocal().Select(s => s.Name));
+        }
+        finally
+        {
+            Directory.Delete(link);
+        }
+    }
+
+    /// <summary>Listed first, a plain folder could otherwise serve its README under a clone sample's name.</summary>
+    [Fact]
+    public async Task A_clone_sample_is_read_only_from_its_own_clone()
+    {
+        Write(Path.Combine("plain", "scripts", "spo-demo", "README.md"), "```powershell\nSPOOFED\n```");
+        Write(Path.Combine("clone", "scripts", "spo-demo", "README.md"), "```powershell\nGet-PnPWeb\n```");
+        Write(Path.Combine("clone", "scripts", "spo-demo", "assets", "sample.json"), """[{"title":"Demo"}]""");
+        using var env = new EnvVar(
+            "PNP_SCRIPT_SAMPLES_PATH",
+            $"{Path.Combine(_folder.FullName, "plain")};{Path.Combine(_folder.FullName, "clone")}");
+        ScriptSampleIndex.Reload();
+
+        var output = await ScriptSampleTools.GetScriptSample("spo-demo");
+
+        Assert.Contains("Get-PnPWeb", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("SPOOFED", output, StringComparison.Ordinal);
+    }
+
     /// <summary>A junction on Windows, which needs no privilege; a symbolic link elsewhere.</summary>
     private static void LinkFolder(string link, string target)
     {
@@ -242,7 +280,7 @@ public sealed class LocalSampleTests : IDisposable
         Assert.Equal(expected, SampleRepository.BatchSsh(env, config, gitSsh));
 
     [Fact]
-    public void A_git_repository_is_cloned_then_updated()
+    public void A_git_repository_is_cloned_updated_and_recloned_once_broken()
     {
         var repo = Path.Combine(_folder.FullName, "repo");
         var copy = SampleRepository.Folder(repo);
@@ -257,6 +295,15 @@ public sealed class LocalSampleTests : IDisposable
             Assert.Equal(copy, SampleRepository.Sync(repo));
             Assert.True(File.Exists(Path.Combine(copy, "first.ps1")));
             Assert.True(File.Exists(Path.Combine(copy, "second.ps1")));
+
+            // What a fetch killed by the timeout leaves behind; every later fetch then refuses to run.
+            File.WriteAllText(Path.Combine(copy, ".git", "index.lock"), string.Empty);
+            File.WriteAllText(Path.Combine(copy, ".git", "shallow.lock"), string.Empty);
+            Commit(repo, "third.ps1");
+
+            SampleRepository.Sync(repo);
+            Assert.True(File.Exists(Path.Combine(copy, "third.ps1")));
+            Assert.False(Directory.Exists(copy + ".new"));
         }
         finally
         {
@@ -291,10 +338,10 @@ public sealed class LocalSampleTests : IDisposable
 
         var saved = ScriptSampleTools.SaveScriptSample("Archive Inactive Sites", "Archive sites with no activity", "Get-PnPTenantSite");
 
-        Assert.Contains("Saved as 'Archive-Inactive-Sites'", saved, StringComparison.Ordinal);
-        Assert.Equal("<#\n.SYNOPSIS\nArchive sites with no activity\n#>\n\nGet-PnPTenantSite\n", File.ReadAllText(Path.Combine(_folder.FullName, "Archive-Inactive-Sites.ps1")));
-        Assert.Equal("Archive-Inactive-Sites", ScriptSampleIndex.Search("archive inactive sites", 1)[0].Document.Name);
-        Assert.Contains("Get-PnPTenantSite", await ScriptSampleTools.GetScriptSample("Archive-Inactive-Sites"), StringComparison.Ordinal);
+        Assert.Contains("Saved as 'archive-inactive-sites'", saved, StringComparison.Ordinal);
+        Assert.Equal("<#\n.SYNOPSIS\nArchive sites with no activity\n#>\n\nGet-PnPTenantSite\n", File.ReadAllText(Path.Combine(_folder.FullName, "archive-inactive-sites.ps1")));
+        Assert.Equal("archive-inactive-sites", ScriptSampleIndex.Search("archive inactive sites", 1)[0].Document.Name);
+        Assert.Contains("Get-PnPTenantSite", await ScriptSampleTools.GetScriptSample("archive-inactive-sites"), StringComparison.Ordinal);
     }
 
     [Fact]
