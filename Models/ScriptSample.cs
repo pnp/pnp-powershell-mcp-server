@@ -33,6 +33,10 @@ internal sealed class ScriptSample
     /// <summary>The user's own .ps1 file. Never deserialized, so an index file cannot point it elsewhere.</summary>
     [JsonIgnore]
     public string LocalPath { get; set; } = string.Empty;
+
+    /// <summary>The listed folder <see cref="LocalPath"/> was found in.</summary>
+    [JsonIgnore]
+    public string LocalRoot { get; set; } = string.Empty;
 }
 
 internal sealed class ScriptSampleAuthor

@@ -141,17 +141,7 @@ public sealed class LocalSampleTests : IDisposable
 
         try
         {
-            if (OperatingSystem.IsWindows())
-            {
-                using var mklink = System.Diagnostics.Process.Start("cmd", ["/c", "mklink", "/J", link, _folder.FullName]);
-                mklink.WaitForExit();
-            }
-            else
-            {
-                Directory.CreateSymbolicLink(link, _folder.FullName);
-            }
-
-            Assert.True(Directory.Exists(link));
+            LinkFolder(link, _folder.FullName);
             using var env = new EnvVar("PNP_SCRIPT_SAMPLES_PATH", _folder.FullName);
 
             Assert.Equal(["x"], ScriptSampleIndex.ReadLocal().Select(s => s.Name));
@@ -160,6 +150,46 @@ public sealed class LocalSampleTests : IDisposable
         {
             Directory.Delete(link);
         }
+    }
+
+    [Fact]
+    public async Task A_folder_swapped_for_a_link_after_indexing_is_not_read()
+    {
+        Write(Path.Combine("listed", "sub", "x.ps1"), "Get-PnPWeb");
+        Write(Path.Combine("elsewhere", "x.ps1"), "NOT-FOR-THE-MODEL");
+        using var env = new EnvVar("PNP_SCRIPT_SAMPLES_PATH", Path.Combine(_folder.FullName, "listed"));
+        ScriptSampleIndex.Reload();
+        Assert.Contains(ScriptSampleIndex.Samples, s => s.Name == "sub-x");
+
+        var sub = Path.Combine(_folder.FullName, "listed", "sub");
+        Directory.Delete(sub, recursive: true);
+
+        try
+        {
+            LinkFolder(sub, Path.Combine(_folder.FullName, "elsewhere"));
+
+            Assert.DoesNotContain("NOT-FOR-THE-MODEL", await ScriptSampleTools.GetScriptSample("sub-x"), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(sub);
+        }
+    }
+
+    /// <summary>A junction on Windows, which needs no privilege; a symbolic link elsewhere.</summary>
+    private static void LinkFolder(string link, string target)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            using var mklink = System.Diagnostics.Process.Start("cmd", ["/c", "mklink", "/J", link, target]);
+            mklink.WaitForExit();
+        }
+        else
+        {
+            Directory.CreateSymbolicLink(link, target);
+        }
+
+        Assert.True(Directory.Exists(link));
     }
 
     /// <summary>A shared repository could otherwise link leak.ps1 to any file this user can read.</summary>
@@ -201,6 +231,15 @@ public sealed class LocalSampleTests : IDisposable
     [InlineData("samples", false)]
     public void Only_https_and_ssh_entries_are_git_repositories(string entry, bool expected) =>
         Assert.Equal(expected, SampleRepository.IsUrl(entry));
+
+    /// <summary>Git's own order: GIT_SSH_COMMAND, then core.sshCommand, then GIT_SSH, then ssh.</summary>
+    [Theory]
+    [InlineData(null, null, null, "ssh -o BatchMode=yes")]
+    [InlineData("ssh -i env", "ssh -i config", null, "ssh -i env -o BatchMode=yes")]
+    [InlineData(null, "ssh -i config\n", "plink.exe", "ssh -i config -o BatchMode=yes")]
+    [InlineData(" ", "", "plink.exe", null)]
+    public void Ssh_runs_in_batch_mode_on_top_of_the_configured_command(string? env, string? config, string? gitSsh, string? expected) =>
+        Assert.Equal(expected, SampleRepository.BatchSsh(env, config, gitSsh));
 
     [Fact]
     public void A_git_repository_is_cloned_then_updated()

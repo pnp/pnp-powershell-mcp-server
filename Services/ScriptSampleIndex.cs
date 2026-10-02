@@ -286,6 +286,27 @@ internal static partial class ScriptSampleIndex
     private static bool IsLink(ref FileSystemEntry entry) =>
         (entry.Attributes & FileAttributes.ReparsePoint) != 0 && entry.ToFileSystemInfo().LinkTarget is not null;
 
+    /// <summary>Rechecks at read time what enumeration did: no link between <paramref name="root"/> and <paramref name="path"/>.</summary>
+    // The root itself is the user's choice, and may sit under a link, as macOS temp folders do.
+    internal static bool IsLinkFree(string root, string path)
+    {
+        if (new FileInfo(path).LinkTarget is not null)
+        {
+            return false;
+        }
+
+        var rootLength = Path.TrimEndingDirectorySeparator(root).Length;
+        for (var folder = Path.GetDirectoryName(path); folder is not null && folder.Length > rootLength; folder = Path.GetDirectoryName(folder))
+        {
+            if (new DirectoryInfo(folder).LinkTarget is not null)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     /// <summary>Null when the file cannot be read, so one bad file skips only itself.</summary>
     private static ScriptSample? FromScript(string folder, FileInfo file)
     {
@@ -308,6 +329,7 @@ internal static partial class ScriptSampleIndex
             Description = Help(script, "DESCRIPTION"),
             Url = new Uri(file.FullName).AbsoluteUri,
             LocalPath = file.FullName,
+            LocalRoot = folder,
             Tags = [.. CmdletRegex().Matches(script).Select(m => m.Value).Distinct(StringComparer.OrdinalIgnoreCase)],
         };
     }

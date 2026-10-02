@@ -37,7 +37,28 @@ internal static class SampleRepository
         return folder;
     }
 
-    internal static bool Git(params string[] arguments)
+    private static readonly Lazy<string?> SshCommand = new(() => BatchSsh(
+        Environment.GetEnvironmentVariable("GIT_SSH_COMMAND"),
+        Run(["config", "--get", "core.sshCommand"], sshCommand: null),
+        Environment.GetEnvironmentVariable("GIT_SSH")));
+
+    /// <summary>The ssh command Git would pick, in Git's order, with BatchMode so ssh fails rather than prompts.</summary>
+    /// <returns>Null when Git would run the program GIT_SSH names, which takes no options.</returns>
+    internal static string? BatchSsh(string? gitSshCommand, string? configured, string? gitSsh)
+    {
+        var command = new[] { gitSshCommand, configured }.FirstOrDefault(c => !string.IsNullOrWhiteSpace(c))?.Trim();
+        if (command is null && !string.IsNullOrWhiteSpace(gitSsh))
+        {
+            return null;
+        }
+
+        return $"{command ?? "ssh"} -o BatchMode=yes";
+    }
+
+    internal static bool Git(params string[] arguments) => Run(arguments, SshCommand.Value) is not null;
+
+    /// <summary>Git's output when it succeeds, otherwise null.</summary>
+    private static string? Run(string[] arguments, string? sshCommand)
     {
         var startInfo = new ProcessStartInfo("git")
         {
@@ -48,6 +69,11 @@ internal static class SampleRepository
             RedirectStandardError = true,
             Environment = { ["GIT_TERMINAL_PROMPT"] = "0", ["GCM_INTERACTIVE"] = "never" },
         };
+
+        if (sshCommand is not null)
+        {
+            startInfo.Environment["GIT_SSH_COMMAND"] = sshCommand;
+        }
 
         foreach (var argument in arguments)
         {
@@ -60,20 +86,20 @@ internal static class SampleRepository
 
             // stdin and stdout are the MCP channel, so the child must never inherit them.
             git.StandardInput.Close();
-            _ = git.StandardOutput.ReadToEndAsync();
+            var output = git.StandardOutput.ReadToEndAsync();
             _ = git.StandardError.ReadToEndAsync();
 
             if (git.WaitForExit(GitTimeout))
             {
-                return git.ExitCode == 0;
+                return git.ExitCode != 0 ? null : output.Wait(GitTimeout) ? output.Result : string.Empty;
             }
 
             git.Kill(entireProcessTree: true);
-            return false;
+            return null;
         }
         catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
         {
-            return false;
+            return null;
         }
     }
 }

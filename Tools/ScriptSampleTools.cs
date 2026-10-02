@@ -41,13 +41,16 @@ internal sealed partial class ScriptSampleTools
     {
         try
         {
+            // A file can be swapped for a link after indexing, so the link check is repeated here.
             if (sample.LocalPath.Length > 0)
-                return (await File.ReadAllTextAsync(sample.LocalPath, cancellationToken)).Trim();
+                return ScriptSampleIndex.IsLinkFree(sample.LocalRoot, sample.LocalPath)
+                    ? (await File.ReadAllTextAsync(sample.LocalPath, cancellationToken)).Trim()
+                    : string.Empty;
 
             foreach (var folder in ScriptSampleIndex.Folders())
             {
                 var readme = Path.Combine(folder, "scripts", sample.Name, "README.md");
-                if (File.Exists(readme))
+                if (File.Exists(readme) && ScriptSampleIndex.IsLinkFree(folder, readme))
                     return ExtractPnpScript(await File.ReadAllTextAsync(readme, cancellationToken));
             }
         }
