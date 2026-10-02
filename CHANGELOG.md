@@ -18,7 +18,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 ### Changed
 
 - Changed `PNP_SCRIPT_SAMPLES_PATH` so it is no longer ignored when the PnP PowerShell VS Code extension is installed. [#30](https://github.com/pnp/pnp-powershell-mcp-server/pull/30)
-- Changed seven tool descriptions so clients pick the right tool more often, notably `pnp_get_connection_status`, `pnp_reset_session` and `pnp_diagnose_connection`. [#30](https://github.com/pnp/pnp-powershell-mcp-server/pull/30)
+- Changed nine tool descriptions so clients pick the right tool more often, notably `pnp_get_connection_status`, `pnp_reset_session` and `pnp_diagnose_connection`. [#30](https://github.com/pnp/pnp-powershell-mcp-server/pull/30)
 
 ## [0.1.7-beta]
 

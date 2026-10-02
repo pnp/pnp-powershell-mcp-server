@@ -270,10 +270,8 @@ internal static partial class ScriptSampleIndex
             new EnumerationOptions { RecurseSubdirectories = true })
         {
             ShouldIncludePredicate = (ref entry) =>
-                !entry.IsDirectory && entry.FileName.EndsWith(".ps1", StringComparison.OrdinalIgnoreCase),
-
-            // Links are not followed, so a junction cannot loop. OneDrive folders are reparse points but not links.
-            ShouldRecursePredicate = (ref entry) => entry.ToFileSystemInfo().LinkTarget is null,
+                !entry.IsDirectory && entry.FileName.EndsWith(".ps1", StringComparison.OrdinalIgnoreCase) && !IsLink(ref entry),
+            ShouldRecursePredicate = (ref entry) => !IsLink(ref entry),
         };
 
         return [.. scripts
@@ -283,6 +281,10 @@ internal static partial class ScriptSampleIndex
             .OfType<ScriptSample>()
             .Where(s => IsSafeName(s.Name))];
     }
+
+    /// <summary>A folder link can loop and a file link can point anywhere. OneDrive items are reparse points but not links.</summary>
+    private static bool IsLink(ref FileSystemEntry entry) =>
+        (entry.Attributes & FileAttributes.ReparsePoint) != 0 && entry.ToFileSystemInfo().LinkTarget is not null;
 
     /// <summary>Null when the file cannot be read, so one bad file skips only itself.</summary>
     private static ScriptSample? FromScript(string folder, FileInfo file)

@@ -14,6 +14,8 @@ internal sealed partial class ScriptSampleTools
     // Shared HttpClient — safe for the lifetime of a stdio MCP server process
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30) };
 
+    private static readonly Lock SaveLock = new();
+
     [GeneratedRegex(@"#\s*\[PnP PowerShell\][^\n]*\n[\s\S]*?```powershell([\s\S]*?)```", RegexOptions.IgnoreCase)]
     private static partial Regex PnpPsTabRegex();
 
@@ -289,25 +291,29 @@ internal sealed partial class ScriptSampleTools
         if (!ScriptSampleIndex.IsSafeName(slug))
             return $"Error: '{OutputLimit.Echo(name)}' cannot be used as a file name. Use letters, digits and dashes.";
 
-        // The index keeps the first of two names differing only in case, so a match anywhere would hide the save.
         var path = Path.Combine(folder, slug + ".ps1");
-        if (File.Exists(path) || ScriptSampleIndex.Samples.Any(s => s.Name.Equals(slug, StringComparison.OrdinalIgnoreCase)))
-            return $"Error: a sample named '{slug}' already exists, so nothing was saved. Choose another name.";
-
         var summary = string.Join(' ', synopsis.Replace("#>", "# >").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
-        try
+        // Check, write and reload as one step, so two saves differing only in case cannot both pass.
+        lock (SaveLock)
         {
-            Directory.CreateDirectory(folder);
-            using var writer = new StreamWriter(new FileStream(path, FileMode.CreateNew, FileAccess.Write));
-            writer.Write($"<#\n.SYNOPSIS\n{summary}\n#>\n\n{script.Trim()}\n");
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            return OutputLimit.Apply($"Error: {path} could not be saved. {ex.Message}");
-        }
+            // The index keeps the first of two names differing only in case, so a match anywhere would hide the save.
+            if (File.Exists(path) || ScriptSampleIndex.Samples.Any(s => s.Name.Equals(slug, StringComparison.OrdinalIgnoreCase)))
+                return $"Error: a sample named '{slug}' already exists, so nothing was saved. Choose another name.";
 
-        ScriptSampleIndex.Reload();
+            try
+            {
+                Directory.CreateDirectory(folder);
+                using var writer = new StreamWriter(new FileStream(path, FileMode.CreateNew, FileAccess.Write));
+                writer.Write($"<#\n.SYNOPSIS\n{summary}\n#>\n\n{script.Trim()}\n");
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return OutputLimit.Apply($"Error: {path} could not be saved. {ex.Message}");
+            }
+
+            ScriptSampleIndex.Reload();
+        }
 
         return $"Saved as '{slug}' to {path}. Searches and suggestions include it from now on.";
     }

@@ -162,6 +162,18 @@ public sealed class LocalSampleTests : IDisposable
         }
     }
 
+    /// <summary>A shared repository could otherwise link leak.ps1 to any file this user can read.</summary>
+    [RequiresSymlinksFact]
+    public void A_script_that_is_a_link_is_not_read()
+    {
+        Write(Path.Combine("listed", "real.ps1"), "Get-PnPWeb");
+        var secret = Write("secret.txt", "not a sample");
+        File.CreateSymbolicLink(Path.Combine(_folder.FullName, "listed", "leak.ps1"), secret);
+        using var env = new EnvVar("PNP_SCRIPT_SAMPLES_PATH", Path.Combine(_folder.FullName, "listed"));
+
+        Assert.Equal(["real"], ScriptSampleIndex.ReadLocal().Select(s => s.Name));
+    }
+
     [Fact]
     public async Task Local_samples_join_the_index_replace_a_namesake_and_return_their_whole_script()
     {
