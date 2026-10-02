@@ -15,7 +15,7 @@ internal static partial class ScriptSampleIndex
 
     private const int MaxLocalScripts = 5_000;
 
-    private const long MaxScriptBytes = 1_000_000;
+    internal const long MaxScriptBytes = 1_000_000;
 
     private sealed record Catalogue(List<ScriptSample> Samples, string Provenance, Bm25Index<ScriptSample> Index);
 
@@ -46,9 +46,29 @@ internal static partial class ScriptSampleIndex
             .Where(e => SampleRepository.IsUrl(e) || Path.IsPathFullyQualified(e))];
 
     /// <summary>Where new samples go: the first listed folder that is neither a Git copy nor a pnp/script-samples clone.</summary>
-    // A folder that cannot be read now is skipped, since it may yet turn out to be a clone.
     internal static string? SaveFolder() =>
-        Entries().FirstOrDefault(e => !SampleRepository.IsUrl(e) && Safely(() => ReadClone(e)) is { Count: 0 });
+        Entries().FirstOrDefault(e => !SampleRepository.IsUrl(e) && IsPlainFolder(e));
+
+    /// <summary>False for a clone, and for a folder that cannot be read now, since it may yet turn out to be one.</summary>
+    private static bool IsPlainFolder(string folder)
+    {
+        try
+        {
+            return !IsClone(folder);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Judged by layout rather than by whether its manifests parse, so a broken clone is still one.</summary>
+    private static bool IsClone(string folder)
+    {
+        var scripts = Path.Combine(folder, "scripts");
+        return Directory.Exists(scripts) &&
+            Directory.EnumerateDirectories(scripts).Any(d => File.Exists(Path.Combine(d, "assets", "sample.json")));
+    }
 
     /// <summary>Every sample in those entries, syncing Git copies first. An unreadable entry skips only itself.</summary>
     internal static List<ScriptSample> ReadLocal() =>
@@ -198,7 +218,7 @@ internal static partial class ScriptSampleIndex
     }
 
     private static List<ScriptSample> ReadFolder(string folder) =>
-        ReadClone(folder) is { Count: > 0 } clone ? clone : ReadScripts(folder);
+        IsClone(folder) ? ReadClone(folder) : ReadScripts(folder);
 
     /// <summary>A pnp/script-samples checkout, read from its per-sample assets/sample.json.</summary>
     private static List<ScriptSample> ReadClone(string root)

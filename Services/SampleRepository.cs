@@ -32,21 +32,43 @@ internal static class SampleRepository
 
         if (!updated)
         {
-            var fresh = folder + ".new";
-            Delete(fresh);
-
+            // Unique per call, so servers sharing this cache never touch each other's clone.
+            var fresh = $"{folder}.{Guid.NewGuid():N}";
             if (Git("clone", "--depth", "1", "--", url, fresh))
             {
-                Delete(folder);
-                Directory.Move(fresh, folder);
+                Replace(folder, fresh);
             }
-            else
-            {
-                Delete(fresh);
-            }
+
+            Delete(fresh);
         }
 
         return folder;
+    }
+
+    /// <summary>Swaps the fresh clone in by renames, so a copy is in place whichever server swaps first.</summary>
+    private static void Replace(string folder, string fresh)
+    {
+        var old = fresh + ".old";
+
+        try
+        {
+            if (Directory.Exists(folder))
+            {
+                Directory.Move(folder, old);
+            }
+
+            Directory.Move(fresh, folder);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Another server swapped first, or the copy is open; put the old one back only if nothing replaced it.
+            if (!Directory.Exists(folder) && Directory.Exists(old))
+            {
+                Directory.Move(old, folder);
+            }
+        }
+
+        Delete(old);
     }
 
     /// <summary>Clears the read-only flag Git puts on its objects, which Directory.Delete refuses on Windows.</summary>

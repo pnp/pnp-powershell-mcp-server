@@ -303,7 +303,7 @@ public sealed class LocalSampleTests : IDisposable
 
             SampleRepository.Sync(repo);
             Assert.True(File.Exists(Path.Combine(copy, "third.ps1")));
-            Assert.False(Directory.Exists(copy + ".new"));
+            Assert.Empty(Directory.GetDirectories(Path.GetDirectoryName(copy)!, Path.GetFileName(copy) + ".*", new EnumerationOptions()));
         }
         finally
         {
@@ -323,8 +323,9 @@ public sealed class LocalSampleTests : IDisposable
     [Fact]
     public void New_samples_go_to_the_first_plain_folder()
     {
+        // A clone whose only manifest is broken is still a clone.
         var clone = Path.Combine(_folder.FullName, "clone");
-        Write(Path.Combine(clone, "scripts", "spo-demo", "assets", "sample.json"), """[{"title":"Demo"}]""");
+        Write(Path.Combine(clone, "scripts", "spo-demo", "assets", "sample.json"), "not json");
         var plain = Path.Combine(_folder.FullName, "plain");
         using var env = new EnvVar("PNP_SCRIPT_SAMPLES_PATH", $"https://example.invalid/samples.git;{clone};{plain}");
 
@@ -342,6 +343,17 @@ public sealed class LocalSampleTests : IDisposable
         Assert.Equal("<#\n.SYNOPSIS\nArchive sites with no activity\n#>\n\nGet-PnPTenantSite\n", File.ReadAllText(Path.Combine(_folder.FullName, "archive-inactive-sites.ps1")));
         Assert.Equal("archive-inactive-sites", ScriptSampleIndex.Search("archive inactive sites", 1)[0].Document.Name);
         Assert.Contains("Get-PnPTenantSite", await ScriptSampleTools.GetScriptSample("archive-inactive-sites"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Saving_refuses_a_script_too_large_to_be_indexed()
+    {
+        using var env = new EnvVar("PNP_SCRIPT_SAMPLES_PATH", _folder.FullName);
+
+        var saved = ScriptSampleTools.SaveScriptSample("huge", "x", new string('Z', (int)ScriptSampleIndex.MaxScriptBytes));
+
+        Assert.Contains("nothing was saved", saved, StringComparison.Ordinal);
+        Assert.Empty(_folder.EnumerateFiles());
     }
 
     [Fact]

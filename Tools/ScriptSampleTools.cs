@@ -301,12 +301,17 @@ internal sealed partial class ScriptSampleTools
             return $"Error: a sample named '{slug}' already exists, so nothing was saved. Choose another name.";
 
         var summary = string.Join(' ', synopsis.Replace("#>", "# >").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        var content = $"<#\n.SYNOPSIS\n{summary}\n#>\n\n{script.Trim()}\n";
+
+        // The index skips larger files, so the saved script would never be found.
+        if (Encoding.UTF8.GetByteCount(content) > ScriptSampleIndex.MaxScriptBytes)
+            return $"Error: the script is over the {ScriptSampleIndex.MaxScriptBytes:N0} bytes a sample can be, so nothing was saved.";
 
         try
         {
             Directory.CreateDirectory(folder);
             using var writer = new StreamWriter(new FileStream(path, FileMode.CreateNew, FileAccess.Write));
-            writer.Write($"<#\n.SYNOPSIS\n{summary}\n#>\n\n{script.Trim()}\n");
+            writer.Write(content);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
