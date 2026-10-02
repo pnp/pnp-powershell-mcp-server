@@ -1,4 +1,3 @@
-using System.Reflection;
 using PnPPowerShell.MCPServer.Models;
 using PnPPowerShell.MCPServer.Services;
 using PnPPowerShell.MCPServer.Tools;
@@ -183,8 +182,7 @@ public class VendoredIndexTests
         Assert.Contains("showing the first", text, StringComparison.Ordinal);
     }
 
-    /// <summary>The PNP_SCRIPT_SAMPLES_PATH override, the only source with no coverage.</summary>
-    // By reflection: ScriptSampleIndex.Samples is a Lazy already resolved.
+    /// <summary>A pnp/script-samples clone named in PNP_SCRIPT_SAMPLES_PATH.</summary>
     [Fact]
     public void A_local_clone_override_is_read_from_its_per_sample_manifests()
     {
@@ -202,8 +200,7 @@ public class VendoredIndexTests
 
             using var path = new EnvVar("PNP_SCRIPT_SAMPLES_PATH", clone.FullName);
 
-            var read = typeof(ScriptSampleIndex).GetMethod("ReadLocalClone", BindingFlags.NonPublic | BindingFlags.Static)!;
-            var samples = (List<ScriptSample>)read.Invoke(null, null)!;
+            var samples = ScriptSampleIndex.ReadLocal();
 
             var sample = Assert.Single(samples);
             Assert.Equal("spo-demo-sample", sample.Name);

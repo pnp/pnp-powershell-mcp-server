@@ -183,7 +183,7 @@ to set rather than working around it.
 | `PNP_MCP_COMMAND_TIMEOUT_SECONDS` | `600` | Per-command wall-clock limit, in seconds. |
 | `PNP_MCP_CONFIRM_DESTRUCTIVE` | `true` | `false` skips destructive confirmations. |
 | `PNP_MCP_MAX_OUTPUT_CHARS` | `50000` | Largest tool response, in characters; longer output is truncated. |
-| `PNP_SCRIPT_SAMPLES_PATH` | _(unset)_ | Local clone of the script samples repo, overriding the vendored index. |
+| `PNP_SCRIPT_SAMPLES_PATH` | _(unset)_ | `;`-separated folders or Git URLs of the user's own samples, searched alongside the community ones. |
 
 Both booleans are matched exactly: read-only turns on only for the literal `true`, and confirmation
 turns off only for the literal `false`. `1` and `yes` leave the default in place.

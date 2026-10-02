@@ -99,6 +99,14 @@ exactly what an MCP client sees, so a prompt it cannot route is one a client may
 - Give me a starting point for archiving inactive sites
 - Automate removing orphaned users across the tenant
 
+## pnp_save_script_sample
+
+- Save this script to my samples so I can reuse it later
+- Keep the export script we just wrote in my sample folder
+- Keep this working script as a sample named archive-inactive-sites
+- Add the script above to my own script samples
+- Save the script that just worked as one of my samples
+
 ## pnp_ping
 
 - Lightweight health check to confirm the server is responsive

@@ -82,6 +82,11 @@ open between two tools; those are excluded from the agreement figure and listed 
 - pnp_suggest_script :: Help me build a script that reports on site collection permissions
 - pnp_suggest_script :: Give me a starting point for archiving inactive sites
 - pnp_suggest_script :: Automate removing orphaned users across the tenant (ambiguous)
+- pnp_save_script_sample :: Save this script to my samples so I can reuse it later
+- pnp_save_script_sample :: Keep the export script we just wrote in my sample folder
+- pnp_save_script_sample :: Keep this working script as a sample named archive-inactive-sites
+- pnp_save_script_sample :: Add the script above to my own script samples
+- pnp_save_script_sample :: Save the script that just worked as one of my samples
 - pnp_ping :: Lightweight health check to confirm the server is responsive
 - pnp_ping :: What version and uptime does the server report
 - pnp_ping :: Is the server responsive and what is its read-only mode status
