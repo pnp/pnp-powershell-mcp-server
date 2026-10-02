@@ -249,9 +249,9 @@ internal static partial class ScriptSampleIndex
                     });
                 }
             }
-            catch (JsonException)
+            catch (Exception ex) when (ex is JsonException or InvalidOperationException)
             {
-                // A malformed sample manifest skips that sample rather than the whole checkout.
+                // A malformed or wrongly typed manifest skips that sample rather than the whole checkout.
             }
         }
 
@@ -266,14 +266,14 @@ internal static partial class ScriptSampleIndex
     {
         var scripts = new FileSystemEnumerable<FileInfo>(
             folder,
-            (ref FileSystemEntry entry) => (FileInfo)entry.ToFileSystemInfo(),
+            (ref entry) => (FileInfo)entry.ToFileSystemInfo(),
             new EnumerationOptions { RecurseSubdirectories = true })
         {
-            ShouldIncludePredicate = (ref FileSystemEntry entry) =>
+            ShouldIncludePredicate = (ref entry) =>
                 !entry.IsDirectory && entry.FileName.EndsWith(".ps1", StringComparison.OrdinalIgnoreCase),
 
             // Links are not followed, so a junction cannot loop. OneDrive folders are reparse points but not links.
-            ShouldRecursePredicate = (ref FileSystemEntry entry) => entry.ToFileSystemInfo().LinkTarget is null,
+            ShouldRecursePredicate = (ref entry) => entry.ToFileSystemInfo().LinkTarget is null,
         };
 
         return [.. scripts

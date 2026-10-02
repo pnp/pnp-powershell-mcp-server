@@ -98,6 +98,18 @@ public sealed class LocalSampleTests : IDisposable
     }
 
     [Fact]
+    public void A_manifest_with_wrongly_typed_values_skips_only_its_sample()
+    {
+        Write(Path.Combine("scripts", "spo-good", "assets", "sample.json"), """[{"title":"Good"}]""");
+        Write(Path.Combine("scripts", "spo-number", "assets", "sample.json"), """[{"title":1}]""");
+        Write(Path.Combine("scripts", "spo-not-object", "assets", "sample.json"), "[1]");
+        Write(Path.Combine("scripts", "spo-tag", "assets", "sample.json"), """[{"title":"Tag","tags":[1]}]""");
+        using var env = new EnvVar("PNP_SCRIPT_SAMPLES_PATH", _folder.FullName);
+
+        Assert.Equal(["spo-good"], ScriptSampleIndex.ReadLocal().Select(s => s.Name));
+    }
+
+    [Fact]
     public void Relative_paths_and_scp_style_urls_are_ignored()
     {
         Write("a.ps1", "Get-PnPWeb");
@@ -242,6 +254,21 @@ public sealed class LocalSampleTests : IDisposable
 
         Assert.Contains("already exists", ScriptSampleTools.SaveScriptSample("taken", "x", "Get-PnPWeb"), StringComparison.Ordinal);
         Assert.Equal("original", File.ReadAllText(path));
+    }
+
+    [Fact]
+    public void Saving_refuses_a_name_the_index_already_has_in_any_case()
+    {
+        var clone = Path.Combine(_folder.FullName, "clone");
+        Write(Path.Combine(clone, "scripts", "spo-demo", "assets", "sample.json"), """[{"title":"Demo"}]""");
+        var plain = Path.Combine(_folder.FullName, "plain");
+        using var env = new EnvVar("PNP_SCRIPT_SAMPLES_PATH", $"{clone};{plain}");
+        ScriptSampleIndex.Reload();
+        var community = ScriptSampleIndex.Samples.First(s => s.LocalPath.Length == 0 && s.Name != "spo-demo").Name;
+
+        Assert.Contains("already exists", ScriptSampleTools.SaveScriptSample("SPO-Demo", "x", "Get-PnPWeb"), StringComparison.Ordinal);
+        Assert.Contains("already exists", ScriptSampleTools.SaveScriptSample(community.ToUpperInvariant(), "x", "Get-PnPWeb"), StringComparison.Ordinal);
+        Assert.False(Directory.Exists(plain));
     }
 
     [Theory]

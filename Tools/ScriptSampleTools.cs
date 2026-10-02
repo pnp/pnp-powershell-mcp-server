@@ -100,7 +100,7 @@ internal sealed partial class ScriptSampleTools
         Name = "pnp_search_script_samples",
         ReadOnly = true,
         Idempotent = true,
-        OpenWorld = false,
+        OpenWorld = true,
         UseStructuredContent = true,
         OutputSchemaType = typeof(SampleSearchResult))]
     [Description(
@@ -270,7 +270,7 @@ internal sealed partial class ScriptSampleTools
             Provenance);
     }
 
-    [McpServerTool(Name = "pnp_save_script_sample", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = false)]
+    [McpServerTool(Name = "pnp_save_script_sample", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = true)]
     [Description(
         "Saves a PnP PowerShell script to the user's own samples for reuse, so later searches and " +
         "suggestions include it. Use it only when the user asks to keep or save a script. It never overwrites an existing file.")]
@@ -289,9 +289,10 @@ internal sealed partial class ScriptSampleTools
         if (!ScriptSampleIndex.IsSafeName(slug))
             return $"Error: '{OutputLimit.Echo(name)}' cannot be used as a file name. Use letters, digits and dashes.";
 
+        // The index keeps the first of two names differing only in case, so a match anywhere would hide the save.
         var path = Path.Combine(folder, slug + ".ps1");
-        if (File.Exists(path))
-            return $"Error: {path} already exists, so nothing was saved. Choose another name.";
+        if (File.Exists(path) || ScriptSampleIndex.Samples.Any(s => s.Name.Equals(slug, StringComparison.OrdinalIgnoreCase)))
+            return $"Error: a sample named '{slug}' already exists, so nothing was saved. Choose another name.";
 
         var summary = string.Join(' ', synopsis.Replace("#>", "# >").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 

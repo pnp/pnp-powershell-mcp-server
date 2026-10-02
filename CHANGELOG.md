@@ -12,12 +12,13 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
-- Added your own script samples. `PNP_SCRIPT_SAMPLES_PATH` now takes a `;`-separated list of full folder paths of `.ps1` files, pnp/script-samples clones, and `https://` or `ssh://` Git URLs. Their samples join the community index instead of replacing it, and your own scripts are described by their comment-based help and ranked ahead of a community sample that matches about as well.
-- Added `pnp_save_script_sample`, which saves a working script into the first plain folder of `PNP_SCRIPT_SAMPLES_PATH` and never overwrites a file.
+- Added your own script samples. `PNP_SCRIPT_SAMPLES_PATH` now takes a `;`-separated list of full folder paths of `.ps1` files, pnp/script-samples clones, and `https://` or `ssh://` Git URLs. Their samples join the community index instead of replacing it, and your own scripts are described by their comment-based help and ranked ahead of a community sample that matches about as well. [#30](https://github.com/pnp/pnp-powershell-mcp-server/pull/30)
+- Added `pnp_save_script_sample`, which saves a working script into the first plain folder of `PNP_SCRIPT_SAMPLES_PATH` and never overwrites a file or reuses a sample's name. [#30](https://github.com/pnp/pnp-powershell-mcp-server/pull/30)
 
 ### Changed
 
-- Changed `PNP_SCRIPT_SAMPLES_PATH` so it is no longer ignored when the PnP PowerShell VS Code extension is installed.
+- Changed `PNP_SCRIPT_SAMPLES_PATH` so it is no longer ignored when the PnP PowerShell VS Code extension is installed. [#30](https://github.com/pnp/pnp-powershell-mcp-server/pull/30)
+- Changed seven tool descriptions so clients pick the right tool more often, notably `pnp_get_connection_status`, `pnp_reset_session` and `pnp_diagnose_connection`. [#30](https://github.com/pnp/pnp-powershell-mcp-server/pull/30)
 
 ## [0.1.7-beta]
 
