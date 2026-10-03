@@ -53,6 +53,11 @@ public class ScriptAnalyzerTests : IAsyncLifetime
         (string Script, string? Method)[] cases =
         [
             ("Invoke-PnPSPRestMethod -Method Delete -Url /_api/web", "Delete"),
+            ("Invoke-PnPSPRestMethod -Url /_api/web Delete", "Delete"),
+            ("Invoke-PnPSPRestMethod Post -Url /_api/web", "Post"),
+            ("Invoke-PnPSPRestMethod -Url /_api/web -Method \"$verb\"", "<dynamic>"),
+            ("Invoke-PnPGraphMethod $url", null),
+            ("irm -Method Patch https://x", "Patch"),
             ("Invoke-PnPGraphMethod -Meth:DELETE -Url groups/1", "DELETE"),
             ("Invoke-WebRequest -CustomM DELETE -Uri https://x", "DELETE"),
             ("Invoke-RestMethod -Method $m -Uri https://x", "<dynamic>"),

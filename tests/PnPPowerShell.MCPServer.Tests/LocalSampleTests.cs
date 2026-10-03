@@ -311,6 +311,38 @@ public sealed class LocalSampleTests : IDisposable
         }
     }
 
+    /// <summary>A save reloads the index, which would otherwise wait on every repository again.</summary>
+    [Fact]
+    public void A_reload_reads_git_copies_as_they_are()
+    {
+        const string url = "https://example.invalid/samples.git";
+        var repo = Path.Combine(_folder.FullName, "repo");
+        var copy = SampleRepository.Folder(url);
+
+        // Git's own URL rewrite, so the https URL is served from a local repository.
+        using var count = new EnvVar("GIT_CONFIG_COUNT", "1");
+        using var key = new EnvVar("GIT_CONFIG_KEY_0", $"url.{repo}.insteadOf");
+        using var value = new EnvVar("GIT_CONFIG_VALUE_0", url);
+
+        try
+        {
+            Assert.True(SampleRepository.Git("init", "--quiet", repo));
+            Commit(repo, "first.ps1");
+            SampleRepository.Sync(url);
+            Commit(repo, "second.ps1");
+            using var env = new EnvVar("PNP_SCRIPT_SAMPLES_PATH", url);
+
+            ScriptSampleIndex.Reload();
+
+            Assert.Contains(ScriptSampleIndex.Samples, s => s.Name == "first");
+            Assert.DoesNotContain(ScriptSampleIndex.Samples, s => s.Name == "second");
+        }
+        finally
+        {
+            DeleteTree(copy);
+        }
+    }
+
     private void Commit(string repo, string file)
     {
         Write(Path.Combine(repo, file), "Get-PnPWeb");

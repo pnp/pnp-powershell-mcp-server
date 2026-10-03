@@ -303,8 +303,9 @@ is judged by what its body runs. A name the session cannot resolve is refused be
 one the same script would define as it runs (`Set-Item function:…`, `Set-Alias`): write a helper as
 `function Name { … }` in the script, or define it in one call and use it in the next.
 Nor is `Invoke-PnPSPRestMethod`, `Invoke-PnPGraphMethod`, `Invoke-RestMethod` or `Invoke-WebRequest` with
-`-Method Delete` or a `-Method` that cannot be read before it runs. A `POST` that deletes through a header or a
-`recycle()` endpoint is not caught, nor is a request made through .NET classes such as `HttpClient`.
+any method other than `GET`, given by name or by position, or one that cannot be read before it runs: a `POST`
+can delete through an `X-HTTP-Method` header or a `recycle()` endpoint, and `PATCH`, `PUT` and `MERGE`
+overwrite. A request made through .NET classes such as `HttpClient` is not caught.
 
 This check favours asking too often over missing something: it also matches a destructive name that
 appears only as text (for example inside a string), so you may occasionally be asked to confirm a

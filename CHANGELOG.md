@@ -42,6 +42,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 - Fixed paging: docs and status lookups no longer drop the cursor, and a warning no longer disables it. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
 - Fixed guidance that still recommended `-Interactive` from inside the server. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
 - Fixed release packages carrying the checked-in `.mcp/server.json` version when a tag or back-fill builds a different one. [#29](https://github.com/pnp/pnp-powershell-mcp-server/pull/29)
+- Fixed REST and Graph calls past the destructive-command prompt: `Invoke-PnPSPRestMethod`, `Invoke-PnPGraphMethod`, `Invoke-RestMethod` and `Invoke-WebRequest` now ask before any method other than `GET`, including one given by position, since a `POST` can delete and `PATCH`, `PUT` and `MERGE` overwrite. [#30](https://github.com/pnp/pnp-powershell-mcp-server/pull/30)
 
 ### Contributors
 

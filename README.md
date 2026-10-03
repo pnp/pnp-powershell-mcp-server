@@ -312,7 +312,7 @@ Entries are separated by `;`, and each one is:
 | Entry | Read as |
 | --- | --- |
 | A full folder path, e.g. `C:\scripts\pnp` | Every `.ps1` in it and its subfolders, up to 5,000. OneDrive folders work. Hidden and system items, files over 1 MB, and symbolic links and junctions, whether to a file or a folder, are skipped. |
-| An `https://` or `ssh://` Git URL | A shallow clone under local app data, refreshed each time the server loads its samples: on the first sample call, and again after a save. It uses your existing Git credentials and never prompts, so clone the repository once yourself first. A copy that cannot be updated is replaced by a fresh clone, and if that fails too, the last copy is used. |
+| An `https://` or `ssh://` Git URL | A shallow clone under local app data, refreshed once per server start, on the first sample call. It uses your existing Git credentials and never prompts, so clone the repository once yourself first. A copy that cannot be updated is replaced by a fresh clone, and if that fails too, the last copy is used. |
 | A [pnp/script-samples](https://github.com/pnp/script-samples) clone | Its samples, in place of the compiled-in copies of the same name. |
 
 Anything else, such as a relative path or `git@host:repo` (write it as `ssh://git@host/repo` instead), is ignored.
@@ -349,8 +349,8 @@ Save the script we just ran to my samples as monthly-storage-report.
 `pnp_save_script_sample` writes to the first plain folder listed (never a Git copy or a clone) under a
 lower-case file name, adds the summary you give it as `.SYNOPSIS`, and refuses to overwrite an existing
 file or reuse a sample's name. The saved script can be
-found at once. Other changes, made by hand or pushed to a Git repository, show up after the next save or
-server restart. A saved script is whatever the model wrote, so review it before sharing that folder with
+found at once. Scripts you add or edit by hand show up after the next save or server restart, and changes
+pushed to a Git repository after a restart. A saved script is whatever the model wrote, so review it before sharing that folder with
 people who run its scripts.
 
 ### Configuration

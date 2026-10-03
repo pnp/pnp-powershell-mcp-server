@@ -19,15 +19,15 @@ internal static partial class ScriptSampleIndex
 
     private sealed record Catalogue(List<ScriptSample> Samples, string Provenance, Bm25Index<ScriptSample> Index);
 
-    private static volatile Lazy<Catalogue> _catalogue = new(Load);
+    private static volatile Lazy<Catalogue> _catalogue = new(() => Load(sync: true));
 
     public static IReadOnlyList<ScriptSample> Samples => _catalogue.Value.Samples;
 
     /// <summary>One line naming where the index came from, so a stale index is visible rather than silent.</summary>
     public static string Provenance => _catalogue.Value.Provenance;
 
-    /// <summary>Rereads every source on next use.</summary>
-    internal static void Reload() => _catalogue = new(Load);
+    /// <summary>Rereads every source on next use. Git copies are read as they are: they sync once per server start.</summary>
+    internal static void Reload() => _catalogue = new(() => Load(sync: false));
 
     /// <summary>Relevance-ranked samples for a free-text query, best first.</summary>
     public static IReadOnlyList<Bm25Hit<ScriptSample>> Search(string? query, int limit) =>
@@ -70,14 +70,17 @@ internal static partial class ScriptSampleIndex
             Directory.EnumerateDirectories(scripts).Any(d => File.Exists(Path.Combine(d, "assets", "sample.json")));
     }
 
-    /// <summary>Every sample in those entries, syncing Git copies first. An unreadable entry skips only itself.</summary>
-    internal static List<ScriptSample> ReadLocal() =>
-        [.. Entries().SelectMany(e => Safely(() => ReadFolder(SampleRepository.IsUrl(e) ? SampleRepository.Sync(e) : e)) ?? [])];
+    /// <summary>Every sample in those entries, syncing Git copies first when asked. An unreadable entry skips only itself.</summary>
+    internal static List<ScriptSample> ReadLocal(bool sync = true) =>
+        [.. Entries().SelectMany(e => Safely(() => ReadFolder(Local(e, sync))) ?? [])];
 
-    private static Catalogue Load()
+    private static string Local(string entry, bool sync) =>
+        !SampleRepository.IsUrl(entry) ? entry : sync ? SampleRepository.Sync(entry) : SampleRepository.Folder(entry);
+
+    private static Catalogue Load(bool sync)
     {
         var (samples, provenance) = LoadCommunity();
-        List<ScriptSample> local = [.. ReadLocal().DistinctBy(s => s.Name, StringComparer.OrdinalIgnoreCase)];
+        List<ScriptSample> local = [.. ReadLocal(sync).DistinctBy(s => s.Name, StringComparer.OrdinalIgnoreCase)];
 
         if (local.Count > 0)
         {

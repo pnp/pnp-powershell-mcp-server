@@ -184,12 +184,15 @@ public class CommandPolicyTests
 
     [Theory]
     [InlineData("Invoke-PnPSPRestMethod", "Delete", true)]
+    [InlineData("Invoke-PnPSPRestMethod", "Post", true)]
+    [InlineData("Invoke-PnPGraphMethod", "Patch", true)]
     [InlineData("Invoke-PnPGraphMethod", "<dynamic>", true)]
-    [InlineData("Invoke-RestMethod", "delete", true)]
+    [InlineData("Invoke-PnPSPRestMethod", "MERGE", true)]
+    [InlineData("Invoke-RestMethod", "Put", true)]
     [InlineData("Invoke-WebRequest", "Delete", true)]
-    [InlineData("Invoke-RestMethod", "Get", false)]
+    [InlineData("Invoke-RestMethod", "get", false)]
     [InlineData("Invoke-RestMethod", null, false)]
-    public void An_http_delete_or_unreadable_method_needs_confirmation(string name, string? method, bool prompts)
+    public void An_http_method_other_than_get_needs_confirmation(string name, string? method, bool prompts)
     {
         var analysis = new ScriptAnalysis { Commands = [new ScriptCommand { Name = name, Verb = "Invoke", Method = method }] };
 
