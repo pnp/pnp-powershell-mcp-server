@@ -183,7 +183,7 @@ to set rather than working around it.
 | `PNP_MCP_COMMAND_TIMEOUT_SECONDS` | `600` | Per-command wall-clock limit, in seconds. |
 | `PNP_MCP_CONFIRM_DESTRUCTIVE` | `true` | `false` skips destructive confirmations. |
 | `PNP_MCP_MAX_OUTPUT_CHARS` | `50000` | Largest tool response, in characters; longer output is truncated. |
-| `PNP_SCRIPT_SAMPLES_PATH` | _(unset)_ | Local clone of the script samples repo, overriding the vendored index. |
+| `PNP_SCRIPT_SAMPLES_PATH` | _(unset)_ | `;`-separated folders or Git URLs of the user's own samples, searched alongside the community ones. |
 
 Both booleans are matched exactly: read-only turns on only for the literal `true`, and confirmation
 turns off only for the literal `false`. `1` and `yes` leave the default in place.
@@ -303,8 +303,9 @@ is judged by what its body runs. A name the session cannot resolve is refused be
 one the same script would define as it runs (`Set-Item function:…`, `Set-Alias`): write a helper as
 `function Name { … }` in the script, or define it in one call and use it in the next.
 Nor is `Invoke-PnPSPRestMethod`, `Invoke-PnPGraphMethod`, `Invoke-RestMethod` or `Invoke-WebRequest` with
-`-Method Delete` or a `-Method` that cannot be read before it runs. A `POST` that deletes through a header or a
-`recycle()` endpoint is not caught, nor is a request made through .NET classes such as `HttpClient`.
+any method other than `GET`, given by name or by position, or one that cannot be read before it runs: a `POST`
+can delete through an `X-HTTP-Method` header or a `recycle()` endpoint, and `PATCH`, `PUT` and `MERGE`
+overwrite. A request made through .NET classes such as `HttpClient` is not caught.
 
 This check favours asking too often over missing something: it also matches a destructive name that
 appears only as text (for example inside a string), so you may occasionally be asked to confirm a

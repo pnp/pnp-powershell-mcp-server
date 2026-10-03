@@ -106,17 +106,17 @@ internal static class ScriptAnalyzer
                   elseif (-not $__pnpCmdInfo -and $__pnpEffective -match '^([A-Za-z]+)-') { $__pnpVerb = $Matches[1] }
                   $__pnpWhatIf = $false
                   if ($__pnpCmdInfo -and $__pnpCmdInfo.Parameters -and $__pnpCmdInfo.Parameters.ContainsKey('WhatIf')) { $__pnpWhatIf = $true }
-                  # -Method or -CustomMethod, possibly abbreviated; a splat may carry either, so a splat counts as unknown.
+                  # -Method or -CustomMethod as PowerShell binds it, named or positional; a splat may carry either, so counts as unknown.
                   $__pnpMethod = $null
-                  $__pnpEls = $__pnpNode.CommandElements
-                  for ($__pnpI = 1; $__pnpI -lt $__pnpEls.Count; $__pnpI++) {
-                    $__pnpE = $__pnpEls[$__pnpI]
-                    if ($__pnpE -is [System.Management.Automation.Language.VariableExpressionAst] -and $__pnpE.Splatted) { $__pnpMethod = '<dynamic>' }
-                    elseif ($__pnpE -is [System.Management.Automation.Language.CommandParameterAst] -and $__pnpE.ParameterName -and ('Method', 'CustomMethod' | Where-Object { $_.StartsWith($__pnpE.ParameterName, [System.StringComparison]::OrdinalIgnoreCase) })) {
-                      $__pnpArg = if ($__pnpE.Argument) { $__pnpE.Argument } elseif ($__pnpI + 1 -lt $__pnpEls.Count) { $__pnpEls[$__pnpI + 1] } else { $null }
-                      $__pnpMethod = if ($__pnpArg -is [System.Management.Automation.Language.StringConstantExpressionAst]) { $__pnpArg.Value } else { '<dynamic>' }
-                    }
+                  if ($__pnpCmdInfo -and $__pnpCmdInfo.Parameters -and ($__pnpCmdInfo.Parameters.ContainsKey('Method') -or $__pnpCmdInfo.Parameters.ContainsKey('CustomMethod'))) {
+                    try {
+                      $__pnpBound = [System.Management.Automation.Language.StaticParameterBinder]::BindCommand($__pnpNode, $true).BoundParameters
+                      foreach ($__pnpK in 'Method', 'CustomMethod') {
+                        if ($__pnpBound.ContainsKey($__pnpK)) { $__pnpMethod = if ($null -ne $__pnpBound[$__pnpK].ConstantValue) { [string]$__pnpBound[$__pnpK].ConstantValue } else { '<dynamic>' } }
+                      }
+                    } catch { $__pnpMethod = '<dynamic>' }
                   }
+                  if (@($__pnpNode.CommandElements | Where-Object { $_ -is [System.Management.Automation.Language.VariableExpressionAst] -and $_.Splatted }).Count) { $__pnpMethod = '<dynamic>' }
                   # Module functions are the module's; only ones defined in this session are opened. Past 50, the rest counts as dynamic.
                   if ($__pnpCmdInfo -and -not $__pnpStillAlias -and -not $__pnpCmdInfo.Module -and @('Function', 'Filter') -contains [string]$__pnpCmdInfo.CommandType -and $__pnpCmdInfo.ScriptBlock -and -not $__pnpRoots.Contains($__pnpCmdInfo.ScriptBlock.Ast)) {
                     if ($__pnpRoots.Count -ge 50) {
@@ -138,7 +138,7 @@ internal static class ScriptAnalyzer
             $__pnpParseMessage = $null
             if ($__pnpParseErrors -and @($__pnpParseErrors).Count -gt 0) { $__pnpParseMessage = @($__pnpParseErrors)[0].Message }
             [PSCustomObject]@{ parseError = $__pnpParseMessage; commands = $__pnpFound; methodCalls = $__pnpMethods } | ConvertTo-Json -Depth 6 -Compress
-            Remove-Variable -Name __pnpSrc,__pnpParseErrors,__pnpAst,__pnpFound,__pnpMethods,__pnpNodes,__pnpNode,__pnpName,__pnpCmdInfo,__pnpGuard,__pnpNext,__pnpStillAlias,__pnpEffective,__pnpVerb,__pnpWhatIf,__pnpMethod,__pnpEls,__pnpI,__pnpE,__pnpArg,__pnpInline,__pnpRoots,__pnpN,__pnpRoot,__pnpMembers,__pnpM,__pnpParseMessage -ErrorAction SilentlyContinue
+            Remove-Variable -Name __pnpSrc,__pnpParseErrors,__pnpAst,__pnpFound,__pnpMethods,__pnpNodes,__pnpNode,__pnpName,__pnpCmdInfo,__pnpGuard,__pnpNext,__pnpStillAlias,__pnpEffective,__pnpVerb,__pnpWhatIf,__pnpMethod,__pnpBound,__pnpK,__pnpInline,__pnpRoots,__pnpN,__pnpRoot,__pnpMembers,__pnpM,__pnpParseMessage -ErrorAction SilentlyContinue
             """;
 
         var raw = (await session.ExecuteAsync(script, timeout, cancellationToken, $"analyse\n{command}")).Trim();

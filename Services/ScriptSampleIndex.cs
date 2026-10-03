@@ -1,43 +1,109 @@
 using PnPPowerShell.MCPServer.Models;
+using System.IO.Enumeration;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace PnPPowerShell.MCPServer.Services;
 
-/// <summary>The catalogue, resolved once. Overrides first, then the compiled-in copy.</summary>
-internal static class ScriptSampleIndex
+/// <summary>The catalogue, resolved once: community samples plus the user's own from PNP_SCRIPT_SAMPLES_PATH.</summary>
+internal static partial class ScriptSampleIndex
 {
-    private static readonly Lazy<(List<ScriptSample> Samples, string Provenance)> Loaded = new(Load);
+    private const string PathVariable = "PNP_SCRIPT_SAMPLES_PATH";
 
-    private static readonly Lazy<Bm25Index<ScriptSample>> Index = new(() =>
-        new Bm25Index<ScriptSample>(
-            Loaded.Value.Samples,
+    /// <summary>A community sample outranks the user's own script only by matching more than twice as well.</summary>
+    private const double LocalBoost = 2;
+
+    private const int MaxLocalScripts = 5_000;
+
+    internal const long MaxScriptBytes = 1_000_000;
+
+    private sealed record Catalogue(List<ScriptSample> Samples, string Provenance, Bm25Index<ScriptSample> Index);
+
+    private static volatile Lazy<Catalogue> _catalogue = new(() => Load(sync: true));
+
+    public static IReadOnlyList<ScriptSample> Samples => _catalogue.Value.Samples;
+
+    /// <summary>One line naming where the index came from, so a stale index is visible rather than silent.</summary>
+    public static string Provenance => _catalogue.Value.Provenance;
+
+    /// <summary>Rereads every source on next use. Git copies are read as they are: they sync once per server start.</summary>
+    internal static void Reload() => _catalogue = new(() => Load(sync: false));
+
+    /// <summary>Relevance-ranked samples for a free-text query, best first.</summary>
+    public static IReadOnlyList<Bm25Hit<ScriptSample>> Search(string? query, int limit) =>
+        limit <= 0
+            ? []
+            : [.. _catalogue.Value.Index.Search(query, int.MaxValue, s => s.Name)
+                .Select(h => h.Document.LocalPath.Length > 0 ? h with { Score = h.Score * LocalBoost } : h)
+                .OrderByDescending(h => h.Score)
+                .Take(limit)];
+
+    /// <summary>The Git URLs and full folder paths PNP_SCRIPT_SAMPLES_PATH lists, separated by ';'.</summary>
+    // A relative path would resolve against whatever directory the client launched the server in.
+    private static string[] Entries() =>
+        [.. (Environment.GetEnvironmentVariable(PathVariable) ?? string.Empty)
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(e => SampleRepository.IsUrl(e) || Path.IsPathFullyQualified(e))];
+
+    /// <summary>Where new samples go: the first listed folder that is neither a Git copy nor a pnp/script-samples clone.</summary>
+    internal static string? SaveFolder() =>
+        Entries().FirstOrDefault(e => !SampleRepository.IsUrl(e) && IsPlainFolder(e));
+
+    /// <summary>False for a clone, and for a folder that cannot be read now, since it may yet turn out to be one.</summary>
+    private static bool IsPlainFolder(string folder)
+    {
+        try
+        {
+            return !IsClone(folder);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Judged by layout rather than by whether its manifests parse, so a broken clone is still one.</summary>
+    private static bool IsClone(string folder)
+    {
+        var scripts = Path.Combine(folder, "scripts");
+        return Directory.Exists(scripts) &&
+            Directory.EnumerateDirectories(scripts).Any(d => File.Exists(Path.Combine(d, "assets", "sample.json")));
+    }
+
+    /// <summary>Every sample in those entries, syncing Git copies first when asked. An unreadable entry skips only itself.</summary>
+    internal static List<ScriptSample> ReadLocal(bool sync = true) =>
+        [.. Entries().SelectMany(e => Safely(() => ReadFolder(Local(e, sync))) ?? [])];
+
+    private static string Local(string entry, bool sync) =>
+        !SampleRepository.IsUrl(entry) ? entry : sync ? SampleRepository.Sync(entry) : SampleRepository.Folder(entry);
+
+    private static Catalogue Load(bool sync)
+    {
+        var (samples, provenance) = LoadCommunity();
+        List<ScriptSample> local = [.. ReadLocal(sync).DistinctBy(s => s.Name, StringComparer.OrdinalIgnoreCase)];
+
+        if (local.Count > 0)
+        {
+            samples = [.. local.Concat(samples).DistinctBy(s => s.Name, StringComparer.OrdinalIgnoreCase)];
+            provenance += $" Plus {local.Count} from {PathVariable}.";
+        }
+
+        return new Catalogue(samples, provenance, new Bm25Index<ScriptSample>(
+            samples,
             [
                 (s => s.Title, 4),
                 (s => s.Name, 3),
                 (s => string.Join(' ', s.Tags), 3),
                 (s => s.Description, 2),
             ]));
+    }
 
-    public static IReadOnlyList<ScriptSample> Samples => Loaded.Value.Samples;
-
-    /// <summary>One line naming where the index came from, so a stale index is visible rather than silent.</summary>
-    public static string Provenance => Loaded.Value.Provenance;
-
-    /// <summary>Relevance-ranked samples for a free-text query, best first.</summary>
-    public static IReadOnlyList<Bm25Hit<ScriptSample>> Search(string? query, int limit) =>
-        limit <= 0 ? [] : Index.Value.Search(query, limit, s => s.Name);
-
-    private static (List<ScriptSample>, string) Load()
+    private static (List<ScriptSample>, string) LoadCommunity()
     {
         // Overrides must not throw: Lazy caches the exception and would disable the tools.
         if (Safely(ReadExtension) is { Count: > 0 } fromExtension)
         {
             return (fromExtension, $"Index: {fromExtension.Count} samples, from the PnP PowerShell VS Code extension.");
-        }
-
-        if (Safely(ReadLocalClone) is { Count: > 0 } fromClone)
-        {
-            return (fromClone, $"Index: {fromClone.Count} samples, from PNP_SCRIPT_SAMPLES_PATH.");
         }
 
         using var stream = typeof(ScriptSampleIndex).Assembly.GetManifestResourceStream("script-samples.json")
@@ -84,7 +150,7 @@ internal static class ScriptSampleIndex
     }
 
     /// <summary>True when a name is one plain folder segment. It reaches a path and a URL.</summary>
-    private static bool IsSafeName(string name) =>
+    internal static bool IsSafeName(string name) =>
         name.Length is > 0 and <= 128 &&
         name == Path.GetFileName(name) &&
         name.IndexOfAny(Path.GetInvalidFileNameChars()) < 0 &&
@@ -154,19 +220,16 @@ internal static class ScriptSampleIndex
         return null;
     }
 
-    /// <summary>A pnp/script-samples checkout named by PNP_SCRIPT_SAMPLES_PATH, read from its per-sample assets/sample.json.</summary>
-    private static List<ScriptSample>? ReadLocalClone()
-    {
-        var root = Environment.GetEnvironmentVariable("PNP_SCRIPT_SAMPLES_PATH");
-        if (string.IsNullOrWhiteSpace(root))
-        {
-            return null;
-        }
+    private static List<ScriptSample> ReadFolder(string folder) =>
+        IsClone(folder) ? ReadClone(folder) : ReadScripts(folder);
 
+    /// <summary>A pnp/script-samples checkout, read from its per-sample assets/sample.json.</summary>
+    private static List<ScriptSample> ReadClone(string root)
+    {
         var scripts = Path.Combine(root, "scripts");
         if (!Directory.Exists(scripts))
         {
-            return null;
+            return [];
         }
 
         var samples = new List<ScriptSample>();
@@ -174,7 +237,7 @@ internal static class ScriptSampleIndex
         foreach (var dir in Directory.EnumerateDirectories(scripts))
         {
             var manifest = Path.Combine(dir, "assets", "sample.json");
-            if (!File.Exists(manifest))
+            if (!File.Exists(manifest) || !IsLinkFree(root, manifest))
             {
                 continue;
             }
@@ -203,12 +266,13 @@ internal static class ScriptSampleIndex
                         Tags = element.TryGetProperty("tags", out var tags) && tags.ValueKind == JsonValueKind.Array
                             ? [.. tags.EnumerateArray().Select(t => t.GetString() ?? string.Empty)]
                             : [],
+                        LocalRoot = root,
                     });
                 }
             }
-            catch (JsonException)
+            catch (Exception ex) when (ex is JsonException or InvalidOperationException)
             {
-                // A malformed sample manifest skips that sample rather than the whole checkout.
+                // A malformed or wrongly typed manifest skips that sample rather than the whole checkout.
             }
         }
 
@@ -217,6 +281,97 @@ internal static class ScriptSampleIndex
 
         return samples;
     }
+
+    /// <summary>Any folder of .ps1 files, each described by its comment-based help.</summary>
+    private static List<ScriptSample> ReadScripts(string folder)
+    {
+        var scripts = new FileSystemEnumerable<FileInfo>(
+            folder,
+            (ref entry) => (FileInfo)entry.ToFileSystemInfo(),
+            new EnumerationOptions { RecurseSubdirectories = true })
+        {
+            ShouldIncludePredicate = (ref entry) =>
+                !entry.IsDirectory && entry.FileName.EndsWith(".ps1", StringComparison.OrdinalIgnoreCase) && !IsLink(ref entry),
+            ShouldRecursePredicate = (ref entry) => !IsLink(ref entry),
+        };
+
+        return [.. scripts
+            .Where(f => f.Length <= MaxScriptBytes)
+            .Take(MaxLocalScripts)
+            .Select(f => FromScript(folder, f))
+            .OfType<ScriptSample>()
+            .Where(s => IsSafeName(s.Name))];
+    }
+
+    /// <summary>A folder link can loop and a file link can point anywhere. OneDrive items are reparse points but not links.</summary>
+    private static bool IsLink(ref FileSystemEntry entry) =>
+        (entry.Attributes & FileAttributes.ReparsePoint) != 0 && entry.ToFileSystemInfo().LinkTarget is not null;
+
+    /// <summary>Rechecks at read time what enumeration did: no link between <paramref name="root"/> and <paramref name="path"/>.</summary>
+    // The root itself is the user's choice, and may sit under a link, as macOS temp folders do.
+    internal static bool IsLinkFree(string root, string path)
+    {
+        if (new FileInfo(path).LinkTarget is not null)
+        {
+            return false;
+        }
+
+        var rootLength = Path.TrimEndingDirectorySeparator(root).Length;
+        for (var folder = Path.GetDirectoryName(path); folder is not null && folder.Length > rootLength; folder = Path.GetDirectoryName(folder))
+        {
+            if (new DirectoryInfo(folder).LinkTarget is not null)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>Null when the file cannot be read, so one bad file skips only itself.</summary>
+    private static ScriptSample? FromScript(string folder, FileInfo file)
+    {
+        string script;
+        try
+        {
+            script = File.ReadAllText(file.FullName);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+
+        var synopsis = Help(script, "SYNOPSIS");
+
+        return new ScriptSample
+        {
+            Name = Slug(Path.ChangeExtension(Path.GetRelativePath(folder, file.FullName), null)),
+            Title = synopsis.Length > 0 ? synopsis : Path.GetFileNameWithoutExtension(file.Name),
+            Description = Help(script, "DESCRIPTION"),
+            Url = new Uri(file.FullName).AbsoluteUri,
+            LocalPath = file.FullName,
+            LocalRoot = folder,
+            Tags = [.. CmdletRegex().Matches(script).Select(m => m.Value).Distinct(StringComparer.OrdinalIgnoreCase)],
+        };
+    }
+
+    internal static string Slug(string text) => SlugRegex().Replace(text, "-").Trim('-');
+
+    private static string Help(string script, string keyword) =>
+        HelpRegex().Matches(script).FirstOrDefault(m => m.Groups["key"].Value.Equals(keyword, StringComparison.OrdinalIgnoreCase)) is { } match
+            ? string.Join(' ', match.Groups["body"].Value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+            : string.Empty;
+
+    // [ \t] rather than \s: \s spans lines, which backtracks for minutes on a run of blank lines.
+    [GeneratedRegex(@"^[ \t]*\.(?<key>SYNOPSIS|DESCRIPTION)[ \t]*\r?$(?<body>.*?)(?=^[ \t]*\.[A-Z]+\b|#>)",
+        RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Singleline | RegexOptions.CultureInvariant)]
+    private static partial Regex HelpRegex();
+
+    [GeneratedRegex(@"\b[a-z]+-pnp\w+", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex CmdletRegex();
+
+    [GeneratedRegex(@"[^A-Za-z0-9_.]+", RegexOptions.CultureInvariant)]
+    private static partial Regex SlugRegex();
 
     private static string Text(JsonElement element, string property) =>
         element.TryGetProperty(property, out var value) ? value.GetString() ?? string.Empty : string.Empty;

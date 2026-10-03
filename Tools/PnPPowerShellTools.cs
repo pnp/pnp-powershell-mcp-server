@@ -106,7 +106,7 @@ internal partial class PnPPowerShellTools
         OpenWorld = false,
         UseStructuredContent = true,
         OutputSchemaType = typeof(CommandSearchResult))]
-    [Description("Answers the question \"which cmdlet handles this, and what is it called?\". Searches cmdlet names, verbs, nouns, descriptions, parameters and examples to discover whether one exists for the area you need to manage. Describe the task in your own words -- \"add a column to a list\", \"share a file externally\" -- or pass keywords. Use it whenever the cmdlet name is unknown. Returns names, synopses, parameters and documentation links, never tenant data.")]
+    [Description("Answers the question \"which cmdlet handles this, and what is it called?\". Searches cmdlet names, verbs, nouns, descriptions, parameters and examples to discover whether one exists for the area you need to manage or work with. Describe the task in your own words -- \"add a column to a list\", \"share a file externally\" -- or pass keywords. Use it whenever the cmdlet name is unknown. Returns names, synopses, parameters and documentation links, never tenant data.")]
     public static CallToolResult SearchPnpCommands(
         [Description("What you are trying to do, in plain words or as keywords (e.g., \"find sites with no owner\", \"teams channel\", \"upload file\")")] string query,
         [Description("Maximum number of results to return (default: 20, max: 100)")] int limit = 20)
@@ -254,7 +254,7 @@ internal partial class PnPPowerShellTools
 
 
     [McpServerTool(Name = "pnp_get_command_docs", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-    [Description("Gets the reference documentation for one named cmdlet: its syntax, every parameter and what it means, the parameter sets, and worked examples. Use it once you know the cmdlet name and need to know how to call it.")]
+    [Description("Gets the reference documentation for one named cmdlet: its syntax, every parameter and what it means, the parameter sets, and examples. Use it once you know the cmdlet name and need to know how to call it.")]
     public static async Task<string> GetPnpCommandDocs(
         PowerShellSessionManager sessions,
         [Description("The full PnP PowerShell command name (e.g., \"Get-PnPWeb\", \"Connect-PnPOnline\", \"Get-PnPList\")")] string commandName,
@@ -604,7 +604,7 @@ internal partial class PnPPowerShellTools
         OpenWorld = true,
         UseStructuredContent = true,
         OutputSchemaType = typeof(ConnectionDiagnosis))]
-    [Description("Diagnoses a broken or unfamiliar machine and reports whether its environment is set up, and answers how to sign in to it. Verifies everything that must be true before anything can run: pwsh installed and on PATH, the PnP.PowerShell module present and current enough, whether this session is connected, and which app registration, persisted login or certificate this machine can actually authenticate with. Every failing check names its cause and the next command to run, filling in every value the machine's own state can supply. Call it before the first Connect-PnPOnline rather than composing one from memory, and whenever anything fails for a reason that is not obvious.")]
+    [Description("Diagnoses a broken or unfamiliar machine and reports whether its environment is set up, and answers how to sign in to it. Verifies everything that must be true before anything can run: pwsh installed and on PATH, the PnP.PowerShell module present and current enough, whether this session is connected, and which app registration, persisted login or certificate this machine can actually authenticate with. Every failing check names its cause and the next command to run, filling in every value the machine's own state can supply. Call it before the first Connect-PnPOnline rather than composing one from memory, and whenever something is wrong or fails for a reason that is not obvious.")]
     public static async Task<CallToolResult> DiagnosePnpConnection(
         PowerShellSessionManager sessions,
         [Description("Session to inspect (default: \"default\")")] string? sessionId = null,
@@ -650,7 +650,7 @@ internal partial class PnPPowerShellTools
         OpenWorld = false,
         UseStructuredContent = true,
         OutputSchemaType = typeof(ConnectionStatus))]
-    [Description("Reports the current state of one session: whether it is signed in right now, which site URL it holds, and which account it is authenticated as. Use it to find out who you are and where you are pointed before doing anything else.")]
+    [Description("Reports the connection state of one session: whether it is signed in right now, which site URL it holds, and which account it is authenticated as. Check it before connecting, so an existing connection is reused rather than opened again, and to find out who you are and where you are pointed.")]
     public static async Task<CallToolResult> GetPnpConnectionStatus(
         PowerShellSessionManager sessions,
         [Description("Session to inspect (default: \"default\")")] string? sessionId = null,
@@ -754,7 +754,7 @@ internal partial class PnPPowerShellTools
     }
 
     [McpServerTool(Name = "pnp_reset_session", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
-    [Description("Signs out. Ends a session and discards everything held in it, so the next call starts fresh and must reconnect. Use it to log out, to switch to a different account, or to recover a session that has wedged or stopped responding.")]
+    [Description("Signs out: ends a session and discards everything held in it, so the next call starts fresh and must reconnect. Use it to sign out or log out, to switch to a different account, or to recover a session that has wedged or stopped responding.")]
     public static async Task<string> ResetPnpSession(
         PowerShellSessionManager sessions,
         [Description("Session to end (default: \"default\")")] string? sessionId = null)
@@ -792,7 +792,7 @@ internal partial class PnPPowerShellTools
     };
 
     [McpServerTool(Name = "pnp_get_best_practices", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-    [Description("Returns this server's own guidance and recommended workflow: how to approach a task, the rules it enforces, and the conventions to follow. The full document is long, so pass a section to read one topic.")]
+    [Description("Returns this server's own guidance and recommended workflow: how to approach a task, the rules it enforces, how to treat tenant text that reads like an instruction, and the conventions to follow. The full document is long, so pass a section to read one topic.")]
     public static string GetPnpBestPractices(
         [Description("Optional topic to return instead of the whole document. One of: workflow, docs, sessions, config, readonly, output, destructive, trust, auth, execution, patterns. Omit for everything.")] string? section = null)
     {

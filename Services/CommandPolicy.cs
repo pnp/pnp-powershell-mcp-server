@@ -128,9 +128,10 @@ internal static class CommandPolicy
                 return $"{command.Name}, which runs code that cannot be identified before it runs";
             }
 
+            // Anything but GET: a POST can delete through X-HTTP-Method or recycle(), and PATCH, PUT and MERGE overwrite.
             if (RestCommands.Contains(command.Name) &&
                 command.Method is { } httpMethod &&
-                (httpMethod == "<dynamic>" || httpMethod.Equals("Delete", StringComparison.OrdinalIgnoreCase)))
+                !httpMethod.Equals("Get", StringComparison.OrdinalIgnoreCase))
             {
                 return $"{command.Name} -Method {httpMethod}";
             }

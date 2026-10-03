@@ -167,6 +167,21 @@ prompt:
 I need a PnP PowerShell script that exports all SharePoint list items to a CSV file — find a community sample and adapt it for the 'Documents' list on my site.
 ```
 
+### Reuse your own scripts
+
+prompt:
+```text
+Do I have a script in my samples that reports inactive sites? If so, run it for the last 90 days.
+```
+
+Then, once a new script works:
+
+```text
+Save that script to my samples as inactive-sites-report.
+```
+
+See [Your own script samples](#your-own-script-samples) for the one-time setup.
+
 ### Report on tenant state
 
 prompt:
@@ -186,9 +201,10 @@ Can you check if I have a Power Automate flow called 'HoursReportingReminder' an
 | pnp_diagnose_connection | Checks everything that has to be true before a command can run: `pwsh` on `PATH`, the `PnP.PowerShell` module, what connection the session holds, and — when it holds none — which app registration, persisted login or certificate this machine can actually sign in with. Every failing check names its cause and the exact next command, with no placeholder left in it where the facts can fill one in. Pass `targetUrl` to get the command for a specific site. The `pwsh`, module and auth-material checks need no tenant and no network, so it still works on a machine that is not set up yet; once a connection exists it also inspects that connection, which asks PnP for a Graph token and so reaches Entra ID. |
 | pnp_reset_session | Ends a session and its PnP connection. Use it to sign out, switch accounts, or recover a session that has stopped responding. |
 | pnp_get_best_practices | Returns best practices for using PnP PowerShell via this MCP server. Takes an optional `section` (`workflow`, `docs`, `sessions`, `config`, `readonly`, `output`, `destructive`, `auth`, `execution`, `patterns`) to retrieve one topic instead of the whole guide, which keeps the response small. |
-| pnp_search_script_samples | Lists community [PnP Script Samples](https://pnp.github.io/script-samples/) matching a keyword — titles, descriptions and links, no code. Answers from an index compiled into the server, so it needs no network. |
-| pnp_get_script_sample | Retrieves the full PnP PowerShell script code for one named script sample. The index entry is local; the script body is fetched from GitHub. |
-| pnp_suggest_script | Finds the most relevant community script samples for a task and returns their full script code plus adaptation guidance, in one call. |
+| pnp_search_script_samples | Lists community [PnP Script Samples](https://pnp.github.io/script-samples/), plus your own from `PNP_SCRIPT_SAMPLES_PATH`, matching a keyword — titles, descriptions and links, no code. The community index is compiled into the server, so it needs no network; a Git URL in `PNP_SCRIPT_SAMPLES_PATH` is fetched on first use. |
+| pnp_get_script_sample | Retrieves the full PnP PowerShell script code for one named script sample. The index entry is local; a community script body is fetched from GitHub, and your own is read from disk. |
+| pnp_suggest_script | Finds the most relevant script samples for a task, favouring your own, and returns their full script code plus adaptation guidance, in one call. |
+| pnp_save_script_sample | Saves a script that worked as a `.ps1` in the first plain folder of `PNP_SCRIPT_SAMPLES_PATH`, with its one-line summary as `.SYNOPSIS`, so searches and suggestions find it at once. Never overwrites an existing file. |
 | pnp_ping | Returns the server version, uptime, read-only mode status, and active session count, and — unless `includeReadiness` is `false` — whether `pwsh` and the `PnP.PowerShell` module are present. Use this as a lightweight health check to confirm the server is responsive and the machine is ready. |
 | pnp_list_sessions | Lists all active PowerShell sessions with their status and last activity time. Use this to see what sessions exist before deciding which to connect, reset, or reuse. |
 | pnp_setup_environment | Installs the `PnP.PowerShell` module for the current user so PnP cmdlets can run, choosing the released or the latest pre-release build. It installs that one module only — it never signs in, touches the tenant, or creates an app registration — and only when `PNP_MCP_ALLOW_SETUP=true`; otherwise it returns the exact `Install-Module` command to run by hand. |
@@ -271,6 +287,72 @@ Connect to contoso, find all site collections with no owner, and export them to 
 - **Reuse the connection.** Do not re-run `Connect-PnPOnline` before every command; check
   `pnp_get_connection_status` first. It reports which session it inspected.
 
+### Your own script samples
+
+Out of the box, the sample tools know the ~320 community [PnP Script Samples](https://pnp.github.io/script-samples/).
+Point `PNP_SCRIPT_SAMPLES_PATH` at your own scripts and they are searched, suggested and fetched the same
+way, ranked ahead of a community sample that matches about as well.
+
+```json
+{
+    "servers": {
+        "PnP PowerShell MCP Server": {
+            "type": "stdio",
+            "command": "pnp-powershell-mcp-server",
+            "env": {
+                "PNP_SCRIPT_SAMPLES_PATH": "C:\\scripts\\pnp;https://github.com/contoso/pnp-scripts.git"
+            }
+        }
+    }
+}
+```
+
+Entries are separated by `;`, and each one is:
+
+| Entry | Read as |
+| --- | --- |
+| A full folder path, e.g. `C:\scripts\pnp` | Every `.ps1` in it and its subfolders, up to 5,000. OneDrive folders work. Hidden and system items, files over 1 MB, and symbolic links and junctions, whether to a file or a folder, are skipped. |
+| An `https://` or `ssh://` Git URL | A shallow clone under local app data, refreshed once per server start, on the first sample call. It uses your existing Git credentials and never prompts, so clone the repository once yourself first. A copy that cannot be updated is replaced by a fresh clone, and if that fails too, the last copy is used. |
+| A [pnp/script-samples](https://github.com/pnp/script-samples) clone | Its samples, in place of the compiled-in copies of the same name. |
+
+Anything else, such as a relative path or `git@host:repo` (write it as `ssh://git@host/repo` instead), is ignored.
+
+A script is found by its comment-based help block (`<# … #>`), so a `.SYNOPSIS` is worth writing. Without
+one, the file name is its title:
+
+```powershell
+<#
+.SYNOPSIS
+Report sites with no activity in the last 180 days
+.DESCRIPTION
+Lists every site collection whose content has not changed recently, oldest first, as a CSV.
+#>
+param([int]$Days = 180)
+Get-PnPTenantSite | Where-Object LastContentModifiedDate -lt (Get-Date).AddDays(-$Days) |
+    Sort-Object LastContentModifiedDate | Select-Object Url, Title, LastContentModifiedDate |
+    Export-Csv inactive-sites.csv -NoTypeInformation
+```
+
+Its name is its path inside the folder, with anything but ASCII letters, digits, `_` and `.` turned into
+`-`, so `C:\scripts\pnp\sites\Inactive Sites.ps1` becomes `sites-Inactive-Sites`. When two scripts end up
+with the same name, the first one found wins, and a script whose name is left empty is skipped.
+
+Prompts that use it:
+
+```text
+What scripts do I have for site permissions?
+Find one of my samples that exports list items, and adapt it for the Documents list.
+Show me the full code of sites-Inactive-Sites.
+Save the script we just ran to my samples as monthly-storage-report.
+```
+
+`pnp_save_script_sample` writes to the first plain folder listed (never a Git copy or a clone) under a
+lower-case file name, adds the summary you give it as `.SYNOPSIS`, and refuses to overwrite an existing
+file or reuse a sample's name. The saved script can be
+found at once. Scripts you add or edit by hand show up after the next save or server restart, and changes
+pushed to a Git repository after a restart. A saved script is whatever the model wrote, so review it before sharing that folder with
+people who run its scripts.
+
 ### Configuration
 
 | Environment variable | Default | Description |
@@ -282,7 +364,7 @@ Connect to contoso, find all site collections with no owner, and export them to 
 | `PNP_MCP_MAX_OUTPUT_CHARS` | `50000` | Largest tool response returned, in characters. A JSON result set over the cap is summarised — true row count, field names, and as many whole rows as fit, plus a cursor for `pnp_get_result_page` — so the response stays complete and parseable. Anything else is truncated to its first whole lines with a note saying how much was dropped. Values below 2000 are ignored, since the note itself would leave no room for output. |
 | `PNP_MCP_REPLAY_DIR` | _(unset)_ | **Testing only.** Answers every command from recorded fixtures in this directory instead of running it, so the server never reaches Microsoft 365. It announces itself on stderr when set. See [Recorded-playback tests](#recorded-playback-tests). |
 | `PNP_MCP_RECORD_DIR` | _(unset)_ | **Testing only.** Writes a scrubbed fixture for every command the server runs, into this directory. |
-| `PNP_SCRIPT_SAMPLES_PATH` | _(unset)_ | Path to a local clone of [pnp/script-samples](https://github.com/pnp/script-samples), overriding the index compiled into the server. For contributors working against a newer catalogue than the one this build shipped with. |
+| `PNP_SCRIPT_SAMPLES_PATH` | _(unset)_ | Your own script samples, searched alongside the community index and ranked ahead of a community sample that matches about as well. A `;`-separated list of full folder paths of `.ps1` files, [pnp/script-samples](https://github.com/pnp/script-samples) clones, and `https://` or `ssh://` Git URLs. `pnp_save_script_sample` writes to the first plain folder listed. See [Your own script samples](#your-own-script-samples). |
 
 The client passes the environment in when it launches the server process, so where you set them decides
 both who they apply to and that a **server restart** is needed for a change to take effect.
@@ -389,6 +471,7 @@ processes too, so prefer the client config unless that is what you want:
 | Let an agent explore a production tenant without being able to change it | `PNP_MCP_READONLY=true` |
 | Tenant-wide reports that take longer than 10 minutes | `PNP_MCP_COMMAND_TIMEOUT_SECONDS=3600` |
 | Unattended automation where the commands are already reviewed | `PNP_MCP_CONFIRM_DESTRUCTIVE=false` |
+| Search and save your own scripts, plus your team's repository | `PNP_SCRIPT_SAMPLES_PATH=C:\scripts;https://github.com/contoso/pnp-scripts.git` |
 | Work against a script-samples clone newer than the vendored index | `PNP_SCRIPT_SAMPLES_PATH=C:\src\script-samples` |
 
 After changing any of these, **restart the MCP server** (in most clients, reload the window or toggle
@@ -455,9 +538,10 @@ running anything.
 
 The script fails rather than guessing if either upstream file stops matching the URL templates.
 
-Two overrides come first, for contributors working against a newer catalogue: the PnP PowerShell VS
-Code extension's own `samples.json` if that extension is installed, then `PNP_SCRIPT_SAMPLES_PATH`
-pointing at a [pnp/script-samples](https://github.com/pnp/script-samples) clone.
+The PnP PowerShell VS Code extension's own `samples.json` replaces the compiled-in catalogue when that
+extension is installed. Samples from `PNP_SCRIPT_SAMPLES_PATH` are then added on top, replacing any of
+the same name, so a [pnp/script-samples](https://github.com/pnp/script-samples) clone listed there
+also serves contributors working against a newer catalogue.
 
 ### Tool selection
 
