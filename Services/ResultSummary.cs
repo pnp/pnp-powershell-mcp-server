@@ -19,6 +19,11 @@ internal sealed class HeldResultSet
     public required IReadOnlyList<string> Fields { get; init; }
     public required int RawLength { get; init; }
 
+    /// <summary>Whatever printed around the array, such as warnings; clamped, with its full length kept.</summary>
+    public string? Notes { get; init; }
+
+    public int NotesLength { get; init; }
+
     /// <summary>True when the result was too large to hold whole and only a prefix is pageable.</summary>
     public bool Partial => TotalRows > Rows.Count;
 }
@@ -43,18 +48,28 @@ internal static class ResultSummary
 
     private const int MaxSessionIdChars = 40;
 
+    // Small enough that the header, fields and footer still fit inside Overhead.
+    private const int MaxNoteChars = 400;
+
     /// <summary>Captures a JSON array of two or more elements; null for anything else.</summary>
     public static HeldResultSet? TryCapture(string? output)
     {
         var text = output?.TrimStart() ?? string.Empty;
-        if (!text.StartsWith('['))
+
+        // Warnings print ahead of the array and stderr lands after it, so the array is found by line.
+        var start = text.StartsWith('[') ? 0 : text.IndexOf("\n[", StringComparison.Ordinal);
+        if (start < 0)
         {
             return null;
         }
 
         try
         {
-            using var document = JsonDocument.Parse(text);
+            var bytes = Encoding.UTF8.GetBytes(text, start, text.Length - start);
+            var reader = new Utf8JsonReader(bytes);
+            using var document = JsonDocument.ParseValue(ref reader);
+            var notes = $"{text[..start]}\n{Encoding.UTF8.GetString(bytes.AsSpan((int)reader.BytesConsumed))}".Trim();
+
             if (document.RootElement.ValueKind != JsonValueKind.Array)
             {
                 return null;
@@ -102,6 +117,8 @@ internal static class ResultSummary
                     TotalRows = total,
                     Fields = fields,
                     RawLength = text.Length,
+                    Notes = notes.Length > 0 ? OutputLimit.Clamp(notes, MaxNoteChars) : null,
+                    NotesLength = notes.Length,
                 };
         }
         catch (JsonException)
@@ -110,7 +127,6 @@ internal static class ResultSummary
         }
     }
 
-    /// <summary>Renders one page: what the whole result set is, then as many rows from <paramref name="offset"/> as fit.</summary>
     /// <summary>
     /// Which held rows one page covers. Shared so the rendered page and the offsets reported alongside it
     /// cannot disagree. <c>Oversized</c> means the row at <c>Start</c> is wider than a whole page.
@@ -137,6 +153,7 @@ internal static class ResultSummary
         return (start, start + (oversized ? 1 : taken), pageable, oversized);
     }
 
+    /// <summary>Renders one page: what the whole result set is, then as many rows from <paramref name="offset"/> as fit.</summary>
     public static string Render(HeldResultSet held, int offset, string sessionId)
     {
         var (start, end, pageable, oversized) = Paging(held, offset);
@@ -210,6 +227,20 @@ internal static class ResultSummary
         sb.AppendLine(
             $"The result set is held in session '{Name(sessionId)}' and is replaced by the next command that runs there, " +
             "so page through it before running anything else. Re-running the command is the only way to get fresher rows.");
+
+        // Last, and only what fits: Paging reserves no room for it, and a page cut by the cap is no longer valid JSON.
+        if (held.Notes is { } notes)
+        {
+            var full = $"Also printed: {notes}";
+            var note = sb.Length + full.Length + 2 <= OutputLimit.MaxChars
+                ? full
+                : $"Also printed: {N(held.NotesLength)} characters of other output, omitted to fit the output cap.";
+
+            if (sb.Length + note.Length + 2 <= OutputLimit.MaxChars)
+            {
+                sb.AppendLine(note);
+            }
+        }
 
         return sb.ToString();
     }

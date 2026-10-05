@@ -1,3 +1,4 @@
+using ModelContextProtocol;
 using System.Collections.Concurrent;
 
 namespace PnPPowerShell.MCPServer.Services;
@@ -11,25 +12,105 @@ internal sealed class PowerShellSessionManager : IAsyncDisposable
 
     private static readonly TimeSpan IdleTimeout = TimeSpan.FromMinutes(30);
 
+    private const int MaxSessions = 10;
+
+    private readonly Lock _admission = new();
+
+    // Named sessions removed but whose process may still be alive.
+    private int _retiring;
+
     private readonly ConcurrentDictionary<string, PowerShellSession> _sessions =
         new(StringComparer.OrdinalIgnoreCase);
 
     public PowerShellSession Get(string? sessionId)
     {
         EvictIdleSessions();
-        return _sessions.GetOrAdd(Normalize(sessionId), static id => new PowerShellSession(id));
+
+        var id = Normalize(sessionId);
+        if (_sessions.TryGetValue(id, out var existing))
+        {
+            return existing;
+        }
+
+        // Each session is a pwsh process with PnP loaded, so named ones are capped, and admitted under a lock
+        // so concurrent calls cannot overshoot. The default neither counts nor is refused: docs and diagnosis run there.
+        lock (_admission)
+        {
+            if (_sessions.TryGetValue(id, out existing))
+            {
+                return existing;
+            }
+
+            var isDefault = IsDefault(id);
+            var named = _sessions.Count - (_sessions.ContainsKey(DefaultSessionId) ? 1 : 0) + Volatile.Read(ref _retiring);
+            if (!isDefault && named >= MaxSessions)
+            {
+                throw new McpException(
+                    $"Too many sessions: {MaxSessions} named sessions are open or still ending. End one with 'pnp_reset_session', or reuse an existing sessionId.");
+            }
+
+            var created = new PowerShellSession(id);
+            _sessions[id] = created;
+            return created;
+        }
     }
 
     public async Task<bool> ResetAsync(string? sessionId)
     {
-        if (!_sessions.TryGetValue(Normalize(sessionId), out var session))
+        // Removed, not just terminated, so a reset frees its slot under the cap once the process is gone.
+        if (Retire(Normalize(sessionId)) is not { } retiring)
         {
             return false;
         }
 
-        await session.ResetAsync();
+        await retiring;
         return true;
     }
+
+    /// <summary>Removes a session, counting it against the cap until its process is gone; null when there was none.</summary>
+    // Under the admission lock, so no replacement is admitted between the removal and the count. Given an
+    // expected instance, only that one is removed, so eviction cannot retire a replacement created since.
+    private Task? Retire(string id, PowerShellSession? expected = null)
+    {
+        var session = expected;
+        var counted = !IsDefault(id);
+
+        lock (_admission)
+        {
+            var removed = session is null
+                ? _sessions.TryRemove(id, out session)
+                : _sessions.TryRemove(KeyValuePair.Create(id, session));
+
+            if (!removed || session is null)
+            {
+                return null;
+            }
+
+            if (counted)
+            {
+                Interlocked.Increment(ref _retiring);
+            }
+        }
+
+        return Finish();
+
+        async Task Finish()
+        {
+            try
+            {
+                await session.RetireAsync();
+            }
+            finally
+            {
+                if (counted)
+                {
+                    Interlocked.Decrement(ref _retiring);
+                }
+            }
+        }
+    }
+
+    private static bool IsDefault(string id) => string.Equals(id, DefaultSessionId, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The session holding a paged result set under this cursor, or null when none does.</summary>
     public PowerShellSession? FindHolder(string? cursor) =>
@@ -58,12 +139,12 @@ internal sealed class PowerShellSessionManager : IAsyncDisposable
         {
             // A command that runs longer than the idle window is still working, not abandoned:
             // LastUsedUtc only advances when it finishes, so busy sessions must be skipped explicitly.
-            if (session.IsBusy || session.LastUsedUtc >= cutoff || !_sessions.TryRemove(session.Id, out var removed))
+            if (session.IsBusy || session.LastUsedUtc >= cutoff)
             {
                 continue;
             }
 
-            _ = removed.DisposeAsync().AsTask();
+            _ = Retire(session.Id, session);
         }
     }
 

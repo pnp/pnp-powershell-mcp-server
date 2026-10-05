@@ -47,6 +47,32 @@ public class ScriptAnalyzerTests : IAsyncLifetime
     }
 
     [RequiresPnPFact]
+    public async Task The_http_method_is_read_however_it_is_written()
+    {
+        // A regression here silently reopens the REST-delete confirmation bypass.
+        (string Script, string? Method)[] cases =
+        [
+            ("Invoke-PnPSPRestMethod -Method Delete -Url /_api/web", "Delete"),
+            ("Invoke-PnPSPRestMethod -Url /_api/web Delete", "Delete"),
+            ("Invoke-PnPSPRestMethod Post -Url /_api/web", "Post"),
+            ("Invoke-PnPSPRestMethod -Url /_api/web -Method \"$verb\"", "<dynamic>"),
+            ("Invoke-PnPGraphMethod $url", null),
+            ("irm -Method Patch https://x", "Patch"),
+            ("Invoke-PnPGraphMethod -Meth:DELETE -Url groups/1", "DELETE"),
+            ("Invoke-WebRequest -CustomM DELETE -Uri https://x", "DELETE"),
+            ("Invoke-RestMethod -Method $m -Uri https://x", "<dynamic>"),
+            ("Invoke-RestMethod @p", "<dynamic>"),
+            ("Invoke-RestMethod -Uri https://x", null),
+        ];
+
+        foreach (var (script, method) in cases)
+        {
+            var command = Assert.Single((await Analyze(script)).Commands);
+            Assert.True(method == command.Method, $"{script}: expected {method ?? "null"}, got {command.Method ?? "null"}");
+        }
+    }
+
+    [RequiresPnPFact]
     public async Task Wildcard_shaped_aliases_resolve_to_a_single_command()
     {
         // Get-Command treats "?" and "%" as wildcards and returns several matches each, which came back

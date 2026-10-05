@@ -480,14 +480,33 @@ internal static class ConnectionPreflight
                 };
         }
 
+        var path = Environment.GetEnvironmentVariable("PATH");
+        if (_healthyProbe is { } cached && cached.Path == path && DateTimeOffset.UtcNow - cached.At < ProbeCacheLifetime)
+        {
+            return cached.Facts;
+        }
+
         var facts = await LaunchProbeAsync(cancellationToken);
         SessionTranscript.Record(
             EnvironmentProbeScript,
             JsonSerializer.Serialize(facts, PreflightJsonContext.Default.EnvironmentFacts),
             ProbeTranscriptKey);
 
+        // Only a healthy machine is cached, so an install the user just ran is seen on the next call.
+        _healthyProbe = facts.PwshVersion is not null && facts.ModuleVersion is not null ? new(facts, path, DateTimeOffset.UtcNow) : null;
+
         return facts;
     }
+
+    /// <summary>Forgets the cached probe, for after an install changes what it would find.</summary>
+    internal static void ForgetProbe() => _healthyProbe = null;
+
+    private static readonly TimeSpan ProbeCacheLifetime = TimeSpan.FromMinutes(1);
+
+    // Keyed on PATH, which decides which pwsh answers.
+    private static CachedProbe? _healthyProbe;
+
+    private sealed record CachedProbe(EnvironmentFacts Facts, string? Path, DateTimeOffset At);
 
     private static async Task<EnvironmentFacts> LaunchProbeAsync(CancellationToken cancellationToken)
     {

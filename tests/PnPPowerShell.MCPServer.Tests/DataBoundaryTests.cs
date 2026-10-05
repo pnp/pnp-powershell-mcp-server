@@ -1,5 +1,6 @@
 using PnPPowerShell.MCPServer.Services;
 using PnPPowerShell.MCPServer.Tools;
+using System.Text.Json.Nodes;
 
 namespace PnPPowerShell.MCPServer.Tests;
 
@@ -75,7 +76,7 @@ public class DataBoundaryTests
         Assert.DoesNotContain(ScriptSampleTools.FetchedContentNotice, output, StringComparison.Ordinal);
     }
 
-    /// <summary>A PNP_SCRIPT_SAMPLES_PATH clone holding one README, so the fetch is offline and its size is chosen.</summary>
+    /// <summary>A PNP_SCRIPT_SAMPLES_PATH clone holding one sample, so the fetch is offline and its size is chosen.</summary>
     private sealed class LocalClone : IDisposable
     {
         private readonly DirectoryInfo _root = Directory.CreateTempSubdirectory("pnp-boundary");
@@ -83,14 +84,27 @@ public class DataBoundaryTests
 
         public LocalClone(string sampleName, string script)
         {
-            var folder = Directory.CreateDirectory(Path.Combine(_root.FullName, "scripts", sampleName));
+            var indexed = ScriptSampleIndex.Samples.First(s => s.Name == sampleName);
+            var folder = Directory.CreateDirectory(Path.Combine(_root.FullName, "scripts", sampleName, "assets")).Parent!;
             File.WriteAllText(Path.Combine(folder.FullName, "README.md"), $"# Sample\n\n```powershell\n{script}\n```\n");
+
+            // The indexed entry's own metadata, so the clone replaces it and search still ranks it first.
+            var manifest = new JsonArray(new JsonObject
+            {
+                ["title"] = indexed.Title,
+                ["shortDescription"] = indexed.Description,
+                ["tags"] = new JsonArray([.. indexed.Tags.Select(t => (JsonNode?)t)]),
+            });
+            File.WriteAllText(Path.Combine(folder.FullName, "assets", "sample.json"), manifest.ToJsonString());
+
             _path = new EnvVar("PNP_SCRIPT_SAMPLES_PATH", _root.FullName);
+            ScriptSampleIndex.Reload();
         }
 
         public void Dispose()
         {
             _path.Dispose();
+            ScriptSampleIndex.Reload();
             _root.Delete(recursive: true);
         }
     }

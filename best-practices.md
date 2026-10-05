@@ -151,13 +151,14 @@ once, then keep running commands against it.
   connection:
 
   ```jsonc
-  { "sessionId": "contoso",  "command": "Connect-PnPOnline -Url https://contoso.sharepoint.com -Interactive" }
-  { "sessionId": "fabrikam", "command": "Connect-PnPOnline -Url https://fabrikam.sharepoint.com -Interactive" }
+  { "sessionId": "contoso",  "command": "Connect-PnPOnline -Url https://contoso.sharepoint.com" }
+  { "sessionId": "fabrikam", "command": "Connect-PnPOnline -Url https://fabrikam.sharepoint.com" }
   { "sessionId": "contoso",  "command": "(Get-PnPTenantSite).Count" }
   ```
 
-  Each session has its own connection **and** its own variables, so a `$sites` set in one is not
-  visible in the other. `pnp_search_commands` uses no session at all, and `pnp_get_command_docs`
+  Both connects assume a persisted login for that tenant, so neither prompts; use the connect
+  `pnp_diagnose_connection` names. Each session has its own connection **and** its own variables, so
+  a `$sites` set in one is not visible in the other. `pnp_search_commands` uses no session at all, and `pnp_get_command_docs`
   always uses `default`, since cmdlet lookup does not depend on the connection.
 - **One command at a time per session.** A second call against a busy session waits, then reports that
   the session is busy. Use a different `sessionId` to genuinely run two things at once.
@@ -182,7 +183,7 @@ to set rather than working around it.
 | `PNP_MCP_COMMAND_TIMEOUT_SECONDS` | `600` | Per-command wall-clock limit, in seconds. |
 | `PNP_MCP_CONFIRM_DESTRUCTIVE` | `true` | `false` skips destructive confirmations. |
 | `PNP_MCP_MAX_OUTPUT_CHARS` | `50000` | Largest tool response, in characters; longer output is truncated. |
-| `PNP_SCRIPT_SAMPLES_PATH` | _(unset)_ | Local clone of the script samples repo, overriding the vendored index. |
+| `PNP_SCRIPT_SAMPLES_PATH` | _(unset)_ | `;`-separated folders or Git URLs of the user's own samples, searched alongside the community ones. |
 
 Both booleans are matched exactly: read-only turns on only for the literal `true`, and confirmation
 turns off only for the literal `false`. `1` and `yes` leave the default in place.
@@ -273,11 +274,12 @@ Pipeline shaping is allowed too, since these appear in the parsed script as comm
 
 ### Also refused
 
-- **Commands invoked indirectly** (`& $someVariable`), because what they would run cannot be
-  established before they run.
+- **Commands invoked indirectly** (`& $someVariable`, `Invoke-Expression`, `Invoke-Command`, `Start-Job`,
+  `Add-Type`), because what they would run cannot be established before they run.
 - **Native executables** (`pwsh`, `git`, ...), which have no verb to classify.
-- **Method calls that can change state** — anything named `Delete*`, `Recycle*`
-  and `Execute*`. `ExecuteQuery` is the commit point for every CSOM change, so
+- **Method calls that can change state** — anything named `Delete*`, `Recycle*`, `Execute*`
+  and `Invoke*`, plus `Create` and `NewScriptBlock`, which build script blocks from strings, and `Start`,
+  which launches a process. `ExecuteQuery` is the commit point for every CSOM change, so
   `$list.DeleteObject(); $ctx.ExecuteQuery()` is refused even though neither is a cmdlet. Read-only
   helpers such as `ToString()` and `Trim()` are unaffected.
 
@@ -286,14 +288,24 @@ Pipeline shaping is allowed too, since these appear in the parsed script as comm
 - Read-only refers to **Microsoft 365**. Local file output (`Out-File`, `Export-*`) is still allowed.
 - Classification is by verb, so a cmdlet whose verb does not match its behaviour is classified by the
   verb. `Invoke-*` is refused wholesale for this reason.
-- This is defence in depth, not a sandbox. A script that builds a command name at runtime is refused
-  rather than analysed, but static analysis cannot prove the absence of every escape.
+- This is defence in depth, not a sandbox. A script that builds a command name or a script block at
+  runtime is refused rather than analysed, but static analysis cannot prove the absence of every escape.
 
 ## Destructive Commands
 
 Commands using a destructive verb — `Remove-*`, `Clear-*`, `Reset-*`, `Uninstall-*`, `Revoke-*`,
-`Deny-*`, `Restore-*`, `Move-*`, `Rename-*`, `Disable-*` — are **not run without confirmation**.
-Neither is a command invoked indirectly, since it cannot be identified in advance.
+`Deny-*`, `Restore-*`, `Move-*`, `Rename-*`, `Disable-*`, `Unregister-*`, `Unpublish-*`, `Merge-*` — are
+**not run without confirmation**. Neither is a command invoked indirectly or through a code runner
+(`Invoke-Expression`, `Invoke-Command`, `Start-Job`, `Add-Type`, `Start-Process`, `Invoke-Item`, `Import-Module`),
+or one with no verb at all (a native program
+such as `pwsh`, or a script file), since it cannot be identified in advance. A function defined in this session
+is judged by what its body runs. A name the session cannot resolve is refused before anything runs, including
+one the same script would define as it runs (`Set-Item function:…`, `Set-Alias`): write a helper as
+`function Name { … }` in the script, or define it in one call and use it in the next.
+Nor is `Invoke-PnPSPRestMethod`, `Invoke-PnPGraphMethod`, `Invoke-RestMethod` or `Invoke-WebRequest` with
+any method other than `GET`, given by name or by position, or one that cannot be read before it runs: a `POST`
+can delete through an `X-HTTP-Method` header or a `recycle()` endpoint, and `PATCH`, `PUT` and `MERGE`
+overwrite. A request made through .NET classes such as `HttpClient` is not caught.
 
 This check favours asking too often over missing something: it also matches a destructive name that
 appears only as text (for example inside a string), so you may occasionally be asked to confirm a

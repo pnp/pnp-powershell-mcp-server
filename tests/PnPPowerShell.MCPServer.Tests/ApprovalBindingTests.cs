@@ -128,6 +128,19 @@ public class ApprovalBindingTests
     }
 
     [Fact]
+    public void Two_identical_prompts_each_redeem_once_and_only_their_own()
+    {
+        var first = PnPPowerShellTools.IssueApproval(Command);
+        var second = PnPPowerShellTools.IssueApproval(Command);
+
+        Assert.NotEqual(first, second);
+        Assert.True(PnPPowerShellTools.IsApprovalBoundTo(PnPPowerShellTools.RedeemApproval(first), Command));
+        Assert.Null(PnPPowerShellTools.RedeemApproval(first));
+        Assert.True(PnPPowerShellTools.IsApprovalBoundTo(PnPPowerShellTools.RedeemApproval(second), Command));
+        Assert.Null(PnPPowerShellTools.RedeemApproval(PnPPowerShellTools.Fingerprint(Command)));
+    }
+
+    [Fact]
     public void The_fingerprint_is_stable_across_calls()
     {
         Assert.Equal(PnPPowerShellTools.Fingerprint(Command), PnPPowerShellTools.Fingerprint(Command));

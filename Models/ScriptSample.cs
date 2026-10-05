@@ -29,6 +29,14 @@ internal sealed class ScriptSample
     public string TabTag { get; set; } = string.Empty;
     public List<string> Tags { get; set; } = [];
     public List<ScriptSampleAuthor> Authors { get; set; } = [];
+
+    /// <summary>The user's own .ps1 file. Never deserialized, so an index file cannot point it elsewhere.</summary>
+    [JsonIgnore]
+    public string LocalPath { get; set; } = string.Empty;
+
+    /// <summary>The listed folder a local or clone sample was found in, and the only place its body is read from.</summary>
+    [JsonIgnore]
+    public string LocalRoot { get; set; } = string.Empty;
 }
 
 internal sealed class ScriptSampleAuthor

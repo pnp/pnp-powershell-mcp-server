@@ -85,6 +85,34 @@ public sealed class RequiresPnPFactAttribute : FactAttribute
     }
 }
 
+/// <summary>A fact that skips itself where a symbolic link needs a privilege, as on Windows without Developer Mode.</summary>
+public sealed class RequiresSymlinksFactAttribute : FactAttribute
+{
+    private static readonly Lazy<bool> Supported = new(() =>
+    {
+        var link = Path.Combine(Path.GetTempPath(), $"pnp-link-probe-{Guid.NewGuid():N}");
+
+        try
+        {
+            File.CreateSymbolicLink(link, "target");
+            File.Delete(link);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    });
+
+    public RequiresSymlinksFactAttribute()
+    {
+        if (!Supported.Value)
+        {
+            Skip = "Creating a symbolic link needs a privilege this process does not hold.";
+        }
+    }
+}
+
 /// <summary>
 /// The mirror of <see cref="RequiresPnPFactAttribute"/>: runs only where pwsh or PnP.PowerShell is
 /// absent. The cold-start states cannot be manufactured on a developer machine that has both — pwsh

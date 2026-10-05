@@ -43,6 +43,11 @@ on:
         required: false
         default: false
         type: boolean
+      publish_registry:
+        description: 'Publish .mcp/server.json to the Official MCP Registry (the version must be on NuGet.org, or pushed by this run)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -61,7 +66,7 @@ jobs:
     outputs:
       version: ${{ steps.resolve.outputs.version }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - id: resolve
         shell: bash
@@ -106,9 +111,9 @@ jobs:
           - rid: linux-arm64
             os: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
@@ -117,6 +122,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang zlib1g-dev
+
+      # Packed as the version being built, so a tag or back-fill cannot ship the checked-in manifest's version.
+      - name: Stamp the release version into server.json
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: jq --arg v "$VERSION" '.version = $v | .packages |= map(.version = $v)' .mcp/server.json > server.tmp && mv server.tmp .mcp/server.json
 
       - name: Pack ${{ matrix.rid }}
         shell: bash
@@ -127,7 +139,7 @@ jobs:
             -p:PackageVersion=${{ needs.version.outputs.version }} \
             --output artifacts
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: nupkg-${{ matrix.rid }}
           path: artifacts/*.nupkg
@@ -141,7 +153,14 @@ jobs:
     needs: version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # Packed as the version being built, so a tag or back-fill cannot ship the checked-in manifest's version.
+      - name: Stamp the release version into server.json
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: jq --arg v "$VERSION" '.version = $v | .packages |= map(.version = $v)' .mcp/server.json > server.tmp && mv server.tmp .mcp/server.json
 
       - name: Pack linux-musl-x64 in an Alpine container
         env:
@@ -157,7 +176,7 @@ jobs:
             mcr.microsoft.com/dotnet/sdk:10.0-alpine-aot \
             sh -ec 'dotnet pack "$PROJECT" --configuration Release --runtime linux-musl-x64 -p:PackageVersion="$VERSION" --output artifacts'
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: nupkg-linux-musl-x64
           path: artifacts/*.nupkg
@@ -170,11 +189,18 @@ jobs:
     needs: version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # Packed as the version being built, so a tag or back-fill cannot ship the checked-in manifest's version.
+      - name: Stamp the release version into server.json
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: jq --arg v "$VERSION" '.version = $v | .packages |= map(.version = $v)' .mcp/server.json > server.tmp && mv server.tmp .mcp/server.json
 
       - name: Pack wrapper
         shell: bash
@@ -184,7 +210,7 @@ jobs:
             -p:PackageVersion=${{ needs.version.outputs.version }} \
             --output artifacts
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: nupkg-wrapper
           path: artifacts/*.nupkg
@@ -197,7 +223,7 @@ jobs:
     needs: [version, pack-rid, pack-musl, pack-wrapper]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           path: staging
           pattern: nupkg-*
@@ -242,6 +268,18 @@ jobs:
           done
           exit "$missing"
 
+      # NuGet versions are immutable, so a README the registry rejects costs a version bump.
+      - name: Check the wrapper README carries the MCP Registry name
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="$(jq -r .name wrapper/.mcp/server.json)"
+          if ! grep -qF "mcp-name: $name" wrapper/README.md; then
+            echo "::error::The packed README.md has no 'mcp-name: $name' line, so the MCP Registry would reject this version"
+            exit 1
+          fi
+          echo "ok: README.md declares mcp-name: $name"
+
       - name: Summarise
         shell: bash
         run: |
@@ -264,18 +302,18 @@ jobs:
     # Optional: if you want the release to require a GitHub environment approval, enable this:
     # environment: nuget
     steps:
-      - uses: actions/setup-dotnet@v6
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           path: staging
           pattern: nupkg-*
           merge-multiple: true
 
       - name: NuGet login (OIDC → temporary API key)
-        uses: NuGet/login@v1
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
         id: login
         with:
           user: ${{ secrets.NUGET_USER }}
@@ -306,3 +344,70 @@ jobs:
             push "$f"
           done
           push "$wrapper"
+
+  publish-mcp-registry:
+    name: Publish to the MCP Registry
+    needs: [version, publish]
+    # Also runs when 'publish' was skipped, to list a version already on NuGet.org. always() is implied by the
+    # status checks beside it; it is stated so the skip rule cannot be misread. !failure() still stops it after a failed verify.
+    if: ${{ always() && !cancelled() && !failure() && (github.event_name == 'push' || inputs.publish_registry) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Stamp the release version into server.json
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          jq --arg v "$VERSION" '.version = $v | .packages |= map(.version = $v)' .mcp/server.json > server.tmp
+          mv server.tmp .mcp/server.json
+          cat .mcp/server.json
+
+      # The registry fetches this same README to verify ownership, and NuGet.org serves it only after validation.
+      - name: Wait for the package README on NuGet.org
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          name="$(jq -r .name .mcp/server.json)"
+          id="$(jq -r '.packages[0].identifier' .mcp/server.json | tr '[:upper:]' '[:lower:]')"
+          version="$(echo "$VERSION" | tr '[:upper:]' '[:lower:]')"
+          url="https://api.nuget.org/v3-flatcontainer/$id/$version/readme"
+
+          deadline=$((SECONDS + 1800))
+          until readme="$(curl -fsSL "$url" 2>/dev/null)"; do
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::$url was still unavailable after 30 minutes"
+              exit 1
+            fi
+            echo "Not available yet: $url"
+            sleep 30
+          done
+
+          if ! grep -qF "mcp-name: $name" <<<"$readme"; then
+            echo "::error::The README of $id $version on NuGet.org has no 'mcp-name: $name' line; the registry would reject it"
+            exit 1
+          fi
+          echo "ok: $url declares mcp-name: $name"
+
+      # Pinned and checksummed: this job can mint an OIDC token, so it runs no unverified binary.
+      - name: Install mcp-publisher
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSLo mcp-publisher.tar.gz https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz
+          echo "a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc  mcp-publisher.tar.gz" | sha256sum -c -
+          tar xzf mcp-publisher.tar.gz mcp-publisher
+
+      # OIDC grants the repository owner's namespace, io.github.pnp/*, with no secret.
+      - name: Log in to the MCP Registry
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish server.json
+        run: ./mcp-publisher publish .mcp/server.json

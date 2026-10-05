@@ -17,10 +17,10 @@ public class TruncationHonestyTests(ITestOutputHelper output)
         using var capped = new EnvVar("PNP_MCP_MAX_OUTPUT_CHARS", OutputLimit.MinimumMaxChars.ToString());
         await using var sessions = new PowerShellSessionManager();
 
-        // Enough sessions, with long enough ids, that the list cannot fit a small cap.
-        for (var i = 0; i < 40; i++)
+        // The session limit, with ids near the echo clamp, is more than a small cap can list.
+        for (var i = 0; i < 10; i++)
         {
-            sessions.Get($"session-{i:D2}-{new string('x', 60)}");
+            sessions.Get($"session-{i:D2}-{new string('x', 105)}");
         }
 
         var result = PnPPowerShellTools.ListSessions(sessions);
@@ -30,16 +30,16 @@ public class TruncationHonestyTests(ITestOutputHelper output)
         var shown = structured.GetProperty("count").GetInt32();
         var truncated = structured.GetProperty("truncated").GetBoolean();
 
-        output.WriteLine($"created 40, shown {shown}, truncated {truncated}");
+        output.WriteLine($"created 10, shown {shown}, truncated {truncated}");
         output.WriteLine(text.Split('\n')[0]);
 
-        Assert.True(truncated, "40 sessions at the minimum cap were not reported as truncated.");
+        Assert.True(truncated, "10 sessions at the minimum cap were not reported as truncated.");
 
         // The prose must not present a partial page as the total.
         Assert.False(
             text.Contains($"**{shown}** active session(s)", StringComparison.Ordinal) &&
             !text.Contains("more", StringComparison.OrdinalIgnoreCase),
-            $"The page shows {shown} of 40 sessions but states it as the total with no note.");
+            $"The page shows {shown} of 10 sessions but states it as the total with no note.");
     }
 
     /// <summary>A declared output schema with no payload and no explanation leaves a client guessing.</summary>

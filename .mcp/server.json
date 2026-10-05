@@ -1,19 +1,38 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
-  "description": "MCP server for PnP PowerShell that allows using natural language to manage your Microsoft 365 tenant and to author complex PnP PowerShell scripts.",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.pnp/pnp-powershell-mcp-server",
-  "version": "0.1.6-beta",
+  "title": "PnP PowerShell",
+  "description": "Manage Microsoft 365 in natural language with PnP PowerShell and author PnP PowerShell scripts.",
+  "websiteUrl": "https://github.com/pnp/pnp-powershell-mcp-server#readme",
+  "version": "0.1.7-beta",
   "packages": [
     {
       "registryType": "nuget",
-      "registryBaseUrl": "https://api.nuget.org",
+      "registryBaseUrl": "https://api.nuget.org/v3/index.json",
       "identifier": "PnP.PowerShell.MCPServer",
-      "version": "0.1.6-beta",
+      "version": "0.1.7-beta",
       "transport": {
         "type": "stdio"
       },
       "packageArguments": [],
-      "environmentVariables": []
+      "environmentVariables": [
+        {
+          "name": "PNP_MCP_READONLY",
+          "description": "Read-only mode: true refuses every command that would change Microsoft 365.",
+          "format": "boolean",
+          "isRequired": false,
+          "default": "false",
+          "choices": ["false", "true"]
+        },
+        {
+          "name": "PNP_MCP_ALLOW_SETUP",
+          "description": "true lets pnp_setup_environment install the PnP.PowerShell module for the current user when it is missing.",
+          "format": "boolean",
+          "isRequired": false,
+          "default": "false",
+          "choices": ["false", "true"]
+        }
+      ]
     }
   ],
   "repository": {
