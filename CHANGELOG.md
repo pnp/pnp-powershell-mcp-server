@@ -10,6 +10,23 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ## [Current version]
 
+### Added
+
+- Added progress reporting to `pnp_run_command`: a client that asks for progress hears every 30 seconds that a long command is still running, so its idle timeout no longer cuts the call off (Claude Code ends a local server's call after 30 minutes of silence). `PNP_MCP_PROGRESS_INTERVAL_SECONDS` changes the interval.
+- Added OpenAI Codex setup to the README, and a table of how VS Code, GitHub Copilot CLI, Claude Code and Codex each handle long commands and destructive-command confirmations.
+
+### Changed
+
+- Changed the MCP SDK from 2.2.0 to 2.3.0 (`ModelContextProtocol`, `ModelContextProtocol.Extensions.Tasks`) and `Microsoft.Extensions.Hosting` from 10.0.11 to 10.0.13.
+- Changed `pnp_run_command` tasks to expire one hour after the longest a command can run, instead of being kept until the server exits. Each task now states its lifetime in `ttlMs`.
+- Changed `tools/list` to a fixed order that follows the usual workflow: connecting, running a command, finding commands and samples, guidance, then session housekeeping.
+
+### Fixed
+
+- Fixed the confirmation prompt for a destructive command when `pnp_run_command` runs as an MCP task, as it does in the Claude Code CLI. The task failed with "MRTR and tasks cannot be composed via [McpServerTool] yet." and the command could not be approved; the task now waits for the answer, then runs or cancels.
+- Fixed a client that declares only URL-mode elicitation being sent a confirmation form it cannot show; it now gets the explanation that the command needs confirmation, and nothing runs.
+- Fixed VS Code GitHub Copilot Chat and OpenAI Codex never showing the model the text of a structured tool result, which since 0.1.6-beta hid the rows from `pnp_get_result_page` and the causes and next commands from `pnp_diagnose_connection`. Both clients give the model only the structured part when one is present, so every structured result now repeats its text in a `text` field; a result too large to carry it twice is sent as text alone.
+
 ## [0.1.7-beta]
 
 ### Added

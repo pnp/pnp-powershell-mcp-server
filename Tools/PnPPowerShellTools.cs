@@ -1,3 +1,4 @@
+using ModelContextProtocol;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using PnPPowerShell.MCPServer.Models;
@@ -25,7 +26,7 @@ internal partial class PnPPowerShellTools
     private static partial Regex DestructiveCommandRegex();
 
     /// <summary>Per-command wall-clock limit; generous because long tenant-wide operations are normal here.</summary>
-    private static TimeSpan CommandTimeout =>
+    internal static TimeSpan CommandTimeout =>
         int.TryParse(Environment.GetEnvironmentVariable("PNP_MCP_COMMAND_TIMEOUT_SECONDS"), out var seconds) && seconds > 0
             ? TimeSpan.FromSeconds(seconds)
             : TimeSpan.FromMinutes(10);
@@ -326,6 +327,7 @@ internal partial class PnPPowerShellTools
         PowerShellSessionManager sessions,
         McpServer server,
         RequestContext<CallToolRequestParams> context,
+        IProgress<ProgressNotificationValue> progress,
         [Description("PnP PowerShell command(s) to execute (e.g., \"Get-PnPSite\", \"Get-PnPList | Select-Object Title, ItemCount\")")] string command,
         [Description("Session to run in. Sessions keep their own PnP connection, so use a second name only when working against two tenants at once (default: \"default\")")] string? sessionId = null,
         CancellationToken cancellationToken = default)
@@ -358,6 +360,8 @@ internal partial class PnPPowerShellTools
         var (analysisBudget, executionFloor) = SplitBudget(budget);
         var elapsed = System.Diagnostics.Stopwatch.StartNew();
 
+        await using var heartbeat = ProgressHeartbeat.StartFor(context, progress, budget);
+
         // Parsed rather than pattern-matched, so aliases and indirect invocation are seen for what they are.
         var (analysis, sessionError) = await ScriptAnalyzer.AnalyzeAsync(session, command, analysisBudget, cancellationToken);
 
@@ -387,7 +391,12 @@ internal partial class PnPPowerShellTools
         if (flagged is not null && !ConfirmationDisabled)
         {
             approvedGeneration = session.Generation;
-            var refusal = await ConfirmDestructiveAsync(server, context, $"{session.Id}\n{approvedGeneration}", command, flagged);
+
+            // Inside a task the prompt is awaited here; time spent waiting for a person is not the command's.
+            elapsed.Stop();
+            var refusal = await ConfirmDestructiveAsync(server, context, $"{session.Id}\n{approvedGeneration}", command, flagged, cancellationToken);
+            elapsed.Start();
+
             if (refusal is not null)
             {
                 return refusal;
@@ -534,7 +543,8 @@ internal partial class PnPPowerShellTools
         RequestContext<CallToolRequestParams> context,
         string session,
         string command,
-        string matchedCmdlet)
+        string matchedCmdlet,
+        CancellationToken cancellationToken)
     {
         // Bound to the session as it is now, so a reset, reconnect or other command in it voids the approval.
         var bound = $"{session}\n{command}";
@@ -552,36 +562,25 @@ internal partial class PnPPowerShellTools
             return EvaluateApproval(issuedFor, bound, response.Deserialize(InputResponse.ElicitResultJsonTypeInfo), matchedCmdlet);
         }
 
-        // IsMrtrSupported only says the round-trip can be represented; on the legacy bridge the client
-        // must additionally be able to elicit, or the SDK fails the call with an opaque error instead
-        // of letting us fall back.
-        if (server.IsMrtrSupported && server.ClientCapabilities?.Elicitation is not null)
+        // The prompt is a form; a client declaring only URL elicitation cannot show it.
+        if (server.ClientCapabilities?.Elicitation?.Form is not null)
         {
-            var state = IssueApproval(bound);
+            // A task is never retried, and the SDK fails one that throws InputRequiredException.
+            if (TaskExecution.RunsAsTask(context))
+            {
+                return await ConfirmInTaskAsync(server, command, matchedCmdlet, cancellationToken);
+            }
 
-            throw new InputRequiredException(
-                inputRequests: new Dictionary<string, InputRequest>
-                {
-                    ["confirmDestructive"] = InputRequest.ForElicitation(new ElicitRequestParams
+            // IsMrtrSupported only says the round-trip is representable; the legacy bridge also needs elicitation.
+            if (server.IsMrtrSupported)
+            {
+                throw new InputRequiredException(
+                    inputRequests: new Dictionary<string, InputRequest>
                     {
-                        Message =
-                            $"This command needs confirmation before it runs against the connected tenant.\n\nFlagged: {matchedCmdlet}\n\n{command}\n\nThis may not be reversible. Continue?",
-                        RequestedSchema = new()
-                        {
-                            Required = ["confirm"],
-                            Properties =
-                            {
-                                ["confirm"] = new ElicitRequestParams.BooleanSchema
-                                {
-                                    Title = "Run this command",
-                                    Description = $"Confirm execution of {matchedCmdlet}",
-                                    Default = false,
-                                },
-                            },
-                        },
-                    }),
-                },
-                requestState: state);
+                        ["confirmDestructive"] = InputRequest.ForElicitation(ConfirmationPrompt(command, matchedCmdlet)),
+                    },
+                    requestState: IssueApproval(bound));
+            }
         }
 
         return $"""
@@ -596,6 +595,42 @@ internal partial class PnPPowerShellTools
             An operator who has already reviewed what this server will be asked to run can set PNP_MCP_CONFIRM_DESTRUCTIVE=false to turn the gate off for the whole process.
             """;
     }
+
+    /// <summary>Asks within a task, whose answer arrives through tasks/update rather than a retry.</summary>
+    // Awaited in this call, so the answer can only approve the command it was asked about.
+    private static async Task<string?> ConfirmInTaskAsync(McpServer server, string command, string matchedCmdlet, CancellationToken cancellationToken)
+    {
+        using var expiry = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        expiry.CancelAfter(ApprovalLifetime);
+
+        try
+        {
+            return EvaluateAnswer(await server.ElicitAsync(ConfirmationPrompt(command, matchedCmdlet), expiry.Token), matchedCmdlet);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return $"Cancelled: {matchedCmdlet} was not confirmed within {ApprovalLifetime.TotalMinutes:0} minutes, so nothing was run.";
+        }
+    }
+
+    private static ElicitRequestParams ConfirmationPrompt(string command, string matchedCmdlet) => new()
+    {
+        Message =
+            $"This command needs confirmation before it runs against the connected tenant.\n\nFlagged: {matchedCmdlet}\n\n{command}\n\nThis may not be reversible. Continue?",
+        RequestedSchema = new()
+        {
+            Required = ["confirm"],
+            Properties =
+            {
+                ["confirm"] = new ElicitRequestParams.BooleanSchema
+                {
+                    Title = "Run this command",
+                    Description = $"Confirm execution of {matchedCmdlet}",
+                    Default = false,
+                },
+            },
+        },
+    };
 
     [McpServerTool(
         Name = "pnp_diagnose_connection",
@@ -879,6 +914,12 @@ internal partial class PnPPowerShellTools
                 "Re-run 'pnp_run_command' and confirm the command you are shown.";
         }
 
+        return EvaluateAnswer(elicited, matchedCmdlet);
+    }
+
+    /// <summary>Null only when the user accepted the prompt and ticked the box.</summary>
+    internal static string? EvaluateAnswer(ElicitResult? elicited, string matchedCmdlet)
+    {
         if (elicited?.IsAccepted is not true)
         {
             return $"Cancelled: {matchedCmdlet} was not confirmed, so nothing was run.";
@@ -898,7 +939,7 @@ internal partial class PnPPowerShellTools
     /// <summary>Unanswered prompts, keyed by a random nonce each, so an answer redeems only its own prompt, once.</summary>
     private static readonly ConcurrentDictionary<string, (string Fingerprint, DateTimeOffset Issued)> IssuedApprovals = new();
 
-    private static readonly TimeSpan ApprovalLifetime = TimeSpan.FromMinutes(10);
+    internal static readonly TimeSpan ApprovalLifetime = TimeSpan.FromMinutes(10);
 
     private const int MaxOutstandingApprovals = 256;
 

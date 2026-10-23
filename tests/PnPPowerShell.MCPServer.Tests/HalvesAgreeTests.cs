@@ -40,12 +40,21 @@ public partial class HalvesAgreeTests(ITestOutputHelper output)
 
         var result = PnPPowerShellTools.GetPnpResultPage(sessions, session.Held!.Cursor);
         var text = ToolResults.Text(result);
-        var page = JsonSerializer.Deserialize(result.StructuredContent!.Value.GetRawText(), ToolOutputJsonContext.Default.ResultPage);
+        var printed = MoreOffset().Match(text);
+
+        // A page near the cap cannot carry its text twice, so it goes out as text alone.
+        if (result.StructuredContent is not { } structured)
+        {
+            output.WriteLine($"rows={rows} cap={cap} -> text only, more={printed.Success}");
+            Assert.Contains("structured output omitted", text, StringComparison.Ordinal);
+            return;
+        }
+
+        var page = JsonSerializer.Deserialize(structured.GetRawText(), ToolOutputJsonContext.Default.ResultPage);
 
         Assert.NotNull(page);
+        Assert.Equal(text, page.Text);
         output.WriteLine($"rows={rows} cap={cap} -> offset={page.Offset} next={page.NextOffset} pageable={page.PageableRows}");
-
-        var printed = MoreOffset().Match(text);
 
         if (page.NextOffset is { } next)
         {
@@ -74,11 +83,15 @@ public partial class HalvesAgreeTests(ITestOutputHelper output)
 
         while (pages++ < 500)
         {
-            var page = JsonSerializer.Deserialize(
-                PnPPowerShellTools.GetPnpResultPage(sessions, cursor, offset).StructuredContent!.Value.GetRawText(),
-                ToolOutputJsonContext.Default.ResultPage)!;
+            var result = PnPPowerShellTools.GetPnpResultPage(sessions, cursor, offset);
+            var printed = MoreOffset().Match(ToolResults.Text(result));
 
-            if (page.NextOffset is not { } next)
+            // Either half's offset is one a client may follow, so whichever was sent must advance.
+            int? reported = result.StructuredContent is { } structured
+                ? JsonSerializer.Deserialize(structured.GetRawText(), ToolOutputJsonContext.Default.ResultPage)!.NextOffset
+                : printed.Success ? int.Parse(printed.Groups[1].Value) : null;
+
+            if (reported is not { } next)
             {
                 break;
             }

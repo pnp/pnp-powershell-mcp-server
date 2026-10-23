@@ -1,4 +1,5 @@
 using ModelContextProtocol.Protocol;
+using PnPPowerShell.MCPServer.Models;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 
@@ -21,26 +22,15 @@ internal static class StructuredResult
     /// <see cref="FitToCap"/>, which keeps as much as fits instead.
     /// </summary>
     public static CallToolResult From<T>(T value, JsonTypeInfo<T> typeInfo, Func<T, string> render)
+        where T : StructuredOutput
     {
         var text = render(value);
+        value.Text = text;
         var structured = JsonSerializer.SerializeToElement(value, typeInfo);
 
         if (text.Length + structured.GetRawText().Length > OutputLimit.MaxChars)
         {
-            // Said out loud. The tool advertises an output schema, so a client that trusted it would
-            // otherwise be unable to tell "there was no data" from "the data was withheld".
-            return new CallToolResult
-            {
-                Content =
-                [
-                    new TextContentBlock
-                    {
-                        Text = text +
-                            "\n\n[structured output omitted: it did not fit alongside this text within " +
-                            $"{OutputLimit.MaxChars} characters. Everything it carried is stated above.]",
-                    },
-                ],
-            };
+            return TextOnly(text);
         }
 
         return new CallToolResult
@@ -67,6 +57,7 @@ internal static class StructuredResult
         Func<IReadOnlyList<TItem>, bool, TResult> project,
         JsonTypeInfo<TResult> typeInfo,
         Func<TResult, string> render)
+        where TResult : StructuredOutput
     {
         var whole = Measure(items.Count, lean: false);
         if (whole.Total <= OutputLimit.MaxChars)
@@ -93,15 +84,21 @@ internal static class StructuredResult
             }
         }
 
-        return best > 0
-            ? Measure(best, lean: false).Result
-            : Measure(Math.Min(1, items.Count), lean: true).Result;
+        var fitted = best > 0
+            ? Measure(best, lean: false)
+            : Measure(Math.Min(1, items.Count), lean: true);
+
+        // Carrying the text twice, one item can still overrun; the text alone then holds everything.
+        return fitted.Total <= OutputLimit.MaxChars
+            ? fitted.Result
+            : TextOnly(((TextContentBlock)fitted.Result.Content[0]).Text);
 
         (CallToolResult Result, int Total) Measure(int take, bool lean)
         {
             var value = project([.. items.Take(take)], lean);
-            var structured = JsonSerializer.SerializeToElement(value, typeInfo);
             var text = render(value);
+            value.Text = text;
+            var structured = JsonSerializer.SerializeToElement(value, typeInfo);
 
             return (
                 new CallToolResult
@@ -113,6 +110,20 @@ internal static class StructuredResult
                 text.Length + structured.GetRawText().Length);
         }
     }
+
+    /// <summary>The text without its structured half, saying so: otherwise a schema-trusting client reads withheld as absent.</summary>
+    private static CallToolResult TextOnly(string text) => new()
+    {
+        Content =
+        [
+            new TextContentBlock
+            {
+                Text = text +
+                    "\n\n[structured output omitted: it did not fit alongside this text within " +
+                    $"{OutputLimit.MaxChars} characters. Everything it carried is stated above.]",
+            },
+        ],
+    };
 
     /// <summary>A plain text result, for the error paths that carry nothing to structure.</summary>
     public static CallToolResult Text(string text, bool isError = false) =>

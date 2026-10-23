@@ -170,16 +170,18 @@ public class VendoredIndexTests
 
         var result = ScriptSampleTools.SearchScriptSamples("site list user teams permission export", 50);
         var text = ToolResults.Text(result);
-        var structured = result.StructuredContent!.Value;
 
         Assert.DoesNotContain(OutputLimit.TruncationMarker, text, StringComparison.Ordinal);
         Assert.Contains(ScriptSampleIndex.Provenance, text, StringComparison.Ordinal);
         Assert.True(text.Length <= OutputLimit.MaxChars, $"{text.Length} characters against a {OutputLimit.MaxChars} cap.");
 
         // Fewer listed than matched, and the prose says so rather than presenting the page as the whole.
-        Assert.True(structured.GetProperty("truncated").GetBoolean());
-        Assert.True(structured.GetProperty("count").GetInt32() < structured.GetProperty("matched").GetInt32());
         Assert.Contains("showing the first", text, StringComparison.Ordinal);
+        if (result.StructuredContent is { } structured)
+        {
+            Assert.True(structured.GetProperty("truncated").GetBoolean());
+            Assert.True(structured.GetProperty("count").GetInt32() < structured.GetProperty("matched").GetInt32());
+        }
     }
 
     /// <summary>A pnp/script-samples clone named in PNP_SCRIPT_SAMPLES_PATH.</summary>

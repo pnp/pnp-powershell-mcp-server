@@ -142,6 +142,35 @@ claude mcp add pnp-powershell --scope user -- pnp-powershell-mcp-server
 
 4. Save and enable the `PnP PowerShell MCP Server` in the `Tools & MCP` tab and wait for the tools to load.
 
+### Add to OpenAI Codex
+
+Add the server to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.pnp-powershell]
+command = "pnp-powershell-mcp-server"
+# Codex gives up on a tool call after 300 seconds by default; a command may run for 600.
+tool_timeout_sec = 660
+# Codex starts the server with only core system variables, so pass through the ones your sign-in uses.
+env_vars = ["ENTRAID_APP_ID", "ENTRAID_APP_CERTIFICATE_PATH"]
+```
+
+Set this server's own options, such as `PNP_MCP_READONLY`, with `env = { PNP_MCP_READONLY = "true" }` in the same table. If you raise `PNP_MCP_COMMAND_TIMEOUT_SECONDS`, raise `tool_timeout_sec` with it.
+
+### How each client behaves
+
+Every client connects, but they differ in how long they wait and how they ask you to confirm a destructive command. A confirmation that is declined, skipped or never shown means the command does not run.
+
+| Client | Long commands | Confirming a destructive command | Worth knowing |
+| --- | --- | --- | --- |
+| VS Code (GitHub Copilot Chat) | No time limit. Progress appears in the chat. | Asked inline in the chat as True / False. Autopilot and auto-approve never answer it; sending a new message skips it. | Tools are listed alphabetically. |
+| GitHub Copilot CLI | Set `timeout` on the server, in milliseconds, longer than `PNP_MCP_COMMAND_TIMEOUT_SECONDS`. | Asked in an interactive session. `copilot -p` and autopilot decline it. | Leave `--experimental` off: in that mode Copilot accepts a task reply only from tools that declare one, which `pnp_run_command` cannot, so its calls fail. |
+| Claude Code (terminal) | From 2.1.304, `pnp_run_command` runs as a background task with no time limit. Otherwise progress keeps the call alive. | Asked in a dialog, hidden while `/tasks` is open. A non-interactive run cancels the command instead. | |
+| Claude Code (VS Code extension) | Runs in the conversation; progress keeps the call alive. | Asked in a dialog. | MCP tasks are not available in the extension. |
+| OpenAI Codex | Raise `tool_timeout_sec` (see above); progress does not extend it. | Asked in the terminal UI, after Codex's own approval prompt. `codex exec` and the bypass mode decline it. | Pass sign-in variables with `env_vars`. |
+
+Tools that return structured content also repeat their text in a `text` field, because VS Code and Codex show the model only the structured part of a result.
+
 ## 📷 Use Cases
 
 The below use cases are only a few examples of how you may use this MCP server. It is capable of handling many different tasks, so feel free to experiment and manage Microsoft 365 using natural language.
@@ -358,6 +387,7 @@ people who run its scripts.
 | Environment variable | Default | Description |
 | --- | --- | --- |
 | `PNP_MCP_COMMAND_TIMEOUT_SECONDS` | `600` | Wall-clock limit for a single `pnp_run_command` call. On timeout the session is terminated and the connection is lost. |
+| `PNP_MCP_PROGRESS_INTERVAL_SECONDS` | `30` | How often a running `pnp_run_command` reports progress to a client that asked for it, so the client's idle timeout does not cut off a long command. |
 | `PNP_MCP_CONFIRM_DESTRUCTIVE` | `true` | Set to `false` to run destructive commands (`Remove-*`, `Clear-*`, ...) without asking for confirmation. This is the only way to bypass the gate: there is no tool parameter that lets the model approve its own destructive command, so on a client that cannot show a confirmation prompt, destructive commands are simply blocked. |
 | `PNP_MCP_READONLY` | `false` | Set to `true` to refuse any command that would change Microsoft 365. Allowed verbs: `Get-`, `Export-`, `Test-`, `Convert-`/`ConvertTo-`/`ConvertFrom-`, `Read-`, `Measure-`, `Connect-`/`Disconnect-`, `Find-`, `Format-`, `Resolve-`, `Write-`, `Search-`, `Show-`, `Compare-`, plus pipeline shaping (`Select-`, `Where-`, `Sort-`, `Group-`, `ForEach-`, `Out-`, `Join-`, `Split-`). Refused: `Set-`, `Remove-`, `Add-`, `New-`, `Clear-`, `Invoke-`, `Update-`, `Move-`, `Enable-`/`Disable-`, `Grant-`/`Revoke-`, `Copy-`, `Import-`, `Restore-`, `Reset-`, `Rename-`, `Start-`/`Stop-`, `Register-`/`Unregister-`, and every other change verb — along with indirectly invoked commands, native executables, and state-changing method calls such as `ExecuteQuery`. See [Best Practices](./best-practices.md#read-only-mode) for the full table. Local file output (`Out-File`, `Export-*`) is still permitted. |
 | `PNP_MCP_ALLOW_SETUP` | `false` | Set to `true` to let `pnp_setup_environment` install the `PnP.PowerShell` module for the current user. Left unset, that tool changes nothing and returns the `Install-Module` command for you to run by hand. It never installs anything else, signs in, or touches the tenant. |
@@ -485,7 +515,8 @@ booleans are matched exactly — `PNP_MCP_READONLY` enables only on the literal 
 `yes` included, leaves the default in place.
 
 Clients that support the MCP **Tasks** extension can run `pnp_run_command` as a task and poll for the
-result, rather than holding the request open for the duration of a long tenant operation.
+result, rather than holding the request open for the duration of a long tenant operation. A destructive
+command run as a task still asks for confirmation: the task waits for the answer, then runs or cancels.
 
 ## 🏗️ How to build and run it locally
 
