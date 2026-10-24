@@ -8,8 +8,17 @@ namespace PnPPowerShell.MCPServer.Models;
 // records are what a client reads from CallToolResult.StructuredContent instead. The text content is
 // still written alongside, because a client that ignores schemas must not lose anything.
 
+/// <summary>Base of every typed result, carrying the text content too.</summary>
+// VS Code Copilot Chat and Codex give the model only structured content when it is present.
+internal abstract record StructuredOutput
+{
+    /// <summary>The same prose as the text content: guidance, next steps, and any rows or report the fields leave out.</summary>
+    [JsonPropertyOrder(1000)]
+    public string? Text { get; set; }
+}
+
 /// <summary>What <c>pnp_search_commands</c> found.</summary>
-internal sealed record CommandSearchResult
+internal sealed record CommandSearchResult : StructuredOutput
 {
     /// <summary>The query as the server understood it.</summary>
     public required string Query { get; init; }
@@ -72,7 +81,7 @@ internal sealed record CommandSearchHit
 /// <summary>What <c>pnp_ping</c> reports.</summary>
 // This tool hand-built its JSON into a string, which is the exact failure structured output exists to
 // fix: the shape was already a contract, just an unschema'd one a client had to parse out of prose.
-internal sealed record ServerHealth
+internal sealed record ServerHealth : StructuredOutput
 {
     public required string Status { get; init; }
 
@@ -104,7 +113,7 @@ internal sealed record ServerHealth
 }
 
 /// <summary>What <c>pnp_list_sessions</c> found.</summary>
-internal sealed record SessionListResult
+internal sealed record SessionListResult : StructuredOutput
 {
     /// <summary>How many are listed here, which is fewer than <see cref="Total"/> when truncated.</summary>
     public int Count => Sessions.Count;
@@ -137,7 +146,7 @@ internal sealed record SessionSummary
 /// The rows themselves stay in the text half only. They are the bulk of the payload, and repeating them
 /// here would halve how many fit the output cap to restate what the caller already has.
 /// </summary>
-internal sealed record ResultPage
+internal sealed record ResultPage : StructuredOutput
 {
     public required string Cursor { get; init; }
 
@@ -159,7 +168,7 @@ internal sealed record ResultPage
 /// <summary>What one session is connected to, as reported by <c>pnp_get_connection_status</c>.</summary>
 // Deserialized from the JSON the session itself emits, then re-emitted with the session id attached, so
 // a client reads one typed object instead of finding JSON inside prose.
-internal sealed record ConnectionStatus
+internal sealed record ConnectionStatus : StructuredOutput
 {
     public string SessionId { get; init; } = string.Empty;
 
@@ -179,7 +188,7 @@ internal sealed record ConnectionStatus
 }
 
 /// <summary>What <c>pnp_search_script_samples</c> found. Titles and links only, never code.</summary>
-internal sealed record SampleSearchResult
+internal sealed record SampleSearchResult : StructuredOutput
 {
     public required string Query { get; init; }
 
@@ -204,7 +213,7 @@ internal sealed record SampleHit
 }
 
 /// <summary>What <c>pnp_setup_environment</c> did, or declined to do.</summary>
-internal sealed record SetupResult
+internal sealed record SetupResult : StructuredOutput
 {
     /// <summary>False when PNP_MCP_ALLOW_SETUP is not set, in which case nothing ran.</summary>
     public required bool Allowed { get; init; }
@@ -222,7 +231,7 @@ internal sealed record SetupResult
 /// The checks <c>pnp_diagnose_connection</c> ran, as facts rather than a report. The prose half carries
 /// the causes and the next command; this half is what a client can branch on.
 /// </summary>
-internal sealed record ConnectionDiagnosis
+internal sealed record ConnectionDiagnosis : StructuredOutput
 {
     public required string SessionId { get; init; }
 

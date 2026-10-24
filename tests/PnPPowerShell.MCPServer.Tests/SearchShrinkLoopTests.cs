@@ -111,7 +111,8 @@ public class SearchShrinkLoopTests(ITestOutputHelper output)
             Assert.False(small.GetProperty("truncated").GetBoolean(), "A result that fits was marked truncated.");
         }
 
-        using (new EnvVar("PNP_MCP_MAX_OUTPUT_CHARS", OutputLimit.MinimumMaxChars.ToString()))
+        // Small enough to cut, large enough that the structured half still fits beside the text.
+        using (new EnvVar("PNP_MCP_MAX_OUTPUT_CHARS", "12000"))
         {
             var big = PnPPowerShellTools.SearchPnpCommands("site list file user group", 100).StructuredContent!.Value;
             Assert.True(big.GetProperty("truncated").GetBoolean(), "A result that was cut was not marked truncated.");
@@ -127,8 +128,14 @@ public class SearchShrinkLoopTests(ITestOutputHelper output)
             using var capped = new EnvVar("PNP_MCP_MAX_OUTPUT_CHARS", cap.ToString());
 
             var result = PnPPowerShellTools.SearchPnpCommands("site list file user group set get add remove", 100);
-            var structured = result.StructuredContent!.Value;
             var text = ToolResults.Text(result);
+
+            if (result.StructuredContent is not { } structured)
+            {
+                output.WriteLine($"cap {cap,6}: text only, text {text.Length,6}");
+                continue;
+            }
+
             var json = structured.GetRawText();
             var lean = !structured.GetProperty("commands")[0].TryGetProperty("parameters", out _);
 

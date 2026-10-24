@@ -70,7 +70,7 @@ public class DataBoundaryTests
         using var replay = new EnvVar("PNP_MCP_REPLAY_DIR", FixtureDirectory);
         await using var sessions = new PowerShellSessionManager();
 
-        var output = await PnPPowerShellTools.RunPnpCommand(sessions, server: null!, context: null!, "Get-PnPWeb | Select-Object Title, Url");
+        var output = await PnPPowerShellTools.RunPnpCommand(sessions, server: null!, context: null!, progress: null!, "Get-PnPWeb | Select-Object Title, Url");
 
         Assert.Contains("Url", output, StringComparison.Ordinal);
         Assert.DoesNotContain(ScriptSampleTools.FetchedContentNotice, output, StringComparison.Ordinal);

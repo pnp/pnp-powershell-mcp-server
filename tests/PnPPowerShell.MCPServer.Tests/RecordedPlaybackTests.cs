@@ -134,7 +134,7 @@ public class RecordedPlaybackTests
         $"-ClientId '{Environment.GetEnvironmentVariable("PNP_MCP_RECORD_CLIENT_ID") ?? "00000000-0000-4000-8000-000000000001"}' -PersistLogin";
 
     private static Task<string> Run(PowerShellSessionManager sessions, string command) =>
-        PnPPowerShellTools.RunPnpCommand(sessions, server: null!, context: null!, command);
+        PnPPowerShellTools.RunPnpCommand(sessions, server: null!, context: null!, progress: null!, command);
 
     /// <summary>The fixtures under source control, rather than the copy in the test output directory.</summary>
     private static string SourceFixtureDirectory()

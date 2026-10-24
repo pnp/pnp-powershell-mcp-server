@@ -1,6 +1,7 @@
 using PnPPowerShell.MCPServer.Models;
 using PnPPowerShell.MCPServer.Services;
 using PnPPowerShell.MCPServer.Tools;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Xunit.Abstractions;
@@ -40,12 +41,21 @@ public partial class HalvesAgreeTests(ITestOutputHelper output)
 
         var result = PnPPowerShellTools.GetPnpResultPage(sessions, session.Held!.Cursor);
         var text = ToolResults.Text(result);
-        var page = JsonSerializer.Deserialize(result.StructuredContent!.Value.GetRawText(), ToolOutputJsonContext.Default.ResultPage);
+        var printed = MoreOffset().Match(text);
+
+        // A page near the cap cannot carry its text twice, so it goes out as text alone.
+        if (result.StructuredContent is not { } structured)
+        {
+            output.WriteLine($"rows={rows} cap={cap} -> text only, more={printed.Success}");
+            Assert.Contains("structured output omitted", text, StringComparison.Ordinal);
+            return;
+        }
+
+        var page = JsonSerializer.Deserialize(structured.GetRawText(), ToolOutputJsonContext.Default.ResultPage);
 
         Assert.NotNull(page);
+        Assert.Equal(text, page.Text);
         output.WriteLine($"rows={rows} cap={cap} -> offset={page.Offset} next={page.NextOffset} pageable={page.PageableRows}");
-
-        var printed = MoreOffset().Match(text);
 
         if (page.NextOffset is { } next)
         {
@@ -55,6 +65,97 @@ public partial class HalvesAgreeTests(ITestOutputHelper output)
         else
         {
             Assert.False(printed.Success, $"The page prints a MORE line at offset {printed.Groups[1].Value} but the structured half says there is no next page.");
+        }
+    }
+
+    /// <summary>A page sent as text alone keeps every row it covers and the offset that continues it.</summary>
+    [Theory]
+    [InlineData(2000)]
+    [InlineData(2500)]
+    [InlineData(5000)]
+    [InlineData(50_000)]
+    public async Task A_page_sent_as_text_alone_keeps_its_rows_and_continuation(int cap)
+    {
+        using var capped = new EnvVar("PNP_MCP_MAX_OUTPUT_CHARS", cap.ToString(CultureInfo.InvariantCulture));
+        await using var sessions = new PowerShellSessionManager();
+        var session = sessions.Get(new string('s', 64));
+
+        // Row widths vary so the page ends at different distances from the cap.
+        foreach (var width in new[] { 5, 37, 61, 113, 240 })
+        foreach (var offset in new[] { 0, 1_997 })
+        {
+            // The page's fixed parts at their widest: long session name, field list at its bound, notes, partial set.
+            var rows = Enumerable.Range(0, 2_000).Select(i => $"{{\"Id\":{i},\"Title\":\"{new string('t', width + (i % 23))}\"}}").ToList();
+            session.Held = new HeldResultSet
+            {
+                Cursor = "0123456789",
+                Rows = rows,
+                TotalRows = int.MaxValue,
+                Fields = [.. Enumerable.Range(0, 60).Select(i => $"AVeryLongSharePointInternalFieldName_{i:00}")],
+                RawLength = int.MaxValue,
+                Notes = new string('n', 400),
+                NotesLength = int.MaxValue,
+            };
+
+            var result = PnPPowerShellTools.GetPnpResultPage(sessions, "0123456789", offset);
+            var text = ToolResults.Text(result);
+            var json = result.StructuredContent is { } s ? s.GetRawText() : string.Empty;
+            var (start, end, pageable, _) = ResultSummary.Paging(session.Held!, offset);
+
+            output.WriteLine($"cap={cap} width={width} offset={offset} -> text {text.Length}, structured={json.Length > 0}, rows {start}-{end}");
+            Assert.True(text.Length + json.Length <= cap, $"width {width} offset {offset}: {text.Length + json.Length} characters against a {cap} cap.");
+            Assert.False(text.Contains(OutputLimit.TruncationMarker, StringComparison.Ordinal), $"width {width} offset {offset}: the page was cut.");
+
+            var array = text.Split('\n').Select(l => l.TrimEnd('\r')).Single(l => l.StartsWith("[{", StringComparison.Ordinal));
+            Assert.Equal(end - start, JsonDocument.Parse(array).RootElement.GetArrayLength());
+
+            var printed = MoreOffset().Match(text);
+            Assert.Equal(end < pageable, printed.Success);
+            if (printed.Success)
+            {
+                Assert.Equal(end, int.Parse(printed.Groups[1].Value, CultureInfo.InvariantCulture));
+            }
+        }
+    }
+
+    /// <summary>A row is skipped as oversized only when it cannot fit beside the page's actual overhead.</summary>
+    [Theory]
+    [InlineData(2000, 400, false, false)]
+    [InlineData(2000, 499, false, false)]
+    [InlineData(2000, 800, false, false)]
+    [InlineData(2000, 1_900, true, false)]
+    [InlineData(2500, 1_200, false, false)]
+    [InlineData(2000, 3_000, true, true)]
+    public async Task A_row_is_skipped_only_when_it_cannot_fit(int cap, int width, bool skipped, bool widestFrame)
+    {
+        using var capped = new EnvVar("PNP_MCP_MAX_OUTPUT_CHARS", cap.ToString(CultureInfo.InvariantCulture));
+        await using var sessions = new PowerShellSessionManager();
+
+        var session = sessions.Get(widestFrame ? new string('s', 64) : null);
+        session.Held = new HeldResultSet
+        {
+            Cursor = "0123456789",
+            Rows = [.. Enumerable.Range(0, 3).Select(i => Row(i, width))],
+            TotalRows = widestFrame ? int.MaxValue : 3,
+            Fields = widestFrame ? [.. Enumerable.Range(0, 60).Select(i => $"AVeryLongSharePointInternalFieldName_{i:00}")] : ["Id", "Title"],
+            RawLength = widestFrame ? int.MaxValue : 3 * width,
+            Notes = widestFrame ? new string('n', 400) : null,
+            NotesLength = widestFrame ? int.MaxValue : 0,
+        };
+
+        var result = PnPPowerShellTools.GetPnpResultPage(sessions, "0123456789");
+        var text = ToolResults.Text(result);
+        var json = result.StructuredContent is { } s ? s.GetRawText() : string.Empty;
+
+        Assert.Equal(skipped, ResultSummary.Paging(session.Held!, 0).Oversized);
+        Assert.Equal(skipped, text.Contains("wider than a page", StringComparison.Ordinal));
+        Assert.True(text.Length + json.Length <= cap, $"{text.Length + json.Length} characters against a {cap} cap.");
+        Assert.False(text.Contains(OutputLimit.TruncationMarker, StringComparison.Ordinal), "The page was cut.");
+
+        static string Row(int i, int width)
+        {
+            var prefix = $"{{\"Id\":{i},\"Title\":\"";
+            return prefix + new string('t', width - prefix.Length - 2) + "\"}";
         }
     }
 
@@ -74,11 +175,15 @@ public partial class HalvesAgreeTests(ITestOutputHelper output)
 
         while (pages++ < 500)
         {
-            var page = JsonSerializer.Deserialize(
-                PnPPowerShellTools.GetPnpResultPage(sessions, cursor, offset).StructuredContent!.Value.GetRawText(),
-                ToolOutputJsonContext.Default.ResultPage)!;
+            var result = PnPPowerShellTools.GetPnpResultPage(sessions, cursor, offset);
+            var printed = MoreOffset().Match(ToolResults.Text(result));
 
-            if (page.NextOffset is not { } next)
+            // Either half's offset is one a client may follow, so whichever was sent must advance.
+            int? reported = result.StructuredContent is { } structured
+                ? JsonSerializer.Deserialize(structured.GetRawText(), ToolOutputJsonContext.Default.ResultPage)!.NextOffset
+                : printed.Success ? int.Parse(printed.Groups[1].Value) : null;
+
+            if (reported is not { } next)
             {
                 break;
             }

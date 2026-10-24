@@ -43,7 +43,7 @@ public class OversizedArgumentTests
                 "get_command_docs" => await PnPPowerShellTools.GetPnpCommandDocs(sessions, Huge),
                 "search_script_samples_matching" => ToolResults.Text(ScriptSampleTools.SearchScriptSamples(HugeMatching, 5)),
                 "suggest_script_matching" => await ScriptSampleTools.SuggestScript(HugeMatching, 1),
-                _ => await PnPPowerShellTools.RunPnpCommand(sessions, null!, null!, Huge + " -PnP"),
+                _ => await PnPPowerShellTools.RunPnpCommand(sessions, null!, null!, null!, Huge + " -PnP"),
             };
 
             Assert.True(

@@ -31,13 +31,10 @@ internal sealed class HeldResultSet
 /// <summary>Summarises an oversized JSON array into pages instead of truncating it.</summary>
 internal static class ResultSummary
 {
-    // Reserved for the header, the field list and the continuation footer before any row is measured.
-    private const int Overhead = 2_000;
-
     // The list repeats on every page, so naming fifty-odd fields stops being useful past the first few.
     private const int MaxListedFields = 25;
 
-    // Bounds the field line in characters as well as in count, so Overhead cannot be overrun by long names.
+    // Bounds the field line in characters as well as in count, so long names cannot crowd out the rows.
     private const int MaxFieldChars = 600;
 
     /// <summary>Ceiling on what a session pins in memory. Rows past it are counted, not kept.</summary>
@@ -48,7 +45,7 @@ internal static class ResultSummary
 
     private const int MaxSessionIdChars = 40;
 
-    // Small enough that the header, fields and footer still fit inside Overhead.
+    // Clamped on capture; a page adds them only when they fit.
     private const int MaxNoteChars = 400;
 
     /// <summary>Captures a JSON array of two or more elements; null for anything else.</summary>
@@ -137,7 +134,8 @@ internal static class ResultSummary
         var pageable = held.Rows.Count;
         var start = Math.Clamp(offset, 0, Math.Max(pageable - 1, 0));
 
-        var budget = Math.Max(OutputLimit.MaxChars - Overhead, 500);
+        // Whatever this set's own page frame leaves, less the notice a text-only page carries.
+        var budget = OutputLimit.MaxChars - StructuredResult.OmittedNoticeLength - Frame(held);
         var taken = 0;
         var used = 0;
 
@@ -153,6 +151,71 @@ internal static class ResultSummary
         return (start, start + (oversized ? 1 : taken), pageable, oversized);
     }
 
+    /// <summary>What any page of this set spends besides its rows, with every variable part at its widest.</summary>
+    private static int Frame(HeldResultSet held)
+    {
+        var line = Environment.NewLine.Length;
+        var pageable = held.Rows.Count;
+        string[] footers =
+        [
+            MoreLine(pageable, held.Cursor, pageable),
+            HeldEndLine(pageable + 1, held.TotalRows),
+            EndLine(held.Cursor),
+            CompleteLine(held.Cursor),
+        ];
+
+        return HeaderLine(held).Length + line
+            + (FieldsLine(held) is { } fields ? fields.Length + line : 0)
+            + RowsLine(held.TotalRows, held.TotalRows, held.TotalRows).Length + (2 * line)
+            + "[]".Length + (2 * line)
+            + footers.Max(f => f.Length) + line
+            + SessionLine(new string('s', MaxSessionIdChars + 1)).Length + line;
+    }
+
+    private static string HeaderLine(HeldResultSet held) =>
+        $"Result set: {N(held.TotalRows)} rows, summarised because the full output is {N(held.RawLength)} characters " +
+        $"and the cap is {N(OutputLimit.MaxChars)}. " +
+        (held.Partial
+            ? $"Too large to hold whole: the first {N(held.Rows.Count)} rows can be paged, the remaining {N(held.TotalRows - held.Rows.Count)} cannot."
+            : "No rows were dropped — they are held for paging.");
+
+    private static string? FieldsLine(HeldResultSet held)
+    {
+        if (held.Fields.Count == 0)
+        {
+            return null;
+        }
+
+        var listed = string.Join(", ", held.Fields.Take(MaxListedFields));
+        var overflow = held.Fields.Count - MaxListedFields;
+
+        if (listed.Length > MaxFieldChars)
+        {
+            listed = listed[..MaxFieldChars];
+            overflow = held.Fields.Count - listed.Count(c => c == ',') - 1;
+        }
+
+        return $"Fields: {listed}{(overflow > 0 ? $", and {N(overflow)} more" : string.Empty)}";
+    }
+
+    private static string RowsLine(int first, int last, int total) => $"Rows {N(first)}-{N(last)} of {N(total)}:";
+
+    private static string MoreLine(int remaining, string cursor, int next) =>
+        $"MORE: {N(remaining)} of the held rows remain. Call 'pnp_get_result_page' with cursor '{cursor}' and offset {next}.";
+
+    // Held rows ended, but the result set did not.
+    private static string HeldEndLine(int firstUnheld, int total) =>
+        $"END OF HELD ROWS: rows {N(firstUnheld)}-{N(total)} were never held, so no cursor reaches them. " +
+        "Re-run with a narrower query — fewer fields, a filter, or -PageSize — to see the rest.";
+
+    private static string EndLine(string cursor) => $"END: this is the last page. Cursor '{cursor}', offset 0 returns to the first.";
+
+    private static string CompleteLine(string cursor) => $"COMPLETE: every row is above. Cursor '{cursor}'.";
+
+    private static string SessionLine(string sessionId) =>
+        $"The result set is held in session '{Name(sessionId)}' and is replaced by the next command that runs there, " +
+        "so page through it before running anything else. Re-running the command is the only way to get fresher rows.";
+
     /// <summary>Renders one page: what the whole result set is, then as many rows from <paramref name="offset"/> as fit.</summary>
     public static string Render(HeldResultSet held, int offset, string sessionId)
     {
@@ -162,25 +225,11 @@ internal static class ResultSummary
         offset = start;
 
         var sb = new StringBuilder();
-        sb.AppendLine(
-            $"Result set: {N(total)} rows, summarised because the full output is {N(held.RawLength)} characters " +
-            $"and the cap is {N(OutputLimit.MaxChars)}. " +
-            (held.Partial
-                ? $"Too large to hold whole: the first {N(pageable)} rows can be paged, the remaining {N(total - pageable)} cannot."
-                : "No rows were dropped — they are held for paging."));
+        sb.AppendLine(HeaderLine(held));
 
-        if (held.Fields.Count > 0)
+        if (FieldsLine(held) is { } fields)
         {
-            var listed = string.Join(", ", held.Fields.Take(MaxListedFields));
-            var overflow = held.Fields.Count - MaxListedFields;
-
-            if (listed.Length > MaxFieldChars)
-            {
-                listed = listed[..MaxFieldChars];
-                overflow = held.Fields.Count - listed.Count(c => c == ',') - 1;
-            }
-
-            sb.AppendLine($"Fields: {listed}{(overflow > 0 ? $", and {N(overflow)} more" : string.Empty)}");
+            sb.AppendLine(fields);
         }
 
         if (oversized)
@@ -196,47 +245,31 @@ internal static class ResultSummary
         }
         else
         {
-            sb.AppendLine($"Rows {N(offset + 1)}-{N(end)} of {N(total)}:");
+            sb.AppendLine(RowsLine(offset + 1, end, total));
             sb.AppendLine();
             sb.AppendLine("[" + string.Join(",", held.Rows.Skip(offset).Take(taken)) + "]");
         }
 
         sb.AppendLine();
 
-        if (end < pageable)
-        {
-            sb.AppendLine(
-                $"MORE: {N(pageable - end)} of the held rows remain. Call 'pnp_get_result_page' with cursor '{held.Cursor}' and offset {end}.");
-        }
-        else if (held.Partial)
-        {
-            // Held rows ended, but the result set did not.
-            sb.AppendLine(
-                $"END OF HELD ROWS: rows {N(pageable + 1)}-{N(total)} were never held, so no cursor reaches them. " +
-                "Re-run with a narrower query — fewer fields, a filter, or -PageSize — to see the rest.");
-        }
-        else if (offset > 0)
-        {
-            sb.AppendLine($"END: this is the last page. Cursor '{held.Cursor}', offset 0 returns to the first.");
-        }
-        else
-        {
-            sb.AppendLine($"COMPLETE: every row is above. Cursor '{held.Cursor}'.");
-        }
-
         sb.AppendLine(
-            $"The result set is held in session '{Name(sessionId)}' and is replaced by the next command that runs there, " +
-            "so page through it before running anything else. Re-running the command is the only way to get fresher rows.");
+            end < pageable ? MoreLine(pageable - end, held.Cursor, end)
+            : held.Partial ? HeldEndLine(pageable + 1, total)
+            : offset > 0 ? EndLine(held.Cursor)
+            : CompleteLine(held.Cursor));
+
+        sb.AppendLine(SessionLine(sessionId));
 
         // Last, and only what fits: Paging reserves no room for it, and a page cut by the cap is no longer valid JSON.
         if (held.Notes is { } notes)
         {
+            var room = OutputLimit.MaxChars - StructuredResult.OmittedNoticeLength;
             var full = $"Also printed: {notes}";
-            var note = sb.Length + full.Length + 2 <= OutputLimit.MaxChars
+            var note = sb.Length + full.Length + 2 <= room
                 ? full
                 : $"Also printed: {N(held.NotesLength)} characters of other output, omitted to fit the output cap.";
 
-            if (sb.Length + note.Length + 2 <= OutputLimit.MaxChars)
+            if (sb.Length + note.Length + 2 <= room)
             {
                 sb.AppendLine(note);
             }
