@@ -118,6 +118,47 @@ public partial class HalvesAgreeTests(ITestOutputHelper output)
         }
     }
 
+    /// <summary>A row is skipped as oversized only when it cannot fit beside the page's actual overhead.</summary>
+    [Theory]
+    [InlineData(2000, 400, false, false)]
+    [InlineData(2000, 499, false, false)]
+    [InlineData(2000, 800, false, false)]
+    [InlineData(2000, 1_900, true, false)]
+    [InlineData(2500, 1_200, false, false)]
+    [InlineData(2000, 3_000, true, true)]
+    public async Task A_row_is_skipped_only_when_it_cannot_fit(int cap, int width, bool skipped, bool widestFrame)
+    {
+        using var capped = new EnvVar("PNP_MCP_MAX_OUTPUT_CHARS", cap.ToString(CultureInfo.InvariantCulture));
+        await using var sessions = new PowerShellSessionManager();
+
+        var session = sessions.Get(widestFrame ? new string('s', 64) : null);
+        session.Held = new HeldResultSet
+        {
+            Cursor = "0123456789",
+            Rows = [.. Enumerable.Range(0, 3).Select(i => Row(i, width))],
+            TotalRows = widestFrame ? int.MaxValue : 3,
+            Fields = widestFrame ? [.. Enumerable.Range(0, 60).Select(i => $"AVeryLongSharePointInternalFieldName_{i:00}")] : ["Id", "Title"],
+            RawLength = widestFrame ? int.MaxValue : 3 * width,
+            Notes = widestFrame ? new string('n', 400) : null,
+            NotesLength = widestFrame ? int.MaxValue : 0,
+        };
+
+        var result = PnPPowerShellTools.GetPnpResultPage(sessions, "0123456789");
+        var text = ToolResults.Text(result);
+        var json = result.StructuredContent is { } s ? s.GetRawText() : string.Empty;
+
+        Assert.Equal(skipped, ResultSummary.Paging(session.Held!, 0).Oversized);
+        Assert.Equal(skipped, text.Contains("wider than a page", StringComparison.Ordinal));
+        Assert.True(text.Length + json.Length <= cap, $"{text.Length + json.Length} characters against a {cap} cap.");
+        Assert.False(text.Contains(OutputLimit.TruncationMarker, StringComparison.Ordinal), "The page was cut.");
+
+        static string Row(int i, int width)
+        {
+            var prefix = $"{{\"Id\":{i},\"Title\":\"";
+            return prefix + new string('t', width - prefix.Length - 2) + "\"}";
+        }
+    }
+
     /// <summary>Paging to the reported next offset must actually advance, or a client loops forever.</summary>
     [Fact]
     public async Task Following_the_reported_offset_terminates()
