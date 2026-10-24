@@ -111,14 +111,20 @@ internal static class StructuredResult
         }
     }
 
+    /// <summary>Room a renderer leaves so the omission notice fits beside its text uncut.</summary>
+    internal static int OmittedNoticeLength => OmittedNotice(complete: true).Length;
+
+    private static string OmittedNotice(bool complete) =>
+        $"\n\n[structured output omitted: it did not fit alongside this text within {OutputLimit.MaxChars} characters." +
+        (complete ? " Everything it carried is stated above.]" : "]");
+
     /// <summary>The text without its structured half, saying so: otherwise a schema-trusting client reads withheld as absent.</summary>
     private static CallToolResult TextOnly(string text)
     {
-        var omitted = $"\n\n[structured output omitted: it did not fit alongside this text within {OutputLimit.MaxChars} characters.";
-        var whole = text + omitted + " Everything it carried is stated above.]";
+        var whole = text + OmittedNotice(complete: true);
 
         // The notice counts against the cap; once that cuts the text, claiming completeness would be false.
-        return Text(whole.Length <= OutputLimit.MaxChars ? whole : OutputLimit.Apply(text, suffix: omitted + "]"));
+        return Text(whole.Length <= OutputLimit.MaxChars ? whole : OutputLimit.Apply(text, suffix: OmittedNotice(complete: false)));
     }
 
     /// <summary>A plain text result, for the error paths that carry nothing to structure.</summary>

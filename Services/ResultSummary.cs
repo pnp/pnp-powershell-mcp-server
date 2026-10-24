@@ -137,7 +137,8 @@ internal static class ResultSummary
         var pageable = held.Rows.Count;
         var start = Math.Clamp(offset, 0, Math.Max(pageable - 1, 0));
 
-        var budget = Math.Max(OutputLimit.MaxChars - Overhead, 500);
+        // A page too large to send with its structured half goes out as text plus a notice, so that is reserved too.
+        var budget = Math.Max(OutputLimit.MaxChars - Overhead, 500) - StructuredResult.OmittedNoticeLength;
         var taken = 0;
         var used = 0;
 
@@ -231,12 +232,13 @@ internal static class ResultSummary
         // Last, and only what fits: Paging reserves no room for it, and a page cut by the cap is no longer valid JSON.
         if (held.Notes is { } notes)
         {
+            var room = OutputLimit.MaxChars - StructuredResult.OmittedNoticeLength;
             var full = $"Also printed: {notes}";
-            var note = sb.Length + full.Length + 2 <= OutputLimit.MaxChars
+            var note = sb.Length + full.Length + 2 <= room
                 ? full
                 : $"Also printed: {N(held.NotesLength)} characters of other output, omitted to fit the output cap.";
 
-            if (sb.Length + note.Length + 2 <= OutputLimit.MaxChars)
+            if (sb.Length + note.Length + 2 <= room)
             {
                 sb.AppendLine(note);
             }

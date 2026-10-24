@@ -1,6 +1,7 @@
 using PnPPowerShell.MCPServer.Models;
 using PnPPowerShell.MCPServer.Services;
 using PnPPowerShell.MCPServer.Tools;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Xunit.Abstractions;
@@ -64,6 +65,56 @@ public partial class HalvesAgreeTests(ITestOutputHelper output)
         else
         {
             Assert.False(printed.Success, $"The page prints a MORE line at offset {printed.Groups[1].Value} but the structured half says there is no next page.");
+        }
+    }
+
+    /// <summary>A page sent as text alone keeps every row it covers and the offset that continues it.</summary>
+    [Theory]
+    [InlineData(2000)]
+    [InlineData(2500)]
+    [InlineData(5000)]
+    [InlineData(50_000)]
+    public async Task A_page_sent_as_text_alone_keeps_its_rows_and_continuation(int cap)
+    {
+        using var capped = new EnvVar("PNP_MCP_MAX_OUTPUT_CHARS", cap.ToString(CultureInfo.InvariantCulture));
+        await using var sessions = new PowerShellSessionManager();
+        var session = sessions.Get(new string('s', 64));
+
+        // Row widths vary so the page ends at different distances from the cap.
+        foreach (var width in new[] { 5, 37, 61, 113, 240 })
+        foreach (var offset in new[] { 0, 1_997 })
+        {
+            // The page's fixed parts at their widest: long session name, field list at its bound, notes, partial set.
+            var rows = Enumerable.Range(0, 2_000).Select(i => $"{{\"Id\":{i},\"Title\":\"{new string('t', width + (i % 23))}\"}}").ToList();
+            session.Held = new HeldResultSet
+            {
+                Cursor = "0123456789",
+                Rows = rows,
+                TotalRows = int.MaxValue,
+                Fields = [.. Enumerable.Range(0, 60).Select(i => $"AVeryLongSharePointInternalFieldName_{i:00}")],
+                RawLength = int.MaxValue,
+                Notes = new string('n', 400),
+                NotesLength = int.MaxValue,
+            };
+
+            var result = PnPPowerShellTools.GetPnpResultPage(sessions, "0123456789", offset);
+            var text = ToolResults.Text(result);
+            var json = result.StructuredContent is { } s ? s.GetRawText() : string.Empty;
+            var (start, end, pageable, _) = ResultSummary.Paging(session.Held!, offset);
+
+            output.WriteLine($"cap={cap} width={width} offset={offset} -> text {text.Length}, structured={json.Length > 0}, rows {start}-{end}");
+            Assert.True(text.Length + json.Length <= cap, $"width {width} offset {offset}: {text.Length + json.Length} characters against a {cap} cap.");
+            Assert.False(text.Contains(OutputLimit.TruncationMarker, StringComparison.Ordinal), $"width {width} offset {offset}: the page was cut.");
+
+            var array = text.Split('\n').Select(l => l.TrimEnd('\r')).Single(l => l.StartsWith("[{", StringComparison.Ordinal));
+            Assert.Equal(end - start, JsonDocument.Parse(array).RootElement.GetArrayLength());
+
+            var printed = MoreOffset().Match(text);
+            Assert.Equal(end < pageable, printed.Success);
+            if (printed.Success)
+            {
+                Assert.Equal(end, int.Parse(printed.Groups[1].Value, CultureInfo.InvariantCulture));
+            }
         }
     }
 
