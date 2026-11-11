@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Extensions.Tasks;
+using ModelContextProtocol.Server;
 using PnPPowerShell.MCPServer.Models;
 using PnPPowerShell.MCPServer.Services;
 using PnPPowerShell.MCPServer.Tools;
@@ -36,22 +37,21 @@ builder.Services
     .AddMcpServer(options => options.ServerInstructions = ServerInstructions)
     .WithStdioServerTransport()
     .WithTasks(
-        new InMemoryMcpTaskStore(),
-        options =>
-        {
-            // Long-running tenant operations are the reason Tasks is here: a client that supports the
-            // extension can start the call and poll, instead of holding a request open. Metadata
-            // lookups are quick and stay synchronous so short calls do not pay for a task round-trip.
-            options.ExecutionModeSelector = request => request.Params?.Name switch
-            {
-                "pnp_run_command" => McpTaskExecutionMode.Optional,
-                _ => McpTaskExecutionMode.Synchronous,
-            };
-        })
+        new InMemoryMcpTaskStore { DefaultTimeToLive = TaskExecution.TimeToLive },
+        options => options.ExecutionModeSelector = TaskExecution.SelectMode)
     // Registered with a source-generated resolver: tools returning typed structured content cannot be
     // serialized by reflection under native AOT.
     .WithTools<PnPPowerShellTools>(ToolJson.Options)
     .WithTools<ScriptSampleTools>(ToolJson.Options)
     .WithResources<PnPResources>();
+
+// After the SDK fills the collection, which otherwise follows declaration order.
+builder.Services.PostConfigure<McpServerOptions>(options =>
+{
+    if (options.ToolCollection is { } tools)
+    {
+        ToolOrder.Apply(tools);
+    }
+});
 
 await builder.Build().RunAsync();

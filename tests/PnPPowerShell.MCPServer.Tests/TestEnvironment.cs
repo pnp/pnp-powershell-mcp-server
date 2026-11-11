@@ -85,6 +85,18 @@ public sealed class RequiresPnPFactAttribute : FactAttribute
     }
 }
 
+/// <summary>The theory form of <see cref="RequiresPnPFactAttribute"/>.</summary>
+public sealed class RequiresPnPTheoryAttribute : TheoryAttribute
+{
+    public RequiresPnPTheoryAttribute()
+    {
+        if (!TestEnvironment.PnPAvailable)
+        {
+            Skip = "Requires pwsh with the PnP.PowerShell module installed.";
+        }
+    }
+}
+
 /// <summary>A fact that skips itself where a symbolic link needs a privilege, as on Windows without Developer Mode.</summary>
 public sealed class RequiresSymlinksFactAttribute : FactAttribute
 {

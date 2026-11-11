@@ -39,7 +39,7 @@ internal sealed class PowerShellSession : IAsyncDisposable
         "Run it again to use a fresh session.";
 
     private const string SessionChangedMessage =
-        "Cancelled: this session was reset, restarted or ran another command after the approval, so nothing was run. " +
+        "Cancelled: this session was reset, restarted or ran another command since this one asked for confirmation, so nothing was run. " +
         "Re-run 'pnp_run_command' and confirm again.";
 
     /// <summary>How a timed-out command reports itself. Callers match on this to recognise one.</summary>

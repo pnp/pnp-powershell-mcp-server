@@ -1,7 +1,10 @@
+using PnPPowerShell.MCPServer.Services;
+using PnPPowerShell.MCPServer.Tools;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace PnPPowerShell.MCPServer.Tests;
 
@@ -33,6 +36,34 @@ public sealed class StdioProtocolTests : IDisposable
         Assert.Contains("say what the default grant is", instructions, StringComparison.Ordinal);
         Assert.Contains("hand the commands to the user instead of running them", instructions, StringComparison.Ordinal);
         Assert.InRange(instructions.Length, 1, 1500);
+    }
+
+    [Fact]
+    public void Tools_are_listed_in_the_declared_order()
+    {
+        _client.Initialize();
+
+        var names = _client.Request("tools/list").GetProperty("tools").EnumerateArray().Select(t => t.GetProperty("name").GetString());
+
+        Assert.Equal(ToolOrder.Names, names);
+    }
+
+    /// <summary>VS Code and Codex give the model only structured content, so it must carry the text too.</summary>
+    [Theory]
+    [InlineData("pnp_search_commands", """{"query":"create a site"}""")]
+    [InlineData("pnp_search_commands", """{"query":"zzqx wqzz"}""")]
+    [InlineData("pnp_search_script_samples", """{"query":"document set","limit":3}""")]
+    [InlineData("pnp_list_sessions", "{}")]
+    public void Structured_content_carries_the_text_it_accompanies(string tool, string arguments)
+    {
+        _client.Initialize();
+
+        var call = new JsonObject { ["name"] = tool, ["arguments"] = JsonNode.Parse(arguments) };
+        var result = _client.Request("tools/call", call.ToJsonString());
+        var text = string.Concat(result.GetProperty("content").EnumerateArray().Select(c => c.GetProperty("text").GetString()));
+
+        Assert.False(string.IsNullOrEmpty(text));
+        Assert.Equal(text, result.GetProperty("structuredContent").GetProperty("text").GetString());
     }
 
     [Fact]
@@ -103,6 +134,177 @@ public sealed class StdioProtocolTests : IDisposable
         Assert.Contains("Remove-PnPTenantSite", result, StringComparison.Ordinal);
         Assert.DoesNotContain("Command completed", result, StringComparison.Ordinal);
     }
+
+    /// <summary>Before 2026-07-28 the prompt is a server-to-client elicitation/create request, as VS Code receives it.</summary>
+    [RequiresPnPTheory]
+    [InlineData("2025-06-18", false)]
+    [InlineData("2025-11-25", true)]
+    public void A_destructive_command_on_a_legacy_connection_asks_through_elicitation_create(string protocolVersion, bool confirm)
+    {
+        using var client = new McpStdioClient();
+        var asked = new List<string>();
+        client.OnServerRequest = (method, _) =>
+        {
+            asked.Add(method);
+            return Answer(confirm);
+        };
+        client.Initialize(protocolVersion, capabilities: """{"elicitation":{}}""");
+
+        var outcome = client.CallTool("pnp_run_command", $$"""{"command":"{{UnknownListRemoval()}}"}""");
+
+        Assert.Equal(["elicitation/create"], asked);
+        if (confirm)
+        {
+            Assert.DoesNotContain("Cancelled", outcome, StringComparison.Ordinal);
+            Assert.Contains("Connect-PnPOnline", outcome, StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.Contains("was not explicitly confirmed, so nothing was run", outcome, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>On 2026-07-28 without tasks, the prompt returns as input_required and the answer as a retry.</summary>
+    [RequiresPnPFact]
+    public void A_destructive_command_outside_a_task_is_answered_by_a_retry()
+    {
+        using var client = new McpStdioClient();
+        client.Discover();
+
+        var call = new JsonObject { ["name"] = "pnp_run_command", ["arguments"] = new JsonObject { ["command"] = UnknownListRemoval() } };
+        var asked = client.Request("tools/call", McpStdioClient.WithMeta(call, tasks: false));
+
+        Assert.Equal("input_required", asked.GetProperty("resultType").GetString());
+
+        call["inputResponses"] = new JsonObject { ["confirmDestructive"] = Answer(confirm: false) };
+        call["requestState"] = asked.GetProperty("requestState").GetString();
+
+        Assert.Contains("was not explicitly confirmed, so nothing was run", ResultText(client.Request("tools/call", McpStdioClient.WithMeta(call, tasks: false))), StringComparison.Ordinal);
+    }
+
+    /// <summary>As Claude Code meets it: the call becomes a task that asks through tasks/get and tasks/update.</summary>
+    [RequiresPnPFact]
+    public void A_destructive_command_run_as_a_task_is_not_run_when_the_box_is_unticked()
+    {
+        Assert.Contains("was not explicitly confirmed, so nothing was run", RunDestructiveTask(confirm: false), StringComparison.Ordinal);
+    }
+
+    [RequiresPnPFact]
+    public void A_destructive_task_is_refused_when_the_client_offers_only_url_elicitation()
+    {
+        using var client = new McpStdioClient();
+        client.Discover();
+
+        var call = new JsonObject { ["name"] = "pnp_run_command", ["arguments"] = new JsonObject { ["command"] = UnknownListRemoval() } };
+        var created = client.Request("tools/call", McpStdioClient.WithMeta(call, tasks: true, elicitation: "url"));
+
+        var outcome = ResultText(PollTask(client, created.GetProperty("taskId").GetString()!, "completed").GetProperty("result"));
+
+        Assert.Contains("Blocked", outcome, StringComparison.Ordinal);
+    }
+
+    [RequiresPnPFact]
+    public void A_destructive_command_run_as_a_task_runs_once_confirmed()
+    {
+        var outcome = RunDestructiveTask(confirm: true);
+
+        // Nothing is connected, so PnP itself refuses the command; reaching PnP proves the gate let it through.
+        Assert.DoesNotContain("Cancelled", outcome, StringComparison.Ordinal);
+        Assert.Contains("Connect-PnPOnline", outcome, StringComparison.Ordinal);
+    }
+
+    /// <summary>A long call reports progress, which resets idle timers such as Claude Code's.</summary>
+    [RequiresPnPFact]
+    public void A_long_command_reports_progress_against_the_callers_token()
+    {
+        using var client = new McpStdioClient(("PNP_MCP_PROGRESS_INTERVAL_SECONDS", "1"));
+        client.Discover();
+
+        client.Request("tools/call", McpStdioClient.WithMeta(SlowCommand(), tasks: false, progressToken: "heartbeat"));
+
+        var beats = client.Notifications
+            .Where(n => n.GetProperty("method").GetString() == "notifications/progress")
+            .Select(n => n.GetProperty("params"))
+            .ToList();
+
+        Assert.True(beats.Count >= 2, $"Expected at least two progress notifications, got {beats.Count}.");
+        Assert.All(beats, b => Assert.Equal("heartbeat", b.GetProperty("progressToken").GetString()));
+        Assert.All(beats, b => Assert.StartsWith("Still running after", b.GetProperty("message").GetString(), StringComparison.Ordinal));
+    }
+
+    [RequiresPnPFact]
+    public void A_task_sends_no_progress_after_its_call_was_answered()
+    {
+        using var client = new McpStdioClient(("PNP_MCP_PROGRESS_INTERVAL_SECONDS", "1"));
+        client.Discover();
+
+        var created = client.Request("tools/call", McpStdioClient.WithMeta(SlowCommand(), tasks: true, progressToken: "heartbeat"));
+        PollTask(client, created.GetProperty("taskId").GetString()!, "completed");
+
+        Assert.DoesNotContain(client.Notifications, n => n.GetProperty("method").GetString() == "notifications/progress");
+    }
+
+    // Read-only and harmless: nothing is connected, so Get-PnPConnection only reports that.
+    private static JsonObject SlowCommand() =>
+        new() { ["name"] = "pnp_run_command", ["arguments"] = new JsonObject { ["command"] = "Start-Sleep -Seconds 4; Get-PnPConnection" } };
+
+    // Names a list that cannot exist, so even a connected session would have nothing to remove.
+    private static string UnknownListRemoval() => $"Remove-PnPList -Identity 'pnp-mcp-test-{Guid.NewGuid():N}' -Force";
+
+    private static JsonObject Answer(bool confirm) =>
+        new() { ["action"] = "accept", ["content"] = new JsonObject { ["confirm"] = confirm } };
+
+    private static string ResultText(JsonElement result) =>
+        string.Concat(result.GetProperty("content").EnumerateArray()
+            .Where(c => c.GetProperty("type").GetString() == "text")
+            .Select(c => c.GetProperty("text").GetString()));
+
+    private static string RunDestructiveTask(bool confirm)
+    {
+        using var client = new McpStdioClient();
+        client.Discover();
+
+        var command = UnknownListRemoval();
+        var call = new JsonObject { ["name"] = "pnp_run_command", ["arguments"] = new JsonObject { ["command"] = command } };
+        var created = client.Request("tools/call", McpStdioClient.WithMeta(call, tasks: true));
+
+        Assert.Equal("task", created.GetProperty("resultType").GetString());
+        Assert.Equal((long)TaskExecution.TimeToLive.TotalMilliseconds, created.GetProperty("ttlMs").GetInt64());
+        var taskId = created.GetProperty("taskId").GetString()!;
+
+        var asked = PollTask(client, taskId, "input_required");
+        var prompt = Assert.Single(asked.GetProperty("inputRequests").EnumerateObject());
+
+        Assert.Equal("elicitation/create", prompt.Value.GetProperty("method").GetString());
+        Assert.Contains(command, prompt.Value.GetProperty("params").GetProperty("message").GetString(), StringComparison.Ordinal);
+
+        var update = new JsonObject { ["taskId"] = taskId, ["inputResponses"] = new JsonObject { [prompt.Name] = Answer(confirm) } };
+        client.Request("tasks/update", McpStdioClient.WithMeta(update, tasks: true));
+
+        return ResultText(PollTask(client, taskId, "completed").GetProperty("result"));
+    }
+
+    /// <summary>Polls tasks/get until the task reaches <paramref name="status"/>, failing on any other end state.</summary>
+    private static JsonElement PollTask(McpStdioClient client, string taskId, string status)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(60);
+
+        while (DateTime.UtcNow < deadline)
+        {
+            var task = client.Request("tasks/get", McpStdioClient.WithMeta(new JsonObject { ["taskId"] = taskId }, tasks: true));
+            var current = task.GetProperty("status").GetString();
+
+            if (current == status)
+            {
+                return task;
+            }
+
+            Assert.True(current is "working" or "input_required", $"Task ended '{current}' while waiting for '{status}': {task}");
+            Thread.Sleep(250);
+        }
+
+        throw new TimeoutException($"Task {taskId} did not reach '{status}' within 60 seconds.");
+    }
 }
 
 /// <summary>Minimal MCP client: newline-delimited JSON-RPC over stdio.</summary>
@@ -112,7 +314,11 @@ internal sealed class McpStdioClient : IDisposable
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(60);
 
     private readonly Process _server;
+    private readonly List<JsonElement> _notifications = [];
     private int _id;
+
+    /// <summary>Every notification the server sent while a request was awaited.</summary>
+    public IReadOnlyList<JsonElement> Notifications => _notifications;
 
     public McpStdioClient(params (string Name, string Value)[] environment)
     {
@@ -179,14 +385,45 @@ internal sealed class McpStdioClient : IDisposable
         return matched[0];
     }
 
-    public JsonElement Initialize()
+    /// <summary>Answers a request the server sends, such as elicitation/create on a legacy connection.</summary>
+    public Func<string, JsonElement, JsonNode>? OnServerRequest { get; set; }
+
+    public JsonElement Initialize(string protocolVersion = "2025-06-18", string capabilities = "{}")
     {
         var result = Request("initialize",
-            """{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"stdio-protocol-tests","version":"1.0"}}""");
+            $$$"""{"protocolVersion":"{{{protocolVersion}}}","capabilities":{{{capabilities}}},"clientInfo":{"name":"stdio-protocol-tests","version":"1.0"}}""");
 
         Send("""{"jsonrpc":"2.0","method":"notifications/initialized"}""");
 
         return result;
+    }
+
+    /// <summary>The 2026-07-28 opening: no initialize, and capabilities travel on every request instead.</summary>
+    public JsonElement Discover() => Request("server/discover", WithMeta(new JsonObject(), tasks: false));
+
+    /// <summary>Adds the per-request _meta a 2026-07-28 client sends; with tasks, shaped as Claude Code's.</summary>
+    public static string WithMeta(JsonObject parameters, bool tasks, string elicitation = "form", string? progressToken = null)
+    {
+        var capabilities = new JsonObject { ["elicitation"] = new JsonObject { [elicitation] = new JsonObject() } };
+        if (tasks)
+        {
+            capabilities["extensions"] = new JsonObject { ["io.modelcontextprotocol/tasks"] = new JsonObject() };
+        }
+
+        var copy = parameters.DeepClone().AsObject();
+        copy["_meta"] = new JsonObject
+        {
+            ["io.modelcontextprotocol/protocolVersion"] = "2026-07-28",
+            ["io.modelcontextprotocol/clientInfo"] = new JsonObject { ["name"] = "stdio-protocol-tests", ["version"] = "1.0" },
+            ["io.modelcontextprotocol/clientCapabilities"] = capabilities,
+        };
+
+        if (progressToken is not null)
+        {
+            copy["_meta"]!["progressToken"] = progressToken;
+        }
+
+        return copy.ToJsonString();
     }
 
     public string CallTool(string name, string arguments)
@@ -219,8 +456,23 @@ internal sealed class McpStdioClient : IDisposable
 
             var message = JsonDocument.Parse(line).RootElement;
 
-            // Skip notifications and any response that is not the one we asked for.
-            if (!message.TryGetProperty("id", out var responseId) || responseId.GetInt32() != id)
+            if (!message.TryGetProperty("id", out var responseId))
+            {
+                _notifications.Add(message.Clone());
+                continue;
+            }
+
+            if (message.TryGetProperty("method", out var serverMethod))
+            {
+                var answer = OnServerRequest?.Invoke(serverMethod.GetString()!, message.GetProperty("params"))
+                    ?? throw new InvalidOperationException($"The server sent an unexpected '{serverMethod}' request.");
+
+                Send(new JsonObject { ["jsonrpc"] = "2.0", ["id"] = JsonNode.Parse(responseId.GetRawText()), ["result"] = answer }.ToJsonString());
+                continue;
+            }
+
+            // Skip any response that is not the one we asked for.
+            if (responseId.GetInt32() != id)
             {
                 continue;
             }

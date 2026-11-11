@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using PnPPowerShell.MCPServer.Models;
 using PnPPowerShell.MCPServer.Services;
 
 namespace PnPPowerShell.MCPServer.Tests;
@@ -7,6 +8,39 @@ namespace PnPPowerShell.MCPServer.Tests;
 /// <summary>The cap must hold for every input, including hostile suffixes and hints.</summary>
 public class OutputLimitBoundaryTests
 {
+    /// <summary>The text-only fallback's notice counts against the cap, and claims completeness only when nothing was cut.</summary>
+    [Theory]
+    [InlineData(2000, false)]
+    [InlineData(2000, true)]
+    [InlineData(5000, false)]
+    [InlineData(5000, true)]
+    [InlineData(50_000, false)]
+    [InlineData(50_000, true)]
+    public void A_result_sent_as_text_alone_stays_inside_the_cap(int limit, bool list)
+    {
+        using var _ = new EnvVar("PNP_MCP_MAX_OUTPUT_CHARS", limit.ToString(CultureInfo.InvariantCulture));
+
+        // Each length is too long to carry twice, so every one takes the fallback.
+        foreach (var length in new[] { (limit / 2) + 1, limit - 100, limit, limit * 3 })
+        {
+            string Render(SetupResult _) => OutputLimit.Apply(new string('x', length));
+            var value = new SetupResult { Allowed = true, Installed = false, Command = "Install-Module PnP.PowerShell" };
+
+            var result = list
+                ? StructuredResult.FitToCap([1], (_, _) => value with { }, ToolOutputJsonContext.Default.SetupResult, Render)
+                : StructuredResult.From(value with { }, ToolOutputJsonContext.Default.SetupResult, Render);
+            var text = ToolResults.Text(result);
+
+            Assert.Null(result.StructuredContent);
+            Assert.True(text.Length <= limit, $"length {length}: {text.Length} characters against a {limit} cap.");
+            Assert.Contains("structured output omitted", text, StringComparison.Ordinal);
+
+            var whole = text.StartsWith(Render(value), StringComparison.Ordinal);
+            Assert.True(whole || !text.Contains("Everything it carried is stated above", StringComparison.Ordinal), $"length {length}: claims completeness after cutting the text.");
+            Assert.True(whole || text.Contains(OutputLimit.TruncationMarker, StringComparison.Ordinal), $"length {length}: cut the text without saying so.");
+        }
+    }
+
     [Theory]
     [InlineData(2000)]
     [InlineData(5000)]
