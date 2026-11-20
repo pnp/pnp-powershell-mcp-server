@@ -104,6 +104,21 @@ internal static class ToolOrder
 
         keep.UnionWith(Core);
 
+        // Both of these answer with sample names and say to fetch one.
+        if (keep.Contains("pnp_search_script_samples") || keep.Contains("pnp_suggest_script"))
+        {
+            keep.Add("pnp_get_script_sample");
+        }
+
         return keep;
     }
+
+    /// <summary>Tells a reader of the guidance which tools it names are not published here; empty when all are.</summary>
+    internal static string UnpublishedNote() => UnpublishedNote(Environment.GetEnvironmentVariable(SelectionVariable));
+
+    internal static string UnpublishedNote(string? selection) =>
+        Select(selection, out _) is { } keep
+            ? $"\n\nNOTE: This server is set up to publish only some of its tools ({SelectionVariable}). Not available here: " +
+              $"{string.Join(", ", Names.Where(n => !keep.Contains(n)))}. Skip any step above that names one of them."
+            : string.Empty;
 }

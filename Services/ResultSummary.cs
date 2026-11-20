@@ -182,13 +182,20 @@ internal static class ResultSummary
             ? $"Too large to hold whole: the first {N(held.Rows.Count)} rows can be paged, the remaining {N(held.TotalRows - held.Rows.Count)} cannot."
             : "No rows were dropped — they are held for paging.");
 
-    /// <summary>The field list, unless it would take more than a quarter of the room the rows have without it.</summary>
-    // At a small cap the names crowd out the rows, and every row names its own fields anyway.
+    /// <summary>The field list, unless it would crowd the rows: over a quarter of their room, or enough to push out a row that fits without it.</summary>
+    // Every row names its own fields anyway. One decision per set, so paging and rendering agree.
     private static string? FieldsLine(HeldResultSet held)
     {
         var room = OutputLimit.MaxChars - StructuredResult.OmittedNoticeLength - FixedFrame(held);
 
-        return ListedFields(held) is { } fields && fields.Length <= room / 4 ? fields : null;
+        if (ListedFields(held) is not { } fields || fields.Length > room / 4)
+        {
+            return null;
+        }
+
+        var left = room - fields.Length - Environment.NewLine.Length;
+
+        return held.Rows.Any(row => row.Length + 1 > left && row.Length + 1 <= room) ? null : fields;
     }
 
     private static string? ListedFields(HeldResultSet held)

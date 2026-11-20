@@ -72,6 +72,7 @@ public sealed class StdioProtocolTests : IDisposable
     [InlineData("pnp_get_command_docs", """{"commandName":"not a cmdlet"}""", true)]
     [InlineData("pnp_run_command", """{"command":"Get-ChildItem"}""", true)]
     [InlineData("pnp_get_script_sample", """{"sampleName":""}""", true)]
+    [InlineData("pnp_get_script_sample", """{"sampleName":"no-such-sample-9f2c"}""", true)]
     [InlineData("pnp_get_best_practices", """{"section":"sessions"}""", false)]
     public void A_text_result_that_reports_a_failure_is_flagged_as_one(string tool, string arguments, bool failure)
     {

@@ -177,7 +177,7 @@ internal sealed partial class ScriptSampleTools
             ?? ScriptSampleIndex.Samples.FirstOrDefault(s => s.Url.Equals(wanted, StringComparison.OrdinalIgnoreCase));
 
         if (sample is null)
-            return $"Sample '{OutputLimit.Echo(wanted)}' was not found in the index.\n" +
+            return $"Error: Sample '{OutputLimit.Echo(wanted)}' was not found in the index.\n" +
                    $"Use 'pnp_search_script_samples' to find the correct sample name.\n\n{ScriptSampleIndex.Provenance}";
 
         var sb = new StringBuilder();

@@ -30,6 +30,9 @@ internal static class AuditLog
         public bool? Confirmed { get; set; }
 
         public bool Task { get; set; }
+
+        /// <summary>Where the parse found secret values in <see cref="Command"/>; null when the command was never parsed.</summary>
+        public IReadOnlyList<SecretSpan>? Secrets { get; set; }
     }
 
     // A relative path would resolve against whatever directory the client launched the server in.
@@ -97,7 +100,7 @@ internal static class AuditLog
         {
             try
             {
-                return new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+                return new FileStream(lockPath, OwnerOnly(FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None));
             }
             catch (IOException)
             {
@@ -110,6 +113,31 @@ internal static class AuditLog
         }
 
         return null;
+    }
+
+    // Commands can hold a secret no redaction recognises, and a usual umask would let other local users read the file.
+    private static FileStreamOptions OwnerOnly(FileMode mode, FileAccess access, FileShare share)
+    {
+        var options = new FileStreamOptions { Mode = mode, Access = access, Share = share };
+
+        if (!OperatingSystem.IsWindows())
+        {
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        }
+
+        return options;
+    }
+
+    // A log that already existed keeps the mode it was created with, so it is narrowed here.
+    private static void KeepOwnerOnly(string path)
+    {
+        const UnixFileMode Others = UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute |
+                                    UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute;
+
+        if (!OperatingSystem.IsWindows() && (File.GetUnixFileMode(path) & Others) != 0)
+        {
+            File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
     }
 
     // On its own: a file something else holds open cannot be renamed, and the entry must still be written.
@@ -137,7 +165,8 @@ internal static class AuditLog
         {
             try
             {
-                using var file = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+                using var file = new FileStream(path, OwnerOnly(FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete));
+                KeepOwnerOnly(path);
                 file.Write(bytes);
 
                 return;
@@ -151,7 +180,8 @@ internal static class AuditLog
 
     internal static string Format(Entry entry, string outcome, TimeSpan duration, DateTimeOffset time)
     {
-        var command = WellFormed(TranscriptScrubber.Secrets(entry.Command));
+        // By position first: the parse sees what a pattern cannot. The patterns still run, for a command that was never parsed.
+        var command = WellFormed(TranscriptScrubber.Secrets(Cut(entry.Command, entry.Secrets)));
         var kept = command.Length > MaxCommandChars ? WellFormed(command[..MaxCommandChars]) : command;
         var buffer = new ArrayBufferWriter<byte>();
 
@@ -185,6 +215,48 @@ internal static class AuditLog
         }
 
         return Encoding.UTF8.GetString(buffer.WrittenSpan);
+    }
+
+    /// <summary>Replaces each span with the redaction marker; spans that overlap or fall outside the text are tolerated.</summary>
+    internal static string Cut(string command, IReadOnlyList<SecretSpan>? spans)
+    {
+        if (spans is not { Count: > 0 })
+        {
+            return command;
+        }
+
+        // Overlapping spans become one, so a value is replaced by one marker.
+        var merged = new List<(int Start, int End)>();
+
+        foreach (var span in spans.OrderBy(s => s.Start))
+        {
+            var start = Math.Clamp(span.Start, 0, command.Length);
+            var end = Math.Clamp(span.End, 0, command.Length);
+
+            if (start >= end)
+            {
+                continue;
+            }
+
+            if (merged.Count > 0 && start <= merged[^1].End)
+            {
+                merged[^1] = (merged[^1].Start, Math.Max(merged[^1].End, end));
+            }
+            else
+            {
+                merged.Add((start, end));
+            }
+        }
+
+        var result = new StringBuilder(command);
+
+        // Right to left, so an earlier offset is still true after a later one is replaced.
+        for (var i = merged.Count - 1; i >= 0; i--)
+        {
+            result.Remove(merged[i].Start, merged[i].End - merged[i].Start).Insert(merged[i].Start, "'[redacted-secret]'");
+        }
+
+        return result.ToString();
     }
 
     // A lone surrogate, typed or left by a cut, makes the JSON writer throw.

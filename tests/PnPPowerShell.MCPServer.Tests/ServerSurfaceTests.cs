@@ -332,6 +332,151 @@ public sealed class ServerSurfaceTests
         }
     }
 
+    [Theory]
+    [InlineData("pnp_search_script_samples")]
+    [InlineData("pnp_suggest_script")]
+    public void A_tool_that_hands_out_sample_names_brings_the_tool_that_fetches_one(string selection) =>
+        Assert.Contains("pnp_get_script_sample", ToolOrder.Select(selection, out _)!);
+
+    [Fact]
+    public void The_guidance_says_which_of_the_tools_it_names_are_not_published()
+    {
+        Assert.Equal(string.Empty, ToolOrder.UnpublishedNote(null));
+        Assert.Equal(string.Empty, ToolOrder.UnpublishedNote("all"));
+
+        var note = ToolOrder.UnpublishedNote("core");
+
+        foreach (var missing in ToolOrder.Names.Except(ToolOrder.Core))
+        {
+            Assert.Contains(missing, note, StringComparison.Ordinal);
+        }
+
+        Assert.All(ToolOrder.Core, name => Assert.DoesNotContain(name, note, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_core_only_server_tells_the_model_so_in_the_guidance_it_serves()
+    {
+        using var client = new McpStdioClient((ToolOrder.SelectionVariable, "core"));
+        client.Initialize();
+
+        var workflow = client.CallTool("pnp_get_best_practices", """{"section":"workflow"}""");
+
+        Assert.Contains("pnp_search_script_samples", workflow, StringComparison.Ordinal);
+        Assert.Contains("Not available here:", workflow, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_connect_prompt_asks_before_replacing_a_connection_to_another_site()
+    {
+        var text = PnPPrompts.Connect("https://contoso.sharepoint.com/sites/marketing");
+        var other = text.IndexOf("connected to a different site", StringComparison.Ordinal);
+        var reset = text.IndexOf("pnp_reset_session", StringComparison.Ordinal);
+        var diagnose = text.IndexOf("pnp_diagnose_connection", StringComparison.Ordinal);
+
+        Assert.True(other > 0 && reset > other && diagnose > reset, "The playbook diagnoses before dealing with a connection to another site.");
+        Assert.Contains("ask whether to replace", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Every_secret_parameter_the_parse_looks_for_is_one_the_patterns_know_too() =>
+        Assert.All(TranscriptScrubber.SecretParameterNames, name =>
+            Assert.Equal($"Connect-PnPOnline -{name} '[redacted-secret]'", TranscriptScrubber.Secrets($"Connect-PnPOnline -{name} 'Hunter2!'")));
+
+    [Fact]
+    public void Positions_that_overlap_or_fall_outside_the_command_are_cut_without_throwing()
+    {
+        const string command = "abcdefghij";
+
+        Assert.Equal(command, AuditLog.Cut(command, null));
+        Assert.Equal(command, AuditLog.Cut(command, []));
+        Assert.Equal("ab'[redacted-secret]'ij", AuditLog.Cut(command, [new SecretSpan { Start = 2, End = 5 }, new SecretSpan { Start = 4, End = 8 }]));
+        Assert.Equal("ab'[redacted-secret]'", AuditLog.Cut(command, [new SecretSpan { Start = 2, End = 500 }]));
+        Assert.Equal(command, AuditLog.Cut(command, [new SecretSpan { Start = 50, End = 60 }, new SecretSpan { Start = 5, End = 5 }, new SecretSpan { Start = -3, End = 0 }]));
+        Assert.Equal("'[redacted-secret]'cd'[redacted-secret]'j", AuditLog.Cut(command, [new SecretSpan { Start = 0, End = 2 }, new SecretSpan { Start = 4, End = 9 }]));
+    }
+
+    [Fact]
+    public void A_position_found_by_the_parse_is_cut_before_the_patterns_run()
+    {
+        const string command = "Connect-PnPOnline -ClientSec 'Hunter2!' -Url https://contoso.sharepoint.com";
+        var start = command.IndexOf("'Hunter2!'", StringComparison.Ordinal);
+
+        var entry = new AuditLog.Entry { Command = command, Secrets = [new SecretSpan { Start = start, End = start + "'Hunter2!'".Length }] };
+        var written = JsonDocument.Parse(AuditLog.Format(entry, "ok", TimeSpan.Zero, DateTimeOffset.UtcNow)).RootElement.GetProperty("command").GetString();
+
+        Assert.Equal("Connect-PnPOnline -ClientSec '[redacted-secret]' -Url https://contoso.sharepoint.com", written);
+    }
+
+    /// <summary>End to end: a secret no pattern recognises, run through the server, never reaches the file.</summary>
+    [RequiresPnPFact]
+    public void A_secret_only_the_parse_can_see_is_kept_out_of_the_audit_file()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"pnp-audit-{Guid.NewGuid():N}", "audit.jsonl");
+
+        try
+        {
+            using (var client = new McpStdioClient((AuditLog.PathVariable, path)))
+            {
+                client.Initialize();
+
+                var call = new JsonObject
+                {
+                    ["name"] = "pnp_run_command",
+                    ["arguments"] = new JsonObject { ["command"] = "$p = ConvertTo-SecureString ('Hun' + 'ter2!') -AsPlainText -Force; Get-PnPConnection -ErrorAction SilentlyContinue | Out-Null" },
+                };
+
+                client.Request("tools/call", call.ToJsonString());
+            }
+
+            var raw = File.ReadAllText(path);
+            var written = JsonDocument.Parse(Assert.Single(File.ReadAllLines(path))).RootElement.GetProperty("command").GetString();
+
+            Assert.DoesNotContain("ter2!", raw, StringComparison.Ordinal);
+            Assert.StartsWith("$p = ConvertTo-SecureString '[redacted-secret]' -AsPlainText -Force;", written, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Path.GetDirectoryName(path) is { } folder && Directory.Exists(folder))
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void On_unix_the_audit_log_and_its_lock_are_readable_by_their_owner_only()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var path = Path.Combine(Path.GetTempPath(), $"pnp-audit-{Guid.NewGuid():N}.jsonl");
+
+        try
+        {
+            // An existing log, created wide open, is narrowed on the next write.
+            File.WriteAllText(path, string.Empty);
+            File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead);
+
+            AuditLog.Write(path, "{\"n\":1}\n");
+
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(path));
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(path + ".lock"));
+
+            File.Delete(path);
+            AuditLog.Write(path, "{\"n\":2}\n");
+
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(path));
+        }
+        finally
+        {
+            File.Delete(path);
+            File.Delete(path + ".lock");
+        }
+    }
+
     [Fact]
     public void No_prompt_names_a_tool_outside_the_core_set()
     {

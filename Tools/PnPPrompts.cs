@@ -16,6 +16,9 @@ internal sealed class PnPPrompts
         Connect to {Site(siteUrl)} with PnP PowerShell.
 
         1. Call pnp_get_connection_status. If this session is already connected to that site, say so and stop.
+           If it is connected to a different site, tell me which, and ask whether to replace that connection.
+           Stop if I say no. If I say yes, call pnp_reset_session first: the diagnosis reports an existing
+           connection as ready and gives no connect command while one is held.
         2. Call pnp_diagnose_connection with targetUrl set to the site. Do not compose a Connect-PnPOnline from memory.
         3. If the report gives a connect command that needs no person, run it with pnp_run_command.
         4. If signing in needs a browser or a device code, do not run it: show me the exact command to run in my

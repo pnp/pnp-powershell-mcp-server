@@ -24,6 +24,10 @@ internal sealed partial class TranscriptScrubber
     [GeneratedRegex(@"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{16,}")]
     private static partial Regex BearerRegex();
 
+    /// <summary>Parameters whose value is a secret. The patterns below spell the same names out, as an attribute needs a constant.</summary>
+    internal static readonly string[] SecretParameterNames =
+        ["ClientSecret", "Password", "CertificatePassword", "CertificateBase64Encoded", "AccessToken", "SecureString", "Token", "ApiKey"];
+
     // PowerShell also binds -ClientSecret:'x', which a spaced-only match missed.
     [GeneratedRegex(@"(?i)-(ClientSecret|Password|CertificatePassword|CertificateBase64Encoded|AccessToken|SecureString|Token|ApiKey)(\s*:\s*|\s+)('[^']*'|""[^""]*""|\$?[^\s;|,)]+)")]
     private static partial Regex SecretParameterRegex();

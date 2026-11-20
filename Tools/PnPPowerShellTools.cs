@@ -412,6 +412,7 @@ internal partial class PnPPowerShellTools
 
         // Parsed rather than pattern-matched, so aliases and indirect invocation are seen for what they are.
         var (analysis, sessionError) = await ScriptAnalyzer.AnalyzeAsync(session, command, analysisBudget, cancellationToken);
+        audit?.Secrets = analysis?.Secrets;
 
         if (sessionError is not null)
         {
@@ -894,7 +895,7 @@ internal partial class PnPPowerShellTools
         {
             var tip = $"TIP: This is the full guide. To pull a single topic next time, call 'pnp_get_best_practices' with section set to one of: {string.Join(", ", BestPracticeSections.Keys)}.";
 
-            return OutputLimit.Apply(document, "Pass a section to read one topic.", "\n\n" + tip);
+            return OutputLimit.Apply(document, "Pass a section to read one topic.", "\n\n" + tip + ToolOrder.UnpublishedNote());
         }
 
         var key = section.Trim();
@@ -909,7 +910,7 @@ internal partial class PnPPowerShellTools
 
         return string.IsNullOrWhiteSpace(extracted)
             ? $"Error: Section '{key}' is not present in this build of the guidance. Omit the section to get the whole document."
-            : OutputLimit.Apply(extracted.TrimEnd());
+            : OutputLimit.Apply(extracted.TrimEnd(), suffix: ToolOrder.UnpublishedNote());
     }
 
     // best-practices.md is compiled into the assembly, so there is exactly one copy of the guidance.
