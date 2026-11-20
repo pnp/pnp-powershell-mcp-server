@@ -152,7 +152,11 @@ internal static class ResultSummary
     }
 
     /// <summary>What any page of this set spends besides its rows, with every variable part at its widest.</summary>
-    private static int Frame(HeldResultSet held)
+    private static int Frame(HeldResultSet held) =>
+        FixedFrame(held) + (FieldsLine(held) is { } fields ? fields.Length + Environment.NewLine.Length : 0);
+
+    /// <summary>The frame without the field list, which is the one part a page can do without.</summary>
+    private static int FixedFrame(HeldResultSet held)
     {
         var line = Environment.NewLine.Length;
         var pageable = held.Rows.Count;
@@ -165,7 +169,6 @@ internal static class ResultSummary
         ];
 
         return HeaderLine(held).Length + line
-            + (FieldsLine(held) is { } fields ? fields.Length + line : 0)
             + RowsLine(held.TotalRows, held.TotalRows, held.TotalRows).Length + (2 * line)
             + "[]".Length + (2 * line)
             + footers.Max(f => f.Length) + line
@@ -179,7 +182,23 @@ internal static class ResultSummary
             ? $"Too large to hold whole: the first {N(held.Rows.Count)} rows can be paged, the remaining {N(held.TotalRows - held.Rows.Count)} cannot."
             : "No rows were dropped — they are held for paging.");
 
+    /// <summary>The field list, unless it would crowd the rows: over a quarter of their room, or enough to push out a row that fits without it.</summary>
+    // Every row names its own fields anyway. One decision per set, so paging and rendering agree.
     private static string? FieldsLine(HeldResultSet held)
+    {
+        var room = OutputLimit.MaxChars - StructuredResult.OmittedNoticeLength - FixedFrame(held);
+
+        if (ListedFields(held) is not { } fields || fields.Length > room / 4)
+        {
+            return null;
+        }
+
+        var left = room - fields.Length - Environment.NewLine.Length;
+
+        return held.Rows.Any(row => row.Length + 1 > left && row.Length + 1 <= room) ? null : fields;
+    }
+
+    private static string? ListedFields(HeldResultSet held)
     {
         if (held.Fields.Count == 0)
         {

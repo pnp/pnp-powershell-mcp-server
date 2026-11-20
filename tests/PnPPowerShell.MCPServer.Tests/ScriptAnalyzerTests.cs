@@ -166,10 +166,54 @@ public class ScriptAnalyzerTests : IAsyncLifetime
     [RequiresPnPFact]
     public async Task Analysis_does_not_leak_variables_into_the_session()
     {
-        await Analyze("Get-PnPWeb");
+        await Analyze("Connect-PnPOnline -Url https://contoso.sharepoint.com -ClientSecret 'x'; 'y' | ConvertTo-SecureString -AsPlainText -Force");
 
-        var probe = await _session.ExecuteAsync("\"leaked=[$__pnpFound][$__pnpMethods][$__pnpVerb]\"", Generous);
+        var probe = await _session.ExecuteAsync("\"leaked=[$__pnpFound][$__pnpMethods][$__pnpVerb][$__pnpSecrets][$__pnpSens][$__pnpV]\"", Generous);
 
-        Assert.Contains("leaked=[][][]", probe);
+        Assert.Contains("leaked=[][][][][][]", probe);
+    }
+
+    /// <summary>What the audit log would write for a command: cut where the parse found secrets, with no pattern applied.</summary>
+    private async Task<string> CutByPosition(string command) =>
+        AuditLog.Cut(command, (await Analyze(command)).Secrets);
+
+    // Each of these got past the patterns: an abbreviation, smart quotes, a grouped value, a continuation, a bare word with an escaped separator.
+    [RequiresPnPTheory]
+    [InlineData("Connect-PnPOnline -Url https://contoso.sharepoint.com -ClientId 11111111-2222-3333-4444-555555555555 -ClientSec 'Hunter2!'", "Hunter2!")]
+    [InlineData("Connect-PnPOnline -Url https://contoso.sharepoint.com -ClientId x -ClientSecret \u2018prefix SensitiveTail\u2019", "SensitiveTail")]
+    [InlineData("Connect-PnPOnline -Url https://contoso.sharepoint.com -ClientId x -ClientSecret ('SensitiveBody')", "SensitiveBody")]
+    [InlineData("Connect-PnPOnline -Url https://contoso.sharepoint.com -ClientId x -ClientSecret `\n  'Hunter2!'", "Hunter2!")]
+    [InlineData("Connect-PnPOnline -Url https://contoso.sharepoint.com -ClientId x -ClientSecret:'Hunter2!'", "Hunter2!")]
+    [InlineData("$p = 'Hunter2!' |\n  ConvertTo-SecureString -AsPlainText -Force", "Hunter2!")]
+    [InlineData("$p = (Write-Output 'Hunter2!') | ConvertTo-SecureString -AsPlainText -Force", "Hunter2!")]
+    [InlineData("$p = ConvertTo-SecureString ('Hun' + 'ter2!') -AsPlainText -Force", "ter2!")]
+    [InlineData("$p = ConvertTo-SecureString Hunter`;2! -AsPlainText -Force", "2!")]
+    [InlineData("$p = ConvertTo-SecureString -AsPlainText -Force -String \u201CHunter2!\u201D", "Hunter2!")]
+    public async Task A_secret_is_found_by_position_however_it_is_written(string command, string fragment)
+    {
+        var written = await CutByPosition(command);
+
+        Assert.DoesNotContain(fragment, written, StringComparison.Ordinal);
+        Assert.Contains("[redacted-secret]", written, StringComparison.Ordinal);
+    }
+
+    [RequiresPnPTheory]
+    [InlineData("Connect-PnPOnline -Url https://contoso.sharepoint.com/sites/x -ClientId 11111111-2222-3333-4444-555555555555 -ClientSecret $secret")]
+    [InlineData("$p = ConvertTo-SecureString $plain -AsPlainText -Force")]
+    [InlineData("$p = $plain | ConvertTo-SecureString -AsPlainText -Force")]
+    [InlineData("Get-PnPList -Identity 'Documents' | Select-Object Title")]
+    [InlineData("Connect-PnPOnline -Url https://contoso.sharepoint.com -ClientId x -Tenant contoso.onmicrosoft.com -Thumbprint ABC")]
+    public async Task A_command_with_no_secret_written_in_it_is_left_as_typed(string command) =>
+        Assert.Equal(command, await CutByPosition(command));
+
+    [RequiresPnPFact]
+    public async Task Only_the_secret_is_cut_and_the_rest_of_the_command_stays()
+    {
+        var written = await CutByPosition(
+            "Connect-PnPOnline -Url https://contoso.sharepoint.com/sites/x -ClientId 11111111-2222-3333-4444-555555555555 -ClientSec 'Hunter2!'; Get-PnPWeb");
+
+        Assert.Equal(
+            "Connect-PnPOnline -Url https://contoso.sharepoint.com/sites/x -ClientId 11111111-2222-3333-4444-555555555555 -ClientSec '[redacted-secret]'; Get-PnPWeb",
+            written);
     }
 }

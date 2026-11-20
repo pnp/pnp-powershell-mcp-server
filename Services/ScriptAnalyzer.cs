@@ -35,6 +35,7 @@ internal sealed class ScriptAnalysis
     // initializer and make every downstream LINQ call throw.
     private List<ScriptCommand> _commands = [];
     private List<string> _methodCalls = [];
+    private List<SecretSpan> _secrets = [];
 
     public List<ScriptCommand> Commands
     {
@@ -48,6 +49,21 @@ internal sealed class ScriptAnalysis
         get => _methodCalls;
         set => _methodCalls = value ?? [];
     }
+
+    /// <summary>Where the script's own text holds a secret value, so a log can leave those characters out.</summary>
+    public List<SecretSpan> Secrets
+    {
+        get => _secrets;
+        set => _secrets = value ?? [];
+    }
+}
+
+/// <summary>Character offsets into the script, end exclusive.</summary>
+internal sealed class SecretSpan
+{
+    public int Start { get; set; }
+
+    public int End { get; set; }
 }
 
 /// <summary>Result of an analysis attempt; SessionError carries a session-level failure to report verbatim.</summary>
@@ -63,6 +79,7 @@ internal static class ScriptAnalyzer
         CancellationToken cancellationToken = default)
     {
         var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(command));
+        var secretParameterList = string.Join(", ", TranscriptScrubber.SecretParameterNames.Select(n => $"'{n}'"));
 
         // InvokeCommand.GetCommand, not Get-Command: the latter treats the name as a wildcard, so "?" and "%" match several commands each.
         var script = $$"""
@@ -71,7 +88,33 @@ internal static class ScriptAnalyzer
             $__pnpAst = [System.Management.Automation.Language.Parser]::ParseInput($__pnpSrc, [ref]$null, [ref]$__pnpParseErrors)
             $__pnpFound = @()
             $__pnpMethods = @()
+            $__pnpSecrets = @()
             if ($__pnpAst) {
+              # Secret values by position, as parsed: an abbreviated parameter, a smart quote, a continuation or a grouped value is all one element here.
+              $__pnpSens = @({{secretParameterList}})
+              $__pnpSecrets = @(foreach ($__pnpC in @($__pnpAst.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] }, $true))) {
+                $__pnpEls = @($__pnpC.CommandElements)
+                $__pnpIsSs = ([string]$__pnpC.GetCommandName()) -eq 'ConvertTo-SecureString'
+                for ($__pnpI = 1; $__pnpI -lt $__pnpEls.Count; $__pnpI++) {
+                  $__pnpE = $__pnpEls[$__pnpI]
+                  $__pnpV = $null
+                  if ($__pnpE -is [System.Management.Automation.Language.CommandParameterAst]) {
+                    $__pnpPn = [string]$__pnpE.ParameterName
+                    if ($__pnpIsSs -or ($__pnpPn.Length -ge 4 -and @($__pnpSens | Where-Object { $_.StartsWith($__pnpPn, [System.StringComparison]::OrdinalIgnoreCase) }).Count -gt 0)) {
+                      if ($__pnpE.Argument) { $__pnpV = $__pnpE.Argument }
+                      elseif (($__pnpI + 1) -lt $__pnpEls.Count -and $__pnpEls[$__pnpI + 1] -isnot [System.Management.Automation.Language.CommandParameterAst]) { $__pnpV = $__pnpEls[$__pnpI + 1] }
+                    }
+                  } elseif ($__pnpIsSs) { $__pnpV = $__pnpE }
+                  # A variable's name is not its value, so it stays readable.
+                  if ($__pnpV -and $__pnpV -isnot [System.Management.Automation.Language.VariableExpressionAst]) { [PSCustomObject]@{ start = $__pnpV.Extent.StartOffset; end = $__pnpV.Extent.EndOffset } }
+                }
+                if ($__pnpIsSs -and $__pnpC.Parent -is [System.Management.Automation.Language.PipelineAst]) {
+                  foreach ($__pnpP in @($__pnpC.Parent.PipelineElements)) {
+                    if ($__pnpP -eq $__pnpC) { break }
+                    if (-not ($__pnpP -is [System.Management.Automation.Language.CommandExpressionAst] -and $__pnpP.Expression -is [System.Management.Automation.Language.VariableExpressionAst])) { [PSCustomObject]@{ start = $__pnpP.Extent.StartOffset; end = $__pnpP.Extent.EndOffset } }
+                  }
+                }
+              })
               # A session-defined function's body runs too, however it was defined, so it is analysed as if inline.
               $__pnpInline = @($__pnpAst.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true) | ForEach-Object { $_.Name })
               $__pnpRoots = [System.Collections.Generic.List[object]]::new()
@@ -137,8 +180,8 @@ internal static class ScriptAnalyzer
             }
             $__pnpParseMessage = $null
             if ($__pnpParseErrors -and @($__pnpParseErrors).Count -gt 0) { $__pnpParseMessage = @($__pnpParseErrors)[0].Message }
-            [PSCustomObject]@{ parseError = $__pnpParseMessage; commands = $__pnpFound; methodCalls = $__pnpMethods } | ConvertTo-Json -Depth 6 -Compress
-            Remove-Variable -Name __pnpSrc,__pnpParseErrors,__pnpAst,__pnpFound,__pnpMethods,__pnpNodes,__pnpNode,__pnpName,__pnpCmdInfo,__pnpGuard,__pnpNext,__pnpStillAlias,__pnpEffective,__pnpVerb,__pnpWhatIf,__pnpMethod,__pnpBound,__pnpK,__pnpInline,__pnpRoots,__pnpN,__pnpRoot,__pnpMembers,__pnpM,__pnpParseMessage -ErrorAction SilentlyContinue
+            [PSCustomObject]@{ parseError = $__pnpParseMessage; commands = $__pnpFound; methodCalls = $__pnpMethods; secrets = $__pnpSecrets } | ConvertTo-Json -Depth 6 -Compress
+            Remove-Variable -Name __pnpSecrets,__pnpSens,__pnpC,__pnpEls,__pnpIsSs,__pnpI,__pnpE,__pnpV,__pnpPn,__pnpP,__pnpSrc,__pnpParseErrors,__pnpAst,__pnpFound,__pnpMethods,__pnpNodes,__pnpNode,__pnpName,__pnpCmdInfo,__pnpGuard,__pnpNext,__pnpStillAlias,__pnpEffective,__pnpVerb,__pnpWhatIf,__pnpMethod,__pnpBound,__pnpK,__pnpInline,__pnpRoots,__pnpN,__pnpRoot,__pnpMembers,__pnpM,__pnpParseMessage -ErrorAction SilentlyContinue
             """;
 
         var raw = (await session.ExecuteAsync(script, timeout, cancellationToken, $"analyse\n{command}")).Trim();

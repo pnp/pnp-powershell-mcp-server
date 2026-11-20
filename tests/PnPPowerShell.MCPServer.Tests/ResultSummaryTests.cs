@@ -40,6 +40,74 @@ public class ResultSummaryTests
         Assert.DoesNotContain(OutputLimit.TruncationMarker, page, StringComparison.Ordinal);
     }
 
+    /// <summary>Rows that share no field names, so the field list is at its longest while each row stays small.</summary>
+    private static string RowsWithManyFieldNames(int count, int width) =>
+        "[" + string.Join(",", Enumerable.Range(0, count).Select(i =>
+            $$"""{"{{new string((char)('a' + (i % 26)), 40)}}{{i}}":{{i}},"v":"{{new string('x', width)}}"}""")) + "]";
+
+    [Fact]
+    public void At_the_smallest_cap_the_field_list_gives_way_to_the_rows()
+    {
+        using var cap = new EnvVar("PNP_MCP_MAX_OUTPUT_CHARS", OutputLimit.MinimumMaxChars.ToString());
+
+        var held = ResultSummary.TryCapture(RowsWithManyFieldNames(30, 400))!;
+        var page = ResultSummary.Render(held, 0, "default");
+        var (start, end, _, oversized) = ResultSummary.Paging(held, 0);
+
+        Assert.False(oversized, "A 450-character row was treated as wider than a 2,000-character page.");
+        Assert.True(end - start >= 1);
+        Assert.DoesNotContain("Fields:", page, StringComparison.Ordinal);
+        Assert.InRange(OutputLimit.Apply(page).Length, 1, OutputLimit.MinimumMaxChars);
+        Assert.DoesNotContain(OutputLimit.TruncationMarker, OutputLimit.Apply(page), StringComparison.Ordinal);
+    }
+
+    /// <summary>One short field name, and rows of every width around a page, so some row fits only without the field line.</summary>
+    [Fact]
+    public void A_short_field_list_gives_way_when_it_would_cost_a_row_its_place()
+    {
+        using var cap = new EnvVar("PNP_MCP_MAX_OUTPUT_CHARS", OutputLimit.MinimumMaxChars.ToString());
+
+        var rows = "[" + string.Join(",", Enumerable.Range(0, 1500).Select(i => $$"""{"v":"{{new string('x', 300 + i)}}"}""")) + "]";
+        var held = ResultSummary.TryCapture(rows)!;
+
+        Assert.DoesNotContain("Fields:", ResultSummary.Render(held, 0, "default"), StringComparison.Ordinal);
+
+        // Every row a page can hold is served; only the rows wider than a whole page are skipped.
+        var widestServed = 0;
+        for (var offset = 0; offset < held.Rows.Count;)
+        {
+            var (start, end, _, oversized) = ResultSummary.Paging(held, offset);
+            if (!oversized)
+            {
+                widestServed = Math.Max(widestServed, Enumerable.Range(start, end - start).Max(i => held.Rows[i].Length));
+            }
+            else
+            {
+                Assert.True(held.Rows[start].Length > widestServed, "A row was skipped although a wider one was served.");
+            }
+
+            offset = end;
+        }
+
+        Assert.True(widestServed > 0);
+    }
+
+    [Fact]
+    public void A_short_field_list_stays_even_at_the_smallest_cap()
+    {
+        using var cap = new EnvVar("PNP_MCP_MAX_OUTPUT_CHARS", OutputLimit.MinimumMaxChars.ToString());
+
+        Assert.Contains("Fields:", ResultSummary.Render(ResultSummary.TryCapture(Rows(500))!, 0, "default"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void At_the_default_cap_a_long_field_list_is_still_shown()
+    {
+        var held = ResultSummary.TryCapture(RowsWithManyFieldNames(400, 400))!;
+
+        Assert.Contains("Fields:", ResultSummary.Render(held, 0, "default"), StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Every_page_is_valid_json_which_is_the_whole_point()
     {
