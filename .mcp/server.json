@@ -4,6 +4,13 @@
   "title": "PnP PowerShell",
   "description": "Manage Microsoft 365 in natural language with PnP PowerShell and author PnP PowerShell scripts.",
   "websiteUrl": "https://github.com/pnp/pnp-powershell-mcp-server#readme",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/pnp/media/master/parker/pnp/300w/parker.png",
+      "mimeType": "image/png",
+      "sizes": ["300x392"]
+    }
+  ],
   "version": "0.1.7-beta",
   "packages": [
     {

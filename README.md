@@ -103,6 +103,10 @@ claude mcp add pnp-powershell --scope user -- pnp-powershell-mcp-server
 
 ### Add to Claude Desktop
 
+**One click:** releases after 0.1.7-beta include a `pnp-powershell-<version>.mcpb` bundle on the [releases page](https://github.com/pnp/pnp-powershell-mcp-server/releases). Download it and open it; Claude Desktop installs it and asks whether to turn on read-only mode. The bundle carries the server itself for Windows and macOS, so it needs neither the .NET SDK nor `dotnet tool install` — only PowerShell 7.4+ and the `PnP.PowerShell` module.
+
+**By hand**, using the installed .NET tool:
+
 1. In Claude Desktop, open Settings by clicking on the hamburger icon in the top left corner.
 2. Select File > Settings (or press `Ctrl + ,`).
 3. In the Developer tab, click Edit Config.
@@ -259,6 +263,17 @@ supports them can browse and cache the content instead of spending a tool call o
 | `pnp://best-practices/{section}` | One section: `workflow`, `docs`, `sessions`, `config`, `readonly`, `output`, `destructive`, `auth`, `execution`, `patterns`. |
 | `pnp://cmdlet/{name}` | Help text for one cmdlet, preceded by its published documentation URL — e.g. `pnp://cmdlet/Get-PnPWeb`. |
 
+A client that supports completion is offered cmdlet names for `{name}` and section names for `{section}` as you type.
+
+### 💬 Prompts
+
+Two playbooks are published as MCP **prompts**, which clients list as slash commands (in Claude Code, `/mcp__pnp-powershell__connect`).
+
+| Prompt | Argument | What it does |
+| --- | --- | --- |
+| `connect` | `siteUrl` | Signs the conversation in to a site: checks the current connection, diagnoses what this machine can authenticate with, runs the connect command if it needs no person, and otherwise hands it to you. |
+| `diagnose` | `siteUrl` (optional) | Reports whether `pwsh` and the module are ready and how you would sign in, without installing or changing anything. |
+
 ### Sessions and `sessionId`
 
 Commands run in a persistent `pwsh` session, so a connection made with `Connect-PnPOnline` stays
@@ -392,6 +407,8 @@ people who run its scripts.
 | `PNP_MCP_READONLY` | `false` | Set to `true` to refuse any command that would change Microsoft 365. Allowed verbs: `Get-`, `Export-`, `Test-`, `Convert-`/`ConvertTo-`/`ConvertFrom-`, `Read-`, `Measure-`, `Connect-`/`Disconnect-`, `Find-`, `Format-`, `Resolve-`, `Write-`, `Search-`, `Show-`, `Compare-`, plus pipeline shaping (`Select-`, `Where-`, `Sort-`, `Group-`, `ForEach-`, `Out-`, `Join-`, `Split-`). Refused: `Set-`, `Remove-`, `Add-`, `New-`, `Clear-`, `Invoke-`, `Update-`, `Move-`, `Enable-`/`Disable-`, `Grant-`/`Revoke-`, `Copy-`, `Import-`, `Restore-`, `Reset-`, `Rename-`, `Start-`/`Stop-`, `Register-`/`Unregister-`, and every other change verb — along with indirectly invoked commands, native executables, and state-changing method calls such as `ExecuteQuery`. See [Best Practices](./best-practices.md#read-only-mode) for the full table. Local file output (`Out-File`, `Export-*`) is still permitted. |
 | `PNP_MCP_ALLOW_SETUP` | `false` | Set to `true` to let `pnp_setup_environment` install the `PnP.PowerShell` module for the current user. Left unset, that tool changes nothing and returns the `Install-Module` command for you to run by hand. It never installs anything else, signs in, or touches the tenant. |
 | `PNP_MCP_MAX_OUTPUT_CHARS` | `50000` | Largest tool response returned, in characters. A JSON result set over the cap is summarised — true row count, field names, and as many whole rows as fit, plus a cursor for `pnp_get_result_page` — so the response stays complete and parseable. Anything else is truncated to its first whole lines with a note saying how much was dropped. Values below 2000 are ignored, since the note itself would leave no room for output. |
+| `PNP_MCP_TOOLS` | `all` | Which tools the server publishes. `core` keeps the nine needed to connect, run commands and look up cmdlets, and leaves out the four script-sample tools, `pnp_ping` and `pnp_list_sessions`, so fewer tool descriptions are sent with every request. Also takes a comma-separated list of tool names, optionally with `core` (`core,pnp_ping`). `pnp_get_result_page` is always published with `pnp_run_command`, whose large results point to it. `pnp_diagnose_connection`, `pnp_get_connection_status` and `pnp_get_best_practices` are published with any selection, because the server's instructions send the model to them. A tool that is left out cannot be called. An entry that is not a tool name is ignored with a line on stderr, and a value naming no valid tool publishes them all. |
+| `PNP_MCP_AUDIT_LOG` | _(unset)_ | Full path of a file to append one JSON line to for every `pnp_run_command` call: time, session, the command with secrets redacted (secret parameters, tokens and `ConvertTo-SecureString` literals; a secret first assigned to a variable is not recognised), outcome (`ok`, `error`, `blocked`, `cancelled`, `timeout`, `confirmation_requested`), duration, what the confirmation gate flagged and whether it was confirmed. Command output is never written. At 10 MB the file is renamed to `<name>.1`, replacing the previous one. A relative path is ignored. |
 | `PNP_MCP_REPLAY_DIR` | _(unset)_ | **Testing only.** Answers every command from recorded fixtures in this directory instead of running it, so the server never reaches Microsoft 365. It announces itself on stderr when set. See [Recorded-playback tests](#recorded-playback-tests). |
 | `PNP_MCP_RECORD_DIR` | _(unset)_ | **Testing only.** Writes a scrubbed fixture for every command the server runs, into this directory. |
 | `PNP_SCRIPT_SAMPLES_PATH` | _(unset)_ | Your own script samples, searched alongside the community index and ranked ahead of a community sample that matches about as well. A `;`-separated list of full folder paths of `.ps1` files, [pnp/script-samples](https://github.com/pnp/script-samples) clones, and `https://` or `ssh://` Git URLs. `pnp_save_script_sample` writes to the first plain folder listed. See [Your own script samples](#your-own-script-samples). |

@@ -1,0 +1,76 @@
+{
+  "manifest_version": "0.3",
+  "name": "pnp-powershell",
+  "display_name": "PnP PowerShell",
+  "version": "0.1.7-beta",
+  "description": "Manage Microsoft 365 in natural language with PnP PowerShell and author PnP PowerShell scripts.",
+  "long_description": "Runs PnP PowerShell against SharePoint Online, Teams and Entra ID from a conversation, with a confirmation prompt before destructive commands and an optional read-only mode.\n\nRequires PowerShell 7.4 or above and the PnP.PowerShell module on this machine. Ask it to check the PnP PowerShell setup and it reports what is missing.",
+  "author": {
+    "name": "PnP Community",
+    "url": "https://pnp.github.io"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pnp/pnp-powershell-mcp-server"
+  },
+  "homepage": "https://github.com/pnp/pnp-powershell-mcp-server",
+  "documentation": "https://github.com/pnp/pnp-powershell-mcp-server#readme",
+  "support": "https://github.com/pnp/pnp-powershell-mcp-server/issues",
+  "icon": "parker.png",
+  "server": {
+    "type": "binary",
+    "entry_point": "server/win-x64/PnPPowerShell.MCPServer.exe",
+    "mcp_config": {
+      "command": "${__dirname}/server/win-x64/PnPPowerShell.MCPServer.exe",
+      "args": [],
+      "env": {
+        "PNP_MCP_READONLY": "${user_config.read_only}",
+        "PNP_MCP_ALLOW_SETUP": "${user_config.allow_setup}"
+      },
+      "platform_overrides": {
+        "darwin": {
+          "command": "/bin/sh",
+          "args": ["${__dirname}/server/launch.sh"]
+        }
+      }
+    }
+  },
+  "tools": [
+    { "name": "pnp_diagnose_connection", "description": "Checks that pwsh and PnP.PowerShell are installed and reports how this machine can sign in." },
+    { "name": "pnp_setup_environment", "description": "Installs the PnP.PowerShell module, only when setup is allowed." },
+    { "name": "pnp_get_connection_status", "description": "Reports which site and account a session is connected as." },
+    { "name": "pnp_run_command", "description": "Runs PnP PowerShell against the connected tenant." },
+    { "name": "pnp_get_result_page", "description": "Returns the next page of a result too large to return whole." },
+    { "name": "pnp_search_commands", "description": "Finds the cmdlet for a task described in plain words." },
+    { "name": "pnp_get_command_docs", "description": "Gets the syntax, parameters and examples of one cmdlet." },
+    { "name": "pnp_suggest_script", "description": "Suggests community script samples for a task." },
+    { "name": "pnp_search_script_samples", "description": "Searches community and your own script samples." },
+    { "name": "pnp_get_script_sample", "description": "Fetches one script sample." },
+    { "name": "pnp_save_script_sample", "description": "Saves a script to your own sample folder." },
+    { "name": "pnp_get_best_practices", "description": "Returns this server's guidance, whole or by section." },
+    { "name": "pnp_list_sessions", "description": "Lists the PowerShell sessions the server holds." },
+    { "name": "pnp_reset_session", "description": "Ends a session and its connection." },
+    { "name": "pnp_ping", "description": "Reports server version, uptime and readiness." }
+  ],
+  "keywords": ["pnp", "powershell", "sharepoint", "microsoft365", "teams", "entra"],
+  "license": "MIT",
+  "compatibility": {
+    "platforms": ["win32", "darwin"]
+  },
+  "user_config": {
+    "read_only": {
+      "type": "boolean",
+      "title": "Read-only mode",
+      "description": "Refuse every command that would change Microsoft 365.",
+      "default": false,
+      "required": false
+    },
+    "allow_setup": {
+      "type": "boolean",
+      "title": "Allow module install",
+      "description": "Let the server install the PnP.PowerShell module for the current user when it is missing.",
+      "default": false,
+      "required": false
+    }
+  }
+}

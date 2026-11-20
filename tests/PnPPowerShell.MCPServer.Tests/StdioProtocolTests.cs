@@ -66,6 +66,23 @@ public sealed class StdioProtocolTests : IDisposable
         Assert.Equal(text, result.GetProperty("structuredContent").GetProperty("text").GetString());
     }
 
+    /// <summary>A text tool reports failure in its text, so the flag has to be set for it.</summary>
+    [Theory]
+    [InlineData("pnp_get_best_practices", """{"section":"no-such-section"}""", true)]
+    [InlineData("pnp_get_command_docs", """{"commandName":"not a cmdlet"}""", true)]
+    [InlineData("pnp_run_command", """{"command":"Get-ChildItem"}""", true)]
+    [InlineData("pnp_get_script_sample", """{"sampleName":""}""", true)]
+    [InlineData("pnp_get_best_practices", """{"section":"sessions"}""", false)]
+    public void A_text_result_that_reports_a_failure_is_flagged_as_one(string tool, string arguments, bool failure)
+    {
+        _client.Initialize();
+
+        var call = new JsonObject { ["name"] = tool, ["arguments"] = JsonNode.Parse(arguments) };
+        var result = _client.Request("tools/call", call.ToJsonString());
+
+        Assert.Equal(failure, result.TryGetProperty("isError", out var flag) && flag.GetBoolean());
+    }
+
     [Fact]
     public void Every_tool_is_published_with_a_description_and_annotations()
     {
@@ -198,9 +215,11 @@ public sealed class StdioProtocolTests : IDisposable
         var call = new JsonObject { ["name"] = "pnp_run_command", ["arguments"] = new JsonObject { ["command"] = UnknownListRemoval() } };
         var created = client.Request("tools/call", McpStdioClient.WithMeta(call, tasks: true, elicitation: "url"));
 
-        var outcome = ResultText(PollTask(client, created.GetProperty("taskId").GetString()!, "completed").GetProperty("result"));
+        var result = PollTask(client, created.GetProperty("taskId").GetString()!, "completed").GetProperty("result");
+        var outcome = ResultText(result);
 
         Assert.Contains("Blocked", outcome, StringComparison.Ordinal);
+        Assert.True(result.GetProperty("isError").GetBoolean(), "A refused task finished without isError.");
     }
 
     [RequiresPnPFact]

@@ -101,7 +101,7 @@ internal sealed partial class ScriptSampleTools
         $"Browse the whole catalogue at https://pnp.github.io/script-samples/\n\n{ScriptSampleIndex.Provenance}";
 
     [McpServerTool(
-        Name = "pnp_search_script_samples",
+        Name = "pnp_search_script_samples", Title = "Search script samples",
         ReadOnly = true,
         Idempotent = true,
         OpenWorld = true,
@@ -159,7 +159,7 @@ internal sealed partial class ScriptSampleTools
             Provenance);
     }
 
-    [McpServerTool(Name = "pnp_get_script_sample", ReadOnly = true, Idempotent = true, OpenWorld = true)]
+    [McpServerTool(Name = "pnp_get_script_sample", Title = "Get a script sample", ReadOnly = true, Idempotent = true, OpenWorld = true)]
     [Description(
         "Opens one specific sample already identified, addressed by the exact slug name a browse returned, and " +
         "gives back its complete script body. Use it when you know precisely which sample you want.")]
@@ -213,7 +213,7 @@ internal sealed partial class ScriptSampleTools
         return OutputLimit.Apply(sb.ToString(), "Open the reference URL above to read the whole sample.", Provenance);
     }
 
-    [McpServerTool(Name = "pnp_suggest_script", ReadOnly = true, Idempotent = true, OpenWorld = true)]
+    [McpServerTool(Name = "pnp_suggest_script", Title = "Suggest a script for a task", ReadOnly = true, Idempotent = true, OpenWorld = true)]
     [Description(
         "Drafts a starting point for a job someone wants to automate, by matching the task against the user's own and " +
         "community samples and returning their code plus guidance on adapting it. The entry point when a job is " +
@@ -274,7 +274,7 @@ internal sealed partial class ScriptSampleTools
             Provenance);
     }
 
-    [McpServerTool(Name = "pnp_save_script_sample", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = true)]
+    [McpServerTool(Name = "pnp_save_script_sample", Title = "Save a script as a sample", ReadOnly = false, Destructive = false, Idempotent = false, OpenWorld = true)]
     [Description(
         "Saves a PnP PowerShell script to the user's own samples for reuse, so later searches and " +
         "suggestions include it. Use it only when the user asks to keep or save a script. It never overwrites an existing file.")]

@@ -76,6 +76,17 @@ packed **on its own matching OS**, with `--runtime <rid>`.
    [Official MCP Registry](https://registry.modelcontextprotocol.io/). See
    [MCP Registry](#mcp-registry) below.
 
+6. The same run builds `pnp-powershell-<version>.mcpb`, the one-click bundle for Claude Desktop, and uploads
+   it as the `mcpb` workflow artifact. Download it and attach it to the GitHub release; the README sends
+   Claude Desktop users there for it. To build one by hand from a folder of RID packages:
+
+   ```powershell
+   pwsh ./build/New-McpbBundle.ps1 -PackageDirectory artifacts -Version 0.1.8-beta
+   ```
+
+   Bump `version` in [mcpb/manifest.json](./mcpb/manifest.json) with the other three; the script stamps the
+   bundle with the version it is given either way.
+
 To do a dry run, use **Actions → Release → Run workflow** with `publish` unchecked: it
 builds all eight and uploads them as workflow artifacts without pushing anything.
 

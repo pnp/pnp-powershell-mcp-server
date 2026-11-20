@@ -101,7 +101,7 @@ internal partial class PnPPowerShellTools
     }
 
     [McpServerTool(
-        Name = "pnp_search_commands",
+        Name = "pnp_search_commands", Title = "Find a cmdlet",
         ReadOnly = true,
         Idempotent = true,
         OpenWorld = false,
@@ -254,7 +254,7 @@ internal partial class PnPPowerShellTools
     }
 
 
-    [McpServerTool(Name = "pnp_get_command_docs", ReadOnly = true, Idempotent = true, OpenWorld = false)]
+    [McpServerTool(Name = "pnp_get_command_docs", Title = "Cmdlet documentation", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description("Gets the reference documentation for one named cmdlet: its syntax, every parameter and what it means, the parameter sets, and examples. Use it once you know the cmdlet name and need to know how to call it.")]
     public static async Task<string> GetPnpCommandDocs(
         PowerShellSessionManager sessions,
@@ -321,7 +321,7 @@ internal partial class PnPPowerShellTools
         return OutputLimit.Apply(links + help, "Read the documentation pages linked above for the full reference.", PnPErrorHints.HintFor(help));
     }
 
-    [McpServerTool(Name = "pnp_run_command", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = true)]
+    [McpServerTool(Name = "pnp_run_command", Title = "Run PnP PowerShell", ReadOnly = false, Destructive = true, Idempotent = false, OpenWorld = true)]
     [Description("Runs PnP PowerShell against the connected tenant and returns what it produced. This is the tool that does the actual work: use it to create, read, update, set, change, add, remove, delete, list, upload, download, copy, move, restore or report on sites, lists, libraries, files, folders, list items, users, groups, permissions, Teams, Entra ID objects, and tenant or site settings. Chain steps with semicolons or newlines. The Connect-PnPOnline connection persists across calls sharing a sessionId, so connect once and keep going.")]
     public static async Task<string> RunPnpCommand(
         PowerShellSessionManager sessions,
@@ -331,6 +331,48 @@ internal partial class PnPPowerShellTools
         [Description("PnP PowerShell command(s) to execute (e.g., \"Get-PnPSite\", \"Get-PnPList | Select-Object Title, ItemCount\")")] string command,
         [Description("Session to run in. Sessions keep their own PnP connection, so use a second name only when working against two tenants at once (default: \"default\")")] string? sessionId = null,
         CancellationToken cancellationToken = default)
+    {
+        if (!AuditLog.Enabled)
+        {
+            return await RunCoreAsync(sessions, server, context, progress, command, sessionId, null, cancellationToken);
+        }
+
+        var audit = new AuditLog.Entry { Command = command ?? string.Empty, Session = string.IsNullOrWhiteSpace(sessionId) ? PowerShellSessionManager.DefaultSessionId : sessionId.Trim() };
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        var outcome = "error";
+
+        try
+        {
+            var result = await RunCoreAsync(sessions, server, context, progress, command!, sessionId, audit, cancellationToken);
+            outcome = AuditLog.Classify(result);
+
+            return result;
+        }
+        catch (InputRequiredException)
+        {
+            outcome = "confirmation_requested";
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            outcome = "cancelled";
+            throw;
+        }
+        finally
+        {
+            AuditLog.Record(audit, outcome, started.Elapsed);
+        }
+    }
+
+    private static async Task<string> RunCoreAsync(
+        PowerShellSessionManager sessions,
+        McpServer server,
+        RequestContext<CallToolRequestParams> context,
+        IProgress<ProgressNotificationValue> progress,
+        string command,
+        string? sessionId,
+        AuditLog.Entry? audit,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(command))
         {
@@ -352,6 +394,12 @@ internal partial class PnPPowerShellTools
         }
 
         var session = sessions.Get(sessionId);
+
+        if (audit is not null)
+        {
+            audit.Session = session.Id;
+            audit.Task = TaskExecution.RunsAsTask(context);
+        }
 
         // Analysis and execution share one budget, so queuing behind a long command still waits out
         // CommandTimeout rather than failing early, and a call cannot exceed the configured limit.
@@ -387,6 +435,7 @@ internal partial class PnPPowerShellTools
         }
 
         var flagged = DetermineConfirmationTarget(analysis, command);
+        audit?.Flagged = flagged;
         long? approvedGeneration = null;
         if (flagged is not null && !ConfirmationDisabled)
         {
@@ -394,7 +443,7 @@ internal partial class PnPPowerShellTools
 
             // Inside a task the prompt is awaited here; time spent waiting for a person is not the command's.
             elapsed.Stop();
-            var refusal = await ConfirmDestructiveAsync(server, context, $"{session.Id}\n{approvedGeneration}", command, flagged, cancellationToken);
+            var refusal = await ConfirmDestructiveAsync(server, context, $"{session.Id}\n{approvedGeneration}", command, flagged, audit, cancellationToken);
             elapsed.Start();
 
             if (refusal is not null)
@@ -451,7 +500,7 @@ internal partial class PnPPowerShellTools
     }
 
     [McpServerTool(
-        Name = "pnp_get_result_page",
+        Name = "pnp_get_result_page", Title = "Next page of a large result",
         ReadOnly = true,
         Idempotent = true,
         OpenWorld = false,
@@ -544,6 +593,7 @@ internal partial class PnPPowerShellTools
         string session,
         string command,
         string matchedCmdlet,
+        AuditLog.Entry? audit,
         CancellationToken cancellationToken)
     {
         // Bound to the session as it is now, so a reset, reconnect or other command in it voids the approval.
@@ -559,7 +609,10 @@ internal partial class PnPPowerShellTools
                     "Re-run 'pnp_run_command' and confirm the command you are shown.";
             }
 
-            return EvaluateApproval(issuedFor, bound, response.Deserialize(InputResponse.ElicitResultJsonTypeInfo), matchedCmdlet);
+            var verdict = EvaluateApproval(issuedFor, bound, response.Deserialize(InputResponse.ElicitResultJsonTypeInfo), matchedCmdlet);
+            audit?.Confirmed = verdict is null;
+
+            return verdict;
         }
 
         // The prompt is a form; a client declaring only URL elicitation cannot show it.
@@ -568,7 +621,7 @@ internal partial class PnPPowerShellTools
             // A task is never retried, and the SDK fails one that throws InputRequiredException.
             if (TaskExecution.RunsAsTask(context))
             {
-                return await ConfirmInTaskAsync(server, command, matchedCmdlet, cancellationToken);
+                return await ConfirmInTaskAsync(server, command, matchedCmdlet, audit, cancellationToken);
             }
 
             // IsMrtrSupported only says the round-trip is representable; the legacy bridge also needs elicitation.
@@ -598,14 +651,17 @@ internal partial class PnPPowerShellTools
 
     /// <summary>Asks within a task, whose answer arrives through tasks/update rather than a retry.</summary>
     // Awaited in this call, so the answer can only approve the command it was asked about.
-    private static async Task<string?> ConfirmInTaskAsync(McpServer server, string command, string matchedCmdlet, CancellationToken cancellationToken)
+    private static async Task<string?> ConfirmInTaskAsync(McpServer server, string command, string matchedCmdlet, AuditLog.Entry? audit, CancellationToken cancellationToken)
     {
         using var expiry = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         expiry.CancelAfter(ApprovalLifetime);
 
         try
         {
-            return EvaluateAnswer(await server.ElicitAsync(ConfirmationPrompt(command, matchedCmdlet), expiry.Token), matchedCmdlet);
+            var verdict = EvaluateAnswer(await server.ElicitAsync(ConfirmationPrompt(command, matchedCmdlet), expiry.Token), matchedCmdlet);
+            audit?.Confirmed = verdict is null;
+
+            return verdict;
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -633,7 +689,7 @@ internal partial class PnPPowerShellTools
     };
 
     [McpServerTool(
-        Name = "pnp_diagnose_connection",
+        Name = "pnp_diagnose_connection", Title = "Diagnose setup and sign-in",
         ReadOnly = true,
         Idempotent = true,
         OpenWorld = true,
@@ -679,7 +735,7 @@ internal partial class PnPPowerShellTools
     }
 
     [McpServerTool(
-        Name = "pnp_get_connection_status",
+        Name = "pnp_get_connection_status", Title = "Connection status",
         ReadOnly = true,
         Idempotent = true,
         OpenWorld = false,
@@ -788,7 +844,7 @@ internal partial class PnPPowerShellTools
         }
     }
 
-    [McpServerTool(Name = "pnp_reset_session", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
+    [McpServerTool(Name = "pnp_reset_session", Title = "End a session", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false)]
     [Description("Signs out: ends a session and discards everything held in it, so the next call starts fresh and must reconnect. Use it to sign out or log out, to switch to a different account, or to recover a session that has wedged or stopped responding.")]
     public static async Task<string> ResetPnpSession(
         PowerShellSessionManager sessions,
@@ -826,7 +882,7 @@ internal partial class PnPPowerShellTools
         ["patterns"] = ["Common Patterns", "Areas Covered by PnP PowerShell"],
     };
 
-    [McpServerTool(Name = "pnp_get_best_practices", ReadOnly = true, Idempotent = true, OpenWorld = false)]
+    [McpServerTool(Name = "pnp_get_best_practices", Title = "Server guidance", ReadOnly = true, Idempotent = true, OpenWorld = false)]
     [Description("Returns this server's own guidance and recommended workflow: how to approach a task, the rules it enforces, how to treat tenant text that reads like an instruction, and the conventions to follow. The full document is long, so pass a section to read one topic.")]
     public static string GetPnpBestPractices(
         [Description("Optional topic to return instead of the whole document. One of: workflow, docs, sessions, config, readonly, output, destructive, trust, auth, execution, patterns. Omit for everything.")] string? section = null)
@@ -1012,7 +1068,7 @@ internal partial class PnPPowerShellTools
     // commands on the user's machine should not be auto-approved on the strength of a false hint.
     // PNP_MCP_ALLOW_SETUP remains the real gate; this makes the annotation agree with it.
     [McpServerTool(
-        Name = "pnp_setup_environment",
+        Name = "pnp_setup_environment", Title = "Install the PnP.PowerShell module",
         ReadOnly = false,
         Destructive = true,
         Idempotent = true,
@@ -1074,7 +1130,7 @@ internal partial class PnPPowerShellTools
     }
 
     [McpServerTool(
-        Name = "pnp_ping",
+        Name = "pnp_ping", Title = "Server health check",
         ReadOnly = true,
         Idempotent = true,
         OpenWorld = false,
@@ -1148,7 +1204,7 @@ internal partial class PnPPowerShellTools
     }
 
     [McpServerTool(
-        Name = "pnp_list_sessions",
+        Name = "pnp_list_sessions", Title = "List sessions",
         ReadOnly = true,
         Idempotent = true,
         OpenWorld = false,

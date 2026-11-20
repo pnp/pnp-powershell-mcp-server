@@ -28,6 +28,17 @@ internal sealed partial class TranscriptScrubber
     [GeneratedRegex(@"(?i)-(ClientSecret|Password|CertificatePassword|CertificateBase64Encoded|AccessToken|SecureString|Token|ApiKey)(\s*:\s*|\s+)('[^']*'|""[^""]*""|\$?[^\s;|,)]+)")]
     private static partial Regex SecretParameterRegex();
 
+    // The usual way a password is passed: the literal sits inside the call, not after the parameter.
+    // Quoted text is taken whole, so a ; or | inside the password does not end the call early.
+    [GeneratedRegex(@"(?i)\bConvertTo-SecureString\b(?:'(?:[^']|'')*'|""[^""]*""|`\r?\n|[^;|\r\n'""])*")]
+    private static partial Regex SecureStringCallRegex();
+
+    [GeneratedRegex(@"(?i)('[^']*'|""[^""]*"")(\s*\|\s*ConvertTo-SecureString\b)")]
+    private static partial Regex PipedSecureStringRegex();
+
+    [GeneratedRegex(@"'(?:[^']|'')*'|""[^""]*""")]
+    private static partial Regex QuotedLiteralRegex();
+
     // A profile path carries the operator's account name, and PnP output is full of paths.
     [GeneratedRegex(@"(?i)([A-Za-z]:\\Users\\|/home/|/Users/)([^\\/""'\s,;)]+)")]
     private static partial Regex LocalProfileRegex();
@@ -47,6 +58,18 @@ internal sealed partial class TranscriptScrubber
 
     [GeneratedRegex(@"(?i)\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b")]
     private static partial Regex GuidRegex();
+
+    /// <summary>Removes secrets only, leaving tenant names and ids readable.</summary>
+    public static string Secrets(string text)
+    {
+        var scrubbed = PemBlockRegex().Replace(text, "[redacted-certificate]");
+        scrubbed = JwtRegex().Replace(scrubbed, "[redacted-token]");
+        scrubbed = BearerRegex().Replace(scrubbed, "Bearer [redacted-token]");
+        scrubbed = SecureStringCallRegex().Replace(scrubbed, m => QuotedLiteralRegex().Replace(m.Value, "'[redacted-secret]'"));
+        scrubbed = PipedSecureStringRegex().Replace(scrubbed, m => "'[redacted-secret]'" + m.Groups[2].Value);
+
+        return SecretParameterRegex().Replace(scrubbed, m => $"-{m.Groups[1].Value} '[redacted-secret]'");
+    }
 
     /// <summary>Returns <paramref name="text"/> with tenant identity and secrets replaced by stable placeholders.</summary>
     public string Scrub(string? text)
