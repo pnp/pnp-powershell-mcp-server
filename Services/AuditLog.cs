@@ -70,8 +70,7 @@ internal static class AuditLog
                     Directory.CreateDirectory(folder);
                 }
 
-                Rotate(path);
-                Append(path, line + "\n");
+                Write(path, line + "\n");
             }
         }
         catch (Exception ex)
@@ -79,6 +78,38 @@ internal static class AuditLog
             // Every kind: this runs after the command, and a throw here would replace its result.
             Console.Error.WriteLine($"{PathVariable}: could not write to '{path}': {ex.Message}");
         }
+    }
+
+    /// <summary>Rotates and appends while holding "path.lock", so server processes sharing a log take turns.</summary>
+    // Two appends opened at the same end-of-file overwrite each other; the in-process lock cannot see the other process.
+    internal static void Write(string path, string text)
+    {
+        using var turn = TakeTurn(path + ".lock");
+
+        Rotate(path);
+        Append(path, text);
+    }
+
+    // Null after about two seconds: an entry written out of turn is better than one not written.
+    private static FileStream? TakeTurn(string lockPath)
+    {
+        for (var attempt = 1; attempt <= 100; attempt++)
+        {
+            try
+            {
+                return new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            }
+            catch (IOException)
+            {
+                Thread.Sleep(20);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return null;
+            }
+        }
+
+        return null;
     }
 
     // On its own: a file something else holds open cannot be renamed, and the entry must still be written.

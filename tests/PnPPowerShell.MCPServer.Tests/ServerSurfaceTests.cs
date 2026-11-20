@@ -490,6 +490,104 @@ public sealed class ServerSurfaceTests
         }
     }
 
+    [Theory]
+    [InlineData("Connect-PnPOnline -Url x -ClientId y -ClientSecret @'\nSensitiveBody\n'@\nGet-PnPWeb", "SensitiveBody")]
+    [InlineData("Connect-PnPOnline -Url x -ClientId y -ClientSecret @\"\r\nSensitive'Body\r\n\"@", "Body")]
+    [InlineData("$p = @'\nSensitiveBody\n'@ | ConvertTo-SecureString -AsPlainText -Force", "SensitiveBody")]
+    [InlineData("$p = ConvertTo-SecureString @'\nSensitive;Body\n'@ -AsPlainText -Force", "Body")]
+    public void A_secret_given_as_a_here_string_is_removed_whole(string command, string fragment)
+    {
+        var line = AuditLog.Format(new AuditLog.Entry { Command = command }, "ok", TimeSpan.Zero, DateTimeOffset.UtcNow);
+
+        Assert.DoesNotContain(fragment, line, StringComparison.Ordinal);
+        Assert.Contains("[redacted-secret]", line, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("$p = ConvertTo-SecureString -String Hunter2! -AsPlainText -Force")]
+    [InlineData("$p = ConvertTo-SecureString Hunter2! -AsPlainText -Force")]
+    [InlineData("$p = ConvertTo-SecureString -AsPlainText -Force -String Hunter2!")]
+    [InlineData("$p = ConvertTo-SecureString -AsPlainText -Force Hunter2!")]
+    [InlineData("$p = ConvertTo-SecureString -String:Hunter2! -AsPlainText -Force")]
+    [InlineData("Connect-PnPOnline -Url x -Credentials (New-Object PSCredential('a@b.com',(ConvertTo-SecureString -Force -AsPlainText Hunter2!)))")]
+    public void A_bare_word_password_is_removed_wherever_it_sits_in_the_call(string command)
+    {
+        var line = AuditLog.Format(new AuditLog.Entry { Command = command }, "ok", TimeSpan.Zero, DateTimeOffset.UtcNow);
+        var written = JsonDocument.Parse(line).RootElement.GetProperty("command").GetString()!;
+
+        Assert.DoesNotContain("Hunter2!", written, StringComparison.Ordinal);
+        Assert.Contains("ConvertTo-SecureString", written, StringComparison.Ordinal);
+        Assert.Contains("-AsPlainText", written, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_secure_string_call_keeps_its_variables_and_the_statement_around_it()
+    {
+        const string command =
+            "Connect-PnPOnline -Credentials (New-Object PSCredential($user,(ConvertTo-SecureString $plain -AsPlainText -Force))) -Url https://contoso.sharepoint.com/sites/x";
+
+        var line = AuditLog.Format(new AuditLog.Entry { Command = command }, "ok", TimeSpan.Zero, DateTimeOffset.UtcNow);
+
+        Assert.Equal(command, JsonDocument.Parse(line).RootElement.GetProperty("command").GetString());
+    }
+
+    /// <summary>Stands in for several server processes: each writer skips the in-process lock, as another process would.</summary>
+    [Fact]
+    public void Writers_sharing_one_audit_file_do_not_overwrite_each_other()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"pnp-audit-{Guid.NewGuid():N}.jsonl");
+        const int writers = 8;
+        const int each = 100;
+
+        try
+        {
+            Parallel.For(0, writers, new ParallelOptions { MaxDegreeOfParallelism = writers }, writer =>
+            {
+                for (var n = 0; n < each; n++)
+                {
+                    AuditLog.Write(path, $"{{\"writer\":{writer},\"n\":{n},\"pad\":\"{new string('x', 200)}\"}}\n");
+                }
+            });
+
+            var lines = File.ReadAllLines(path);
+
+            Assert.Equal(writers * each, lines.Length);
+            Assert.All(lines, line => Assert.Equal(JsonValueKind.Object, JsonDocument.Parse(line).RootElement.ValueKind));
+            Assert.Equal(writers * each, lines.Distinct(StringComparer.Ordinal).Count());
+        }
+        finally
+        {
+            File.Delete(path);
+            File.Delete(path + ".lock");
+        }
+    }
+
+    [Fact]
+    public void An_entry_waits_its_turn_when_another_process_is_writing()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"pnp-audit-{Guid.NewGuid():N}.jsonl");
+
+        try
+        {
+            var other = new FileStream(path + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            var release = Task.Run(async () =>
+            {
+                await Task.Delay(300);
+                other.Dispose();
+            });
+
+            AuditLog.Write(path, "{\"n\":1}\n");
+            release.Wait();
+
+            Assert.Equal("{\"n\":1}", Assert.Single(File.ReadAllLines(path)));
+        }
+        finally
+        {
+            File.Delete(path);
+            File.Delete(path + ".lock");
+        }
+    }
+
     [Fact]
     public void An_entry_is_still_written_while_another_process_holds_the_file_open()
     {
