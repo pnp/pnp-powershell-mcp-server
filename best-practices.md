@@ -184,7 +184,7 @@ to set rather than working around it.
 | `PNP_MCP_CONFIRM_DESTRUCTIVE` | `true` | `false` skips destructive confirmations. |
 | `PNP_MCP_MAX_OUTPUT_CHARS` | `50000` | Largest tool response, in characters; longer output is truncated. |
 | `PNP_SCRIPT_SAMPLES_PATH` | _(unset)_ | `;`-separated folders or Git URLs of the user's own samples, searched alongside the community ones. |
-| `PNP_MCP_TOOLS` | `all` | `core` publishes only the tools for connecting, running and looking up cmdlets; a tool it leaves out cannot be called. |
+| `PNP_MCP_TOOLS` | `all` | `core` publishes only the nine tools for connecting, running and looking up cmdlets; naming others adds them to those nine. A tool that is left out cannot be called. |
 | `PNP_MCP_AUDIT_LOG` | _(unset)_ | Full path of a file that gets one JSON line per `pnp_run_command` call: command, outcome, whether it was confirmed. |
 
 Both booleans are matched on the whole word, in any letter case: read-only turns on only for `true`, and

@@ -41,14 +41,6 @@ internal static class ToolOrder
         "pnp_reset_session",
     ];
 
-    /// <summary>Kept by every selection: the tools the server instructions name.</summary>
-    internal static readonly string[] AlwaysPublished =
-    [
-        "pnp_diagnose_connection",
-        "pnp_get_connection_status",
-        "pnp_get_best_practices",
-    ];
-
     /// <summary>Re-adds the tools in <see cref="Names"/> order; an unlisted tool keeps its relative place after them.</summary>
     internal static void Apply(McpServerPrimitiveCollection<McpServerTool> tools) =>
         Apply(tools, Environment.GetEnvironmentVariable(SelectionVariable));
@@ -59,7 +51,7 @@ internal static class ToolOrder
 
         if (unknown.Count > 0)
         {
-            Console.Error.WriteLine($"{SelectionVariable}: ignoring unknown entries: {string.Join(", ", unknown)}. Valid: all, core, or tool names.");
+            Console.Error.WriteLine($"{SelectionVariable}: ignoring unknown entries: {string.Join(", ", unknown)}. Valid: all, core, or the names of tools to publish besides the core ones.");
         }
 
         var ordered = tools
@@ -74,12 +66,14 @@ internal static class ToolOrder
         }
     }
 
-    /// <summary>The tools a comma-separated selection names; null for every tool.</summary>
-    // Fails open: a selection naming nothing valid would otherwise publish a server with no tools.
+    /// <summary>The core tools plus any a comma-separated selection names; null for every tool.</summary>
+    // Core is the floor: the instructions, both prompts, the diagnosis and large results all send the model to core tools.
+    // Fails open: a selection naming nothing valid publishes every tool.
     internal static HashSet<string>? Select(string? selection, out List<string> unknown)
     {
         unknown = [];
         var keep = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var valid = false;
 
         foreach (var entry in (selection ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
@@ -90,11 +84,12 @@ internal static class ToolOrder
 
             if (entry.Equals("core", StringComparison.OrdinalIgnoreCase))
             {
-                keep.UnionWith(Core);
+                valid = true;
             }
             else if (Names.Contains(entry, StringComparer.OrdinalIgnoreCase))
             {
                 keep.Add(entry);
+                valid = true;
             }
             else
             {
@@ -102,19 +97,12 @@ internal static class ToolOrder
             }
         }
 
-        if (keep.Count == 0)
+        if (!valid)
         {
             return null;
         }
 
-        // The server instructions and both prompts send the model to these, whatever else is published.
-        keep.UnionWith(AlwaysPublished);
-
-        // A large result tells the model to call the paging tool, so it follows the tool that produces one.
-        if (keep.Contains("pnp_run_command"))
-        {
-            keep.Add("pnp_get_result_page");
-        }
+        keep.UnionWith(Core);
 
         return keep;
     }

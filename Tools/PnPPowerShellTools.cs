@@ -783,7 +783,8 @@ internal partial class PnPPowerShellTools
         // type. Reporting connected:false there would be a claim about the tenant we cannot support.
         if (ParseStatus(result) is not { } status)
         {
-            return StructuredResult.Text(text);
+            // The "Session:" heading hides the Error: prefix the failure filter looks for.
+            return StructuredResult.Text(text, isError: true);
         }
 
         // Clamped before serializing: these come back from the tenant, and a pathological value would
@@ -1058,6 +1059,12 @@ internal partial class PnPPowerShellTools
     // Scheme optional: bare hosts are what users type.
     [GeneratedRegex(@"^(https://)?[A-Za-z0-9.-]+(/[A-Za-z0-9._~%/-]*)?$", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase)]
     private static partial Regex SiteUrlRegex();
+
+    internal const int MaxSiteUrlChars = 512;
+
+    /// <summary>True for text that is a site URL and nothing else, short enough to pass on whole.</summary>
+    internal static bool IsSiteUrl(string? url) =>
+        url?.Trim() is { Length: > 0 and <= MaxSiteUrlChars } trimmed && SiteUrlRegex().IsMatch(trimmed);
 
     private static DateTimeOffset ServerStartedUtc =>
         System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime();

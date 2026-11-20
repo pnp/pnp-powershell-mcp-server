@@ -28,15 +28,23 @@ internal sealed partial class TranscriptScrubber
     [GeneratedRegex(@"(?i)-(ClientSecret|Password|CertificatePassword|CertificateBase64Encoded|AccessToken|SecureString|Token|ApiKey)(\s*:\s*|\s+)('[^']*'|""[^""]*""|\$?[^\s;|,)]+)")]
     private static partial Regex SecretParameterRegex();
 
+    // A whole PowerShell string, escapes included: '' in single quotes, "" or a backtick pair in double quotes.
+    // Stopping at an escaped quote would leave the rest of a secret in the clear.
+    private const string Literal = @"'(?:[^']|'')*'|""(?:[^""`]|`[\s\S]|"""")*""";
+
+    // The audit log's own copy: the transcript pattern above is tied to recorded fixtures.
+    [GeneratedRegex(@"(?i)-(ClientSecret|Password|CertificatePassword|CertificateBase64Encoded|AccessToken|SecureString|Token|ApiKey)(\s*:\s*|\s+)(" + Literal + @"|\$?[^\s;|,)]+)")]
+    private static partial Regex AuditSecretParameterRegex();
+
     // The usual way a password is passed: the literal sits inside the call, not after the parameter.
     // Quoted text is taken whole, so a ; or | inside the password does not end the call early.
-    [GeneratedRegex(@"(?i)\bConvertTo-SecureString\b(?:'(?:[^']|'')*'|""[^""]*""|`\r?\n|[^;|\r\n'""])*")]
+    [GeneratedRegex(@"(?i)\bConvertTo-SecureString\b(?:" + Literal + @"|`\r?\n|[^;|\r\n'""])*")]
     private static partial Regex SecureStringCallRegex();
 
-    [GeneratedRegex(@"(?i)('[^']*'|""[^""]*"")(\s*\|\s*ConvertTo-SecureString\b)")]
+    [GeneratedRegex(@"(?i)(" + Literal + @")(\s*\|\s*ConvertTo-SecureString\b)")]
     private static partial Regex PipedSecureStringRegex();
 
-    [GeneratedRegex(@"'(?:[^']|'')*'|""[^""]*""")]
+    [GeneratedRegex(Literal)]
     private static partial Regex QuotedLiteralRegex();
 
     // A profile path carries the operator's account name, and PnP output is full of paths.
@@ -68,7 +76,7 @@ internal sealed partial class TranscriptScrubber
         scrubbed = SecureStringCallRegex().Replace(scrubbed, m => QuotedLiteralRegex().Replace(m.Value, "'[redacted-secret]'"));
         scrubbed = PipedSecureStringRegex().Replace(scrubbed, m => "'[redacted-secret]'" + m.Groups[2].Value);
 
-        return SecretParameterRegex().Replace(scrubbed, m => $"-{m.Groups[1].Value} '[redacted-secret]'");
+        return AuditSecretParameterRegex().Replace(scrubbed, m => $"-{m.Groups[1].Value} '[redacted-secret]'");
     }
 
     /// <summary>Returns <paramref name="text"/> with tenant identity and secrets replaced by stable placeholders.</summary>
