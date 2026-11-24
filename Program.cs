@@ -25,6 +25,8 @@ const string ServerInstructions =
 
 var builder = Host.CreateApplicationBuilder(args);
 
+AuditLog.WarnIfIgnored();
+
 // Configure all logs to go to stderr (stdout is used for the MCP protocol messages).
 builder.Logging.AddConsole(o => o.LogToStandardErrorThreshold = LogLevel.Trace);
 
@@ -34,7 +36,11 @@ builder.Services.AddSingleton<PowerShellSessionManager>();
 
 // Add the MCP services: the transport to use (stdio) and the tools to register.
 builder.Services
-    .AddMcpServer(options => options.ServerInstructions = ServerInstructions)
+    .AddMcpServer(options =>
+    {
+        options.ServerInstructions = ServerInstructions;
+        options.ServerInfo = ServerIdentity.Create();
+    })
     .WithStdioServerTransport()
     .WithTasks(
         new InMemoryMcpTaskStore { DefaultTimeToLive = TaskExecution.TimeToLive },
@@ -43,7 +49,10 @@ builder.Services
     // serialized by reflection under native AOT.
     .WithTools<PnPPowerShellTools>(ToolJson.Options)
     .WithTools<ScriptSampleTools>(ToolJson.Options)
-    .WithResources<PnPResources>();
+    .WithResources<PnPResources>()
+    .WithPrompts<PnPPrompts>(ToolJson.Options)
+    .WithCompleteHandler(CmdletCompletion.HandleAsync)
+    .WithRequestFilters(filters => filters.AddCallToolFilter(ToolFailure.Filter));
 
 // After the SDK fills the collection, which otherwise follows declaration order.
 builder.Services.PostConfigure<McpServerOptions>(options =>
