@@ -916,7 +916,7 @@ internal partial class PnPPowerShellTools
     // best-practices.md is compiled into the assembly, so there is exactly one copy of the guidance.
     // It previously fell back to a hand-maintained inline duplicate, which had already drifted: the
     // duplicate used different headings, so the section lookup silently returned nothing for some keys.
-    private static readonly Lazy<string> BestPracticesDocument = new(() =>
+    internal static readonly Lazy<string> BestPracticesDocument = new(() =>
     {
         using var stream = typeof(PnPPowerShellTools).Assembly.GetManifestResourceStream("best-practices.md")
             ?? throw new InvalidOperationException("best-practices.md is missing from the assembly; it must be an EmbeddedResource.");
