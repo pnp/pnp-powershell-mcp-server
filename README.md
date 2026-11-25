@@ -274,6 +274,16 @@ Two playbooks are published as MCP **prompts**, which clients list as slash comm
 | `connect` | `siteUrl` | Signs the conversation in to a site: checks the current connection, diagnoses what this machine can authenticate with, runs the connect command if it needs no person, and otherwise hands it to you and then connects the server once you have signed in. The URL must be a site URL; anything else is refused. |
 | `diagnose` | `siteUrl` (optional) | Reports whether `pwsh` and the module are ready and how you would sign in, without installing or changing anything. |
 
+### 🧩 Skills
+
+The server also serves one [skill over MCP](https://modelcontextprotocol.io/extensions/skills/overview), for clients that support the Skills extension. Only its name and description are sent up front; the client loads the body when a task calls for it.
+
+| Skill | What it carries |
+| --- | --- |
+| `pnp-connect` | The steps for getting connected, followed by the Prerequisites and Authentication sections of the guidance, unchanged. |
+
+In Claude Code (2.1.331 or later) it is listed by `/skills` and runs as `/<server name>:pnp-connect`. The skill is built from the same embedded guidance as `pnp_get_best_practices`, so there is no second copy. The Skills extension is experimental in the MCP C# SDK, and a client without it is unaffected.
+
 ### Sessions and `sessionId`
 
 Commands run in a persistent `pwsh` session, so a connection made with `Connect-PnPOnline` stays

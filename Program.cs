@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ModelContextProtocol.Extensions.Skills;
 using ModelContextProtocol.Extensions.Tasks;
 using ModelContextProtocol.Server;
 using PnPPowerShell.MCPServer.Models;
@@ -35,6 +36,7 @@ builder.Logging.AddConsole(o => o.LogToStandardErrorThreshold = LogLevel.Trace);
 builder.Services.AddSingleton<PowerShellSessionManager>();
 
 // Add the MCP services: the transport to use (stdio) and the tools to register.
+#pragma warning disable MCPEXP005 // Skills extension is experimental in SDK 2.4.0.
 builder.Services
     .AddMcpServer(options =>
     {
@@ -51,8 +53,10 @@ builder.Services
     .WithTools<ScriptSampleTools>(ToolJson.Options)
     .WithResources<PnPResources>()
     .WithPrompts<PnPPrompts>(ToolJson.Options)
+    .WithSkillPackages(PnPSkills.All)
     .WithCompleteHandler(CmdletCompletion.HandleAsync)
     .WithRequestFilters(filters => filters.AddCallToolFilter(ToolFailure.Filter));
+#pragma warning restore MCPEXP005
 
 // After the SDK fills the collection, which otherwise follows declaration order.
 builder.Services.PostConfigure<McpServerOptions>(options =>
