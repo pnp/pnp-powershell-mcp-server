@@ -74,6 +74,18 @@ public sealed class SkillTests : IDisposable
         Assert.All(named, name => Assert.Contains(name, ToolOrder.Core));
     }
 
+    /// <summary>The status reads the held connection object, so it cannot settle a failed sign-in or an account switch.</summary>
+    [Fact]
+    public void A_held_connection_does_not_end_a_recovery_or_an_account_switch()
+    {
+        var steps = PnPSkills.ConnectMarkdown().Split("\n## ")[0];
+
+        Assert.Contains("not whether those credentials", steps, StringComparison.Ordinal);
+        Assert.Contains("only for an ordinary request to connect", steps, StringComparison.Ordinal);
+        Assert.Contains("another account or one the status does not confirm", steps, StringComparison.Ordinal);
+        Assert.Contains("a sign-in or permission failure", steps, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void The_server_declares_the_skills_extension()
     {

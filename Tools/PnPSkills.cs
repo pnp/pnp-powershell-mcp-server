@@ -22,10 +22,15 @@ internal static class PnPSkills
         """
         # Connect to SharePoint with PnP PowerShell
 
-        1. Call `pnp_get_connection_status`. If the session is already connected to the site the user wants, say so
-           and stop. If it is connected to a different site, say which and ask whether to replace that connection.
-           Stop on a no. On a yes, call `pnp_reset_session` first: the diagnosis reports a held connection as
-           ready and gives no connect command.
+        1. Call `pnp_get_connection_status`. It reports what the session holds, not whether those credentials
+           still work, and it often leaves the account blank.
+           - Stop here, and say what is connected, only for an ordinary request to connect, when the session
+             holds the site the user wants and they have not asked for a particular account.
+           - Otherwise a connection is held that may not be the one wanted: a different site, a request for
+             another account or one the status does not confirm, or a sign-in or permission failure the user
+             is reporting. Say what is held and ask whether to discard it. Stop on a no. On a yes, call
+             `pnp_reset_session` first: the diagnosis reports a held connection as ready and gives no
+             connect command.
         2. Call `pnp_diagnose_connection` with `targetUrl` set to the site. Do not compose a connect command yourself.
         3. If the report gives a connect command that needs no person, run it with `pnp_run_command`, not in a
            shell of your own: only that tool reaches this server's session.
